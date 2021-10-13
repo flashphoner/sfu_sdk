@@ -1,1 +1,1 @@
-# Flashphoner WebCallServer SFU SDK beta 
+Flashphoner SFU SDK

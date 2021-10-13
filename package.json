@@ -1,0 +1,20 @@
+{
+  "name": "sfu_client",
+  "version": "1.0.0",
+  "dependencies": {
+    "bootstrap": "^4.6.0",
+    "datatables.net": "^1.10.24",
+    "datatables.net-dt": "^1.10.24",
+    "jquery": "^3.6.0",
+    "jquery-ui": "^1.12.1",
+    "popper.js": "^1.16.1",
+    "sdp-transform": "^2.14.0",
+    "webrtc-adapter": "^7.2.6"
+  },
+  "devDependencies": {
+    "grunt": "^1.0.1",
+    "grunt-browserify": "^5.0.0",
+    "grunt-contrib-clean": "^1.0.0",
+    "grunt-contrib-copy": "^1.0.0"
+  }
+}
