@@ -2,85 +2,45 @@ module.exports = function(grunt) {
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
         browserify: {
-            ClientObject: {
-                src: ['./src/client/main.js'],
-                dest: './out/client/main.js',
+            PSFUOBject: {
+                src: ['./src/sdk/sfu.js'],
+                dest: './out/sfu.js',
                 options: {
                     browserifyOptions: {
-                        standalone: 'SFUClient'
+                        standalone: 'SFU'
                     }
                 }
             },
-            ControllerObject: {
-                src: ['./src/controller/main.js'],
-                dest: './out/controller/main.js',
+            ZSFUOBject: {
+                src: ['./src/sdk/sfu-extended.js'],
+                dest: './out/sfu-extended.js',
                 options: {
                     browserifyOptions: {
-                        standalone: 'SFUController'
+                        standalone: 'SFUExtended'
                     }
                 }
             }
         },
         copy: {
-            client: {
+            examples: {
                 files: [
                     {
                         expand: true,
-                        cwd: './src/client',
+                        cwd: './src',
                         src: [
-                            'main.css',
-                            'main.html',
-                            'config.json'
+                            'examples/**'
                         ],
-                        dest: 'out/client'
-                    },
-                    {
-                        expand: true,
-                        cwd: './',
-                        src: [
-                            'dependencies/**'
-                        ],
-                        dest: 'out/client/'
-                    },
-                    {
-                        expand: true,
-                        cwd: './src/client',
-                        src: [
-                            'resources/**'
-                        ],
-                        dest: 'out/client/'
+                        dest: 'out'
                     }
                 ]
-            },
-            controller: {
-                files: [
-                    {
-                        expand: true,
-                        cwd: './src/controller',
-                        src: [
-                            'main.css',
-                            'main.html',
-                            'vconfig.js'
-                        ],
-                        dest: 'out/controller'
-                    },
-                    {
-                        expand: true,
-                        cwd: './',
-                        src: [
-                            'dependencies/**'
-                        ],
-                        dest: 'out/controller/'
-                    },
-                    {
-                        expand: true,
-                        cwd: './src/controller',
-                        src: [
-                            'resources/**'
-                        ],
-                        dest: 'out/controller/'
-                    }
-                ]
+            }
+        },
+        jsdoc: {
+            src: ['./src/sdk/sfu.js', './src/sdk/sfu-extended.js', './src/sdk/room.js', './src/sdk/constants.js'],
+            options: {
+                template: './docTemplate',
+                readme: './docTemplate/README.md',
+                destination: 'out/doc/'
             }
         },
         clean: {
@@ -96,9 +56,11 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-browserify');
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
+    grunt.loadNpmTasks('grunt-jsdoc');
     grunt.registerTask('build', [
         'clean:build',
         'copy',
-        'browserify'
+        'browserify',
+        'jsdoc'
     ]);
 };
