@@ -93,7 +93,8 @@ const createControls = function(config) {
             }
             trackCallback({
                 stream: stream,
-                encodings: track.encodings
+                encodings: track.encodings,
+                source: track.source
             });
         });
     }
@@ -124,7 +125,8 @@ const createControls = function(config) {
             });
             trackCallback({
                 stream: stream,
-                encodings: track.encodings
+                encodings: track.encodings,
+                source: track.source
             });
         });
     }
@@ -199,7 +201,8 @@ const createControls = function(config) {
             let data = this.data();
             streams.push({
                 stream: data.stream,
-                encodings: data.encodings
+                encodings: data.encodings,
+                source: data.source
             });
         });
         return streams;
@@ -210,7 +213,8 @@ const createControls = function(config) {
             let data = this.data();
             streams.push({
                 stream: data.stream,
-                encodings: []
+                encodings: [],
+                source: data.source
             });
         });
         return streams;

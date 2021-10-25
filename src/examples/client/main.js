@@ -93,30 +93,38 @@ function connect() {
         let streams = cControls.getVideoStreams();
         //combine local video streams with audio streams
         streams.push.apply(streams, cControls.getAudioStreams());
+        let config = {};
         //add our local streams to the room (to PeerConnection)
         streams.forEach(function (s) {
             //add local stream to local display
             localDisplay.add(s.stream.id, "local", s.stream);
             //add each track to PeerConnection
             s.stream.getTracks().forEach((track) => {
+                if (s.source === "screen") {
+                    config[track.id] = s.source;
+                }
                 addTrackToPeerConnection(pc, s.stream, track, s.encodings);
                 subscribeTrackToEndedEvent(room, track, pc);
             });
         });
         //add callback for the new local stream to the local controls
         cControls.onTrack(function (s) {
+            let config = {};
             //add local stream to local display
             localDisplay.add(s.stream.id, "local", s.stream);
             //add each track to PeerConnection
             s.stream.getTracks().forEach((track) => {
+                if (s.source === "screen") {
+                    config[track.id] = s.source;
+                }
                 addTrackToPeerConnection(pc, s.stream, track, s.encodings);
                 subscribeTrackToEndedEvent(room, track, pc);
             });
             //kickoff renegotiation
-            room.updateState();
+            room.updateState(config);
         });
         //join room
-        room.join();
+        room.join(config);
     });
 }
 
