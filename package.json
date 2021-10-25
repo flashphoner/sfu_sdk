@@ -1,5 +1,6 @@
 {
-  "name": "sfu_client",
+  "name": "@flashphoner/sfusdk",
+  "description": "Official Flashphoner WebCallServer SFU SDK package",
   "version": "1.0.1",
   "dependencies": {
     "bootstrap": "^4.6.0",
@@ -10,7 +11,7 @@
     "popper.js": "^1.16.1",
     "sdp-transform": "^2.14.0",
     "webrtc-adapter": "^7.2.6",
-    "uuid": "^3.3.2"
+    "uuid": "^8.3.0"
   },
   "devDependencies": {
     "grunt": "^1.0.1",
@@ -18,5 +19,12 @@
     "grunt-contrib-clean": "^1.0.0",
     "grunt-contrib-copy": "^1.0.0",
     "grunt-jsdoc": "^2.4.0"
-  }
+  },
+  "keywords": [
+    "Flashphoner",
+    "WebCallServer",
+    "SFU SDK"
+  ],
+  "author": "Flashphoner",
+  "license": "MIT"
 }

@@ -1,5 +1,5 @@
 SFU SDK - 0.5.28 
 
-[Download builds](https://docs.flashphoner.com/display/WEBSDK2EN/Web+SDK+release+notes)
+[Download builds](https://docs.flashphoner.com/display/SS1E/Release+notes)
 
-[Sources](https://github.com/flashphoner/flashphoner_client/tree/wcs_api-2.0)
+[Sources](https://github.com/flashphoner/sfu_sdk/tree/1.0)
