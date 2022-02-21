@@ -50,6 +50,18 @@ module.exports = function(grunt) {
             release: [
                 'release'
             ]
+        },
+        run: {
+            options: {
+                // ...
+            },
+            test: {
+                cmd: 'npm',
+                args: [
+                    'run',
+                    'test'
+                ]
+            }
         }
     });
 
@@ -57,6 +69,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
     grunt.loadNpmTasks('grunt-jsdoc');
+    grunt.loadNpmTasks('grunt-run');
     grunt.registerTask('build', [
         'clean:build',
         'copy',
