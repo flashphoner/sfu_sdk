@@ -1,0 +1,34 @@
+{
+  "room": {
+    "url": "ws://127.0.0.1:8080",
+    "name": "ROOM1",
+    "pin": "1234",
+    "nickName": "User1"
+  },
+  "media": {
+    "audio": {
+      "tracks": [{
+        "source": "mic",
+        "channels": 2
+      }]
+    },
+    "video": {
+      "tracks": [
+        {
+          "source": "camera",
+          "width": 1280,
+          "height": 720,
+          "codec": "H264",
+          "constraints": {
+            "frameRate": 25
+          },
+          "encodings": [
+            { "rid": "720p", "active": true, "maxBitrate": 900000 },
+            { "rid": "360p", "active": true, "maxBitrate": 500000, "scaleResolutionDownBy": 2 },
+            { "rid": "180p", "active": true, "maxBitrate": 200000, "scaleResolutionDownBy": 4 }
+          ]
+        }        
+      ]
+    }
+  }
+}
