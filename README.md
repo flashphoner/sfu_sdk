@@ -87,7 +87,7 @@ cp -r out/* /var/www/html/flashphoner-sfu-test
 
 [SFU functions description](https://docs.flashphoner.com/display/WCS52EN/SFU+functions+with+Simulcast)
 [SFU SDK documentation](https://docs.flashphoner.com/display/SS1E/SFU+SDK+1.0+-+EN)
-[SFU client example description](https://docs.flashphoner.com/display/SS1E/SFU+client)
+[SFU examples description](https://docs.flashphoner.com/display/SS1E/SFU+SDK+Examples)
 [API documentation](http://flashphoner.com/docs/api/WCS5/client/sfu-sdk/latest)
 
 ## Known issues
