@@ -56,15 +56,36 @@ const CurrentState = function(prefix) {
         pc: null,
         session: null,
         room: null,
+        timer: null,
         set: function(pc, session, room) {
             state.pc = pc;
             state.session = session;
             state.room = room;
         },
         clear: function() {
+            state.stopWaiting();
             state.room = null;
             state.session = null;
             state.pc = null;
+        },
+        waitFor: function(div, timeout) {
+            state.stopWaiting();
+            state.timer = setTimeout(function () {
+                if (div.innerHTML !== "") {
+                    // Enable stop button
+                    $("#" + state.buttonId()).prop('disabled', false);
+                }
+                else if (state.isConnected()) {
+                    setStatus(state.errInfoId(), "No media capturing started in " + timeout + " ms, stopping", "red");
+                    onStopClick(state);
+                }
+            }, timeout);        
+        },
+        stopWaiting: function() {
+            if (state.timer) {
+                clearTimeout(state.timer);
+                state.timer = null;                
+            }
         },
         buttonId: function() {
             return state.prefix + "Btn";
@@ -86,6 +107,12 @@ const CurrentState = function(prefix) {
         },
         is: function(value) {
             return (prefix === value);
+        },
+        isActive: function() {
+            return (state.room && state.pc);
+        },
+        isConnected: function() {
+            return (state.session && state.session.state() == constants.SFU_STATE.CONNECTED);
         }
     };
     return state;
@@ -165,14 +192,12 @@ const onConnected = function(state) {
     // Add errors displaying
     state.room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
         setStatus(state.errInfoId(), e, "red");
+        stopStreaming(state);
     }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
         setStatus(state.errInfoId(), e.operation + " failed: " + e.error, "red");
+        stopStreaming(state);
     });
-    if (state.is(PUBLISH)) {
-        publishStreams(state);
-    } else if (state.is(PLAY)) {
-        playStreams(state);
-    }
+    startStreaming(state);
 }
 
 const onDisconnected = function(state) {
@@ -204,65 +229,67 @@ const onStartClick = function(state) {
 
 const onStopClick = function(state) {
     $("#" + state.buttonId()).prop('disabled', true);
+    stopStreaming(state);
+    if (state.isConnected()) {
+        state.session.disconnect();
+    }
+}
+
+const startStreaming = function(state) {
+    if (state.is(PUBLISH)) {
+        publishStreams(state);
+    } else if (state.is(PLAY)) {
+        playStreams(state);
+    }
+}
+
+const stopStreaming = function(state) {
+    state.stopWaiting();
     if (state.is(PUBLISH)) {
         unPublishStreams(state);
     } else if (state.is(PLAY)) {
         stopStreams(state);
-    }    
-    state.session.disconnect();
-}
-
-const publishStreams = async function(state) {
-    let timerId;
-    //create local display item to show local streams
-    localDisplay = initLocalDisplay(document.getElementById("localVideo"));
-    try {
-        //get configured local video streams
-        let streams = await getVideoStreams(mainConfig);
-        let audioStreams = await getAudioStreams(mainConfig);
-        //combine local video streams with audio streams
-        streams.push.apply(streams, audioStreams);
-        let config = {};
-        //add our local streams to the room (to PeerConnection)
-        streams.forEach(function (s) {
-            //add local stream to local display
-            localDisplay.add(s.stream.id, $("#" + state.inputId()).val(), s.stream);
-            //add each track to PeerConnection
-            s.stream.getTracks().forEach((track) => {
-                if (s.source === "screen") {
-                    config[track.id] = s.source;
-                }
-                addTrackToPeerConnection(state.pc, s.stream, track, s.encodings);
-                subscribeTrackToEndedEvent(state.room, track, state.pc);
-            });
-        });
-        state.room.join(config);
-        // TODO: Use room state or promises to detect if publishing started to enable stop button
-        timerId = waitFor(document.getElementById("localVideo"), 3000, state);
-    } catch(e) {
-        console.error("Failed to capture streams: " + e);
-        setStatus(state.errInfoId(), e.name, "red");
-        if (timerId) {
-            clearTimeout(timerId);
-            timerId = null;
-        }    
-        onStopClick(state);
     }
 }
 
-// A workaround to check if publishing or playback is started
-const waitFor = function (div, timeout, state) {
-    let timerId = setTimeout(function () {
-        if (div.innerHTML !== "") {
-            // Enable stop button
-            $("#" + state.buttonId()).prop('disabled', false);
+const publishStreams = async function(state) {
+    if (state.isConnected()) {
+        //create local display item to show local streams
+        localDisplay = initLocalDisplay(document.getElementById("localVideo"));
+        try {
+            //get configured local video streams
+            let streams = await getVideoStreams(mainConfig);
+            let audioStreams = await getAudioStreams(mainConfig);
+            if (state.isConnected() && state.isActive()) {
+                //combine local video streams with audio streams
+                streams.push.apply(streams, audioStreams);
+                let config = {};
+                //add our local streams to the room (to PeerConnection)
+                streams.forEach(function (s) {
+                    //add local stream to local display
+                    localDisplay.add(s.stream.id, $("#" + state.inputId()).val(), s.stream);
+                    //add each track to PeerConnection
+                    s.stream.getTracks().forEach((track) => {
+                        if (s.source === "screen") {
+                            config[track.id] = s.source;
+                        }
+                        addTrackToPeerConnection(state.pc, s.stream, track, s.encodings);
+                        subscribeTrackToEndedEvent(state.room, track, state.pc);
+                    });
+                });
+                state.room.join(config);
+                // TODO: Use room state or promises to detect if publishing started to enable stop button
+                state.waitFor(document.getElementById("localVideo"), 3000);
+            }
+        } catch(e) {
+            console.error("Failed to capture streams: " + e);
+            setStatus(state.errInfoId(), e.name, "red");
+            state.stopWaiting();
+            if (state.isConnected()) { 
+                onStopClick(state);
+            }
         }
-        else {
-            setStatus(state.errInfoId(), "Something went wrong, stopping", "red");
-            onStopClick(state);
-        }
-    }, timeout);
-    return timerId;
+    }
 }
 
 const unPublishStreams = function(state) {
@@ -272,9 +299,11 @@ const unPublishStreams = function(state) {
 }
 
 const playStreams = function(state) {
-    //create remote display item to show remote streams
-    remoteDisplay = initRemoteDisplay(document.getElementById("remoteVideo"), state.room, state.pc);
-    state.room.join();
+    if (state.isConnected() && state.isActive()) {
+        //create remote display item to show remote streams
+        remoteDisplay = initRemoteDisplay(document.getElementById("remoteVideo"), state.room, state.pc);
+        state.room.join();
+    }
     $("#" + state.buttonId()).prop('disabled', false);
 }
 

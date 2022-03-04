@@ -100,6 +100,9 @@ const connect = function(state) {
     roomConfig.url = $("#url").val();
     roomConfig.roomName = $("#roomName").val();
     roomConfig.nickname = $("#" + state.inputId()).val();
+    // clean state display items
+    setStatus(state.statusId(), "");
+    setStatus(state.errInfoId(), "");
     // connect to server and create a room if not
     const session = sfu.createRoom(roomConfig);
     session.on(constants.SFU_EVENT.CONNECTED, function(room) {
