@@ -1,6 +1,4 @@
-.idea
-doc
 node_modules
-release
-out
-.DS_Store
+dist
+.idea
+examples/sfu.js

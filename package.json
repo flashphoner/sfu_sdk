@@ -1,31 +1,20 @@
 {
   "name": "@flashphoner/sfusdk",
+  "version": "2.0.6",
   "description": "Official Flashphoner WebCallServer SFU SDK package",
-  "version": "1.0.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
   "scripts": {
-    "test": "jest --runInBand"
-  },
-  "dependencies": {
-    "bootstrap": "^4.6.0",
-    "datatables.net": "^1.10.24",
-    "datatables.net-dt": "^1.10.24",
-    "jquery": "^3.6.0",
-    "jquery-ui": "^1.12.1",
-    "popper.js": "^1.16.1",
-    "sdp-transform": "^2.14.0",
-    "uuid": "^8.3.0",
-    "webrtc-adapter": "^7.2.6"
-  },
-  "devDependencies": {
-    "@mapbox/node-pre-gyp": "^1.0.8",
-    "grunt": "^1.0.1",
-    "grunt-browserify": "^5.0.0",
-    "grunt-contrib-clean": "^1.0.0",
-    "grunt-contrib-copy": "^1.0.0",
-    "grunt-jsdoc": "^2.4.0",
-    "grunt-run": "^0.8.1",
-    "jest": "^27.4.7",
-    "wrtc": "^0.4.7"
+    "clean": "rm -rf dist/*",
+    "test": "jest --runInBand --forceExit",
+    "build": "tsc",
+    "build-examples": "webpack --mode=production",
+    "publish-lib": "npm run build && npm publish",
+    "publish-beta": "npm run build && npm publish --tag beta",
+    "publish-dryrun": "npm run build && npm publish --dry-run"
   },
   "keywords": [
     "Flashphoner",
@@ -34,8 +23,19 @@
   ],
   "author": "Flashphoner",
   "license": "MIT",
-  "jest" : {
-    "testEnvironment": "jsdom",
-    "testRunner": "jest-jasmine2"
+  "devDependencies": {
+    "@mapbox/node-pre-gyp": "^1.0.8",
+    "@types/jest": "^27.4.1",
+    "jest": "^27.4.7",
+    "ts-jest": "^27.1.4",
+    "ts-loader": "^9.2.8",
+    "typescript": "^4.6.3",
+    "webpack": "^5.72.0",
+    "webpack-cli": "^4.9.2",
+    "wrtc": "^0.4.7"
+  },
+  "dependencies": {
+    "uuid": "^8.3.0",
+    "webrtc-adapter": "^7.2.6"
   }
 }
