@@ -19,6 +19,8 @@ export const TEST_USER_2 = {
     nickname: "kiri"
 }
 
+export const TEST_EMAIL_INVITE = "john@flashphoner.com";
+
 export const TEST_GROUP_USER0 = {
     nickname: "bob",
     logGroup: "test"
