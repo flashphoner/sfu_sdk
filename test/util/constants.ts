@@ -55,7 +55,9 @@ export const CALENDAR_EVENT = {
     participantVideo: false
 }
 
-export const FILE_PATH = "../resources/1.jpeg"
+export const FILE_NAME = "1.jpeg";
+export const DOWNLOAD_PATH = "../resources/downloads/"
+export const FILE_PATH = "../resources/" + FILE_NAME;
 
 export const TEST_PUBLIC_CHANNEL = {
     channel: true,
@@ -75,7 +77,13 @@ export const TEST_MESSAGE_ROOM = "Room test message";
 
 export const TEST_MESSAGE_ATTACHMENT = {
     type: MessageAttachmentType.picture,
-    name: FILE_PATH,
-    payload: Buffer.from(fs.readFileSync(path.resolve(__dirname, FILE_PATH))).toString('base64'),
-    size: fs.readFileSync(path.resolve(__dirname, FILE_PATH)).length
+    name: FILE_NAME,
+    size: fs.readFileSync(path.resolve(__dirname, FILE_PATH)).length,
+    id: 0
+}
+
+export const TEST_MESSAGE_ATTACHMENT_DATA = {
+    payload: Buffer.from(new Uint8Array(fs.readFileSync(path.resolve(__dirname, FILE_PATH)))).buffer,
+    size: fs.readFileSync(path.resolve(__dirname, FILE_PATH)).length,
+    id: 0
 }
