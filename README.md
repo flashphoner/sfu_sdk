@@ -1,8 +1,8 @@
 # @flashphoner/sfusdk
 
-# Flashphoner WebCallServer SFU JavaScript API (SFU SDK)
+# Flashphoner WebCallServer SFU API (SFU SDK)
 
-Flashphoner [WebCallServer](https://flashphoner.com) [SFU](https://docs.flashphoner.com/display/WCS52EN/SFU+functions+with+Simulcast) JavaScript API (SFU SDK) implementation.
+Flashphoner [WebCallServer](https://flashphoner.com) [SFU](https://docs.flashphoner.com/display/WCS52EN/SFU+functions+with+Simulcast) API (SFU SDK) implementation.
 
 ## Install
 ```
@@ -12,8 +12,7 @@ npm install @flashphoner/sfusdk
 ## Usage example
 ```
 import React, {useState} from "react";
-import * as SFU from '@flashphoner/sfusdk/src/sdk/sfu.js'
-import * as Constants from '@flashphoner/sfusdk/src/sdk/constants.js'
+import {Sfu, SfuEvent} from "@flashphoner/sfusdk";
 
 export default function TestApp() {
     const [url, setUrl] = useState("ws://localhost:8080");
@@ -21,23 +20,44 @@ export default function TestApp() {
     const [buttonText, setButtonText] = useState("Connect");
     const [session, setSession] = useState(null);
 
+    function createRoom(options: {
+        url: string,
+        roomName: string,
+        pin: string,
+        nickname: string,
+        pc: RTCPeerConnection
+    }) {
+        const sfu = new Sfu();
+        sfu.connect({
+            url: options.url,
+            nickname: options.nickname,
+            logGroup: options.roomName
+        });
+        const room = sfu.createRoom({
+            name: options.roomName,
+            pin: options.pin,
+            pc: options.pc
+        });
+        return sfu;
+    }
+
     function onClick() {
         if (session == null) {
             console.log("Trying to connect");
             const pc = new RTCPeerConnection();
-            const s = SFU.createRoom({
+            const s = createRoom({
                 url: url,
                 roomName: "ROOM",
                 pin: "1234",
                 nickname: "Test",
                 pc: pc
-            }).on(Constants.SFU_EVENT.CONNECTED, (room) => {
+            }).on(SfuEvent.CONNECTED, (room) => {
                 console.log("Connected!");
                 setEstablished("Connected!");
                 setButtonText("Disconnect");
                 setSession(s);
                 room.join();
-            }).on(Constants.SFU_EVENT.DISCONNECTED, () => {
+            }).on(SfuEvent.DISCONNECTED, () => {
                 console.log("Disconnected!");
                 setEstablished("Not connected!");
                 setButtonText("Connect");
@@ -65,29 +85,14 @@ export default function TestApp() {
 }
 ```
 
-## Building browserified JS bundle
-
-### Install grunt (if this is not installed)
-```
-npm install grunt
-```
-
-### Build
-```
-grunt build
-```
-
-### Deploy to web server
-```
-mkdir -p /var/www/html/flashphoner-sfu-test
-cp -r out/* /var/www/html/flashphoner-sfu-test
-```
-
 ## Documentation
 
 [SFU functions description](https://docs.flashphoner.com/display/WCS52EN/SFU+functions+with+Simulcast)
+
 [SFU SDK documentation](https://docs.flashphoner.com/display/SS1E/SFU+SDK+1.0+-+EN)
+
 [SFU examples description](https://docs.flashphoner.com/display/SS1E/SFU+SDK+Examples)
+
 [API documentation](http://flashphoner.com/docs/api/WCS5/client/sfu-sdk/latest)
 
 ## Known issues
