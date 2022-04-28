@@ -77,6 +77,13 @@ export const TEST_PRIVATE_CHANNEL = {
     channelSendPolicy: ChannelSendPolicy.EVERYONE
 }
 
+export const TEST_PRIVATE_CHANNEL_WITH_LIST = {
+    channel: true,
+    name: "test_private_channel_with_list",
+    channelType: ChannelType.PRIVATE,
+    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST
+}
+
 export const TEST_MESSAGE_ROOM = "Room test message";
 
 export const TEST_MESSAGE_ATTACHMENT = {
