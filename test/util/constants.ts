@@ -44,6 +44,7 @@ export const TEST_ROOM = {
 export const PINLESS_TEST_ROOM = {
     name: "pinless_test"
 }
+export const MEETING_NICKNAME = "Custom Nickname";
 
 export const CALENDAR_EVENT = {
     id: uuidv4(),
