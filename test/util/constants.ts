@@ -42,7 +42,8 @@ export const TEST_ROOM = {
 }
 
 export const PINLESS_TEST_ROOM = {
-    name: "pinless_test"
+    name: "pinless_test",
+    id: "pinless_test"
 }
 export const MEETING_NICKNAME = "Custom Nickname";
 

@@ -96,7 +96,6 @@ const connect = function(state) {
     pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = getRoomConfig(mainConfig);
-    roomConfig.pc = pc;
     roomConfig.url = $("#url").val();
     roomConfig.roomName = $("#roomName").val();
     roomConfig.nickname = $("#" + state.inputId()).val();
@@ -168,7 +167,7 @@ const onStopClick = function(state) {
 const playStreams = function(state) {
     //create remote display item to show remote streams
     remoteDisplay = initRemoteDisplay(document.getElementById("remoteVideo"), state.room, state.pc);
-    state.room.join();
+    state.room.join(state.pc);
 }
 
 const stopStreams = function(state) {

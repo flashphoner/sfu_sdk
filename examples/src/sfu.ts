@@ -4,8 +4,7 @@ export function createRoom(options: {
     url: string,
     roomName: string,
     pin: string,
-    nickname: string,
-    pc: RTCPeerConnection
+    nickname: string
 }) {
     const sfu = new Sfu();
     sfu.connect({
@@ -13,10 +12,9 @@ export function createRoom(options: {
         nickname: options.nickname,
         logGroup: options.roomName
     });
-    const room = sfu.createRoom({
+    sfu.createRoom({
         name: options.roomName,
-        pin: options.pin,
-        pc: options.pc
+        pin: options.pin
     });
     return sfu;
 }

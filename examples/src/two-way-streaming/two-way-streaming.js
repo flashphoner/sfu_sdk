@@ -157,7 +157,6 @@ const connect = function(state) {
     pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = getRoomConfig(mainConfig);
-    roomConfig.pc = pc;
     roomConfig.url = $("#url").val();
     roomConfig.roomName = $("#roomName").val();
     roomConfig.nickname = $("#" + state.inputId()).val();
@@ -277,7 +276,7 @@ const publishStreams = async function(state) {
                         subscribeTrackToEndedEvent(state.room, track, state.pc);
                     });
                 });
-                state.room.join(config);
+                state.room.join(state.pc, null, config);
                 // TODO: Use room state or promises to detect if publishing started to enable stop button
                 state.waitFor(document.getElementById("localVideo"), 3000);
             }
@@ -302,7 +301,7 @@ const playStreams = function(state) {
     if (state.isConnected() && state.isActive()) {
         //create remote display item to show remote streams
         remoteDisplay = initRemoteDisplay(document.getElementById("remoteVideo"), state.room, state.pc);
-        state.room.join();
+        state.room.join(state.pc);
     }
     $("#" + state.buttonId()).prop('disabled', false);
 }

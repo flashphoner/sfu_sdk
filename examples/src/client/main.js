@@ -2,6 +2,7 @@ const constants = SFU.constants;
 const sfu = SFU;
 let localDisplay;
 let cControls;
+let pc;
 
 const defaultConfig = {
     room: {
@@ -62,10 +63,9 @@ function connect() {
     //disable controls
     cControls.muteInput();
     //create peer connection
-    const pc = new RTCPeerConnection();
+    pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = cControls.roomConfig();
-    roomConfig.pc = pc;
     //kick off connect to server and local room creation
     const session = sfu.createRoom(roomConfig);
     session.on(constants.SFU_EVENT.CONNECTED, function() {
@@ -125,7 +125,7 @@ function connect() {
             room.updateState(config);
         });
         //join room
-        room.join(config);
+        room.join(pc, null, config);
     });
 }
 
