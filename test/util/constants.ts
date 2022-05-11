@@ -48,13 +48,12 @@ export const PINLESS_TEST_ROOM = {
 export const MEETING_NICKNAME = "Custom Nickname";
 
 export const CALENDAR_EVENT = {
-    id: uuidv4(),
     title: "test",
     description: "test",
     start: Date.now(),
     end: Date.now() + 10000,
     recurring: false,
-    accessCode: "",
+    accessCode: "123456",
     waitingRoom: true,
     usePMI: true,
     ownerVideo: false,
