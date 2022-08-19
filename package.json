@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "clean": "rm -rf dist/*",
-    "test": "jest --runInBand --forceExit",
+    "test": "jest --runInBand --forceExit --reporters=\"default\" --reporters=\"jest-teamcity\"",
     "build": "tsc",
     "publish-lib": "npm run build && npm publish",
     "publish-beta": "npm run build && npm publish --tag beta",
@@ -26,6 +26,7 @@
     "@mapbox/node-pre-gyp": "^1.0.8",
     "@types/jest": "^27.4.1",
     "jest": "^27.4.7",
+    "jest-teamcity": "^1.11.0",
     "ts-jest": "^27.1.4",
     "ts-loader": "^9.2.8",
     "typescript": "^4.6.3",
