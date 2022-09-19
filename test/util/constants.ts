@@ -50,8 +50,8 @@ export const MEETING_NICKNAME = "Custom Nickname";
 export const CALENDAR_EVENT = {
     title: "test",
     description: "test",
-    start: Date.now(),
-    end: Date.now() + 10000,
+    start: Date.now() + 10000,
+    end: Date.now() + 20000,
     recurring: false,
     accessCode: "123456",
     waitingRoom: true,
