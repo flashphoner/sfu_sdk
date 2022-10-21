@@ -119,3 +119,14 @@ export const TEST_PDF_ATTACHMENT_DATA = {
 export const ATTACHMENTS = [TEST_PICTURE_ATTACHMENT, TEST_PDF_ATTACHMENT];
 
 export const ATTACHMENTS_PAYLOAD = [TEST_PICTURE_ATTACHMENT_DATA, TEST_PDF_ATTACHMENT_DATA]
+
+export const UPDATED_PMI_SETTINGS = {
+    allowJoinAtAnyTime: true,
+    useMuteAudioOnJoin: true,
+    useLocalAutoRecord: true,
+    useAccessCode: true,
+    useWaitingRoom: true,
+    useOwnerVideo: true,
+    useParticipantsVideo: true,
+    accessCode: 'NEW_ACCESS_CODE'
+}
