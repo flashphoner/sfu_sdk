@@ -6,7 +6,10 @@ const createChat = function(room, messages, input, sendButton) {
     const chatEventColour = "navy";
 
     room.on(constants.SFU_ROOM_EVENT.MESSAGE, function(e) {
-        appendMessage(e, chatOtherColour, chatTextColour);
+        appendMessage({
+            nickName: getNickName(e.message),
+            message: getMessage(e.message)
+        }, chatOtherColour, chatTextColour);
     }).on(constants.SFU_ROOM_EVENT.JOINED, function(e) {
         appendMessage({
             nickName: e.name,
@@ -63,5 +66,23 @@ const createChat = function(room, messages, input, sendButton) {
     const getChatTimestamp = function() {
         let currentdate = new Date();
         return currentdate.getHours() + ":" + currentdate.getMinutes() + ":" + currentdate.getSeconds();
+    }
+
+    const getNickName = function(msgData) {
+        let nickName = "unknown";
+        if (msgData.nickName) {
+            nickName = msgData.nickName;
+        } else if (msgData.message.nickName) {
+            nickName = msgData.message.nickName;
+        }
+        return nickName;
+    }
+
+    const getMessage = function(msgData) {
+        let message = "";
+        if (msgData.message) {
+            message = JSON.parse(msgData.message).payload;
+        }
+        return message;
     }
 }
