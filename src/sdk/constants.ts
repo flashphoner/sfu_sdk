@@ -654,6 +654,7 @@ export type ContactRemovedEvent = InternalMessage & {
 
 export type CalendarEvent = {
     id: string;
+    meetingId: string;
     accessCode?: string;
     description: string;
     title: string;
