@@ -1127,14 +1127,15 @@ export class SfuExtended {
         return this.#rooms[options.id];
     }
 
-    public disconnect() {
+    public async disconnect() {
         for (const [key, value] of Object.entries(this.#rooms)) {
             value.leaveRoom();
         }
         this.#_user = undefined;
-        this.#connection.close();
-        this.#createConnection();
-        this.#_state = State.DISCONNECTED;
+        if (this.#_state !== State.DISCONNECTED) {
+            await this.#connection.close();
+            this.#_state = State.DISCONNECTED;
+        }
         this.#rooms = {};
     };
 

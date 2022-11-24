@@ -8,7 +8,7 @@ import {
     Message,
     MessageState,
     MessageStatus, MessageStatusBulkEvent, RoomError,
-    SfuEvent,
+    SfuEvent, State,
     User,
     UserSpecificChatInfo
 } from "../../src/sdk/constants";
@@ -73,6 +73,24 @@ describe("sfu-extended", () => {
             url: url,
             ...TEST_USER_0
         });
+    });
+    it("should reconnect after disconnect", async () => {
+        const sfu = new SfuExtended();
+        await sfu.connect({
+            url: url,
+            ...TEST_USER_0
+        });
+        await sfu.disconnect();
+        expect(sfu.state()).toEqual(State.DISCONNECTED);
+        const user = await sfu.connect({
+            url: url,
+            ...TEST_USER_0
+        });
+        expect(user).toBeTruthy();
+        expect(user.username).toEqual(TEST_USER_0.username);
+        expect(user.nickname).toEqual(TEST_USER_0.nickname);
+        expect(user.pmi).toBeTruthy();
+        await sfu.disconnect();
     });
 
     describe("user", () => {

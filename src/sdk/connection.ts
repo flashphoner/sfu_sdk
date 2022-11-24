@@ -124,9 +124,18 @@ export class Connection {
 
     }
 
-    public close() {
+    public async close() {
         if (this.ws) {
-            this.ws.close();
+            const self = this;
+            return new Promise<void>(function (resolve) {
+                self.ws.onclose = function (e) {
+                    if (self.connected) {
+                        self.onClose(e);
+                    }
+                    resolve();
+                }
+                self.ws.close();
+            });
         }
     }
 }
