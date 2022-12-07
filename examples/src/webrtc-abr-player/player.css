@@ -1,0 +1,27 @@
+.fp-remoteVideo {
+    width: 802px;
+    text-align: center;
+    display: inline-block;
+}
+
+.fp-placeholder {
+    border: 1px double black;
+    width: 802px;
+    height: 402px;
+    text-align: center;
+    background: #c0c0c0;
+    display: inline-block;
+}
+
+video, object {
+    width: 100%;
+    height: 100%;
+}
+
+video:-webkit-full-screen {
+    border-radius: 1px;
+}
+
+video::-webkit-media-controls-play-button, video::-webkit-media-controls-pause-button {
+    display: none !important;
+}

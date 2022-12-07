@@ -57,11 +57,11 @@ const initLocalDisplay = function(localDisplayElement){
         coreDisplay.setAttribute("class","text-center");
         coreDisplay.setAttribute("style","width: auto; height: auto;");
         coreDisplay.id = stream.id;
-        const streamNameDisplay = document.createElement("div");
-        streamNameDisplay.innerHTML = "Name: " + name;
-        streamNameDisplay.setAttribute("class","text-center");
-        streamNameDisplay.setAttribute("style","width: auto; height: auto;");
-        coreDisplay.appendChild(streamNameDisplay);
+        const publisherNameDisplay = document.createElement("div");
+        publisherNameDisplay.innerHTML = "Name: " + name;
+        publisherNameDisplay.setAttribute("class","text-center");
+        publisherNameDisplay.setAttribute("style","width: auto; height: auto;");
+        coreDisplay.appendChild(publisherNameDisplay);
 
         const audioStateDisplay = document.createElement("button");
         audioStateDisplay.innerHTML = audioStateText(stream);
@@ -102,7 +102,7 @@ const initLocalDisplay = function(localDisplayElement){
             });
         });
         video.addEventListener('resize', function (event) {
-            streamNameDisplay.innerHTML = "Name: " + name + "<br/>Max.resolution: " + video.videoWidth + "x" + video.videoHeight;
+            publisherNameDisplay.innerHTML = "Name: " + name + "<br/>Max.resolution: " + video.videoWidth + "x" + video.videoHeight;
             resizeVideo(event.target);
         });
         localDisplays[id] = coreDisplay;
@@ -133,9 +133,25 @@ const initLocalDisplay = function(localDisplayElement){
     }
 }
 
-const initRemoteDisplay = function(mainDiv, room, peerConnection) {
+const initRemoteDisplay = function(options) {
     const constants = SFU.constants;
     const remoteParticipants = {};
+    // Validate options first
+    if (!options.div) {
+        throw new Error("Main div to place all the media tag is not defined");
+    }
+    if (!options.room) {
+        throw new Error("Room is not defined");
+    }
+    if (!options.peerConnection) {
+        throw new Error("PeerConnection is not defined");
+    }
+
+    let mainDiv = options.div;
+    let room = options.room;
+    let peerConnection = options.peerConnection;
+    let displayOptions = options.displayOptions || {publisher: true, quality: true};
+
     room.on(constants.SFU_ROOM_EVENT.ADD_TRACKS, function(e) {
         console.log("Received ADD_TRACKS");
         let participant = remoteParticipants[e.info.nickName];
@@ -171,7 +187,7 @@ const initRemoteDisplay = function(mainDiv, room, peerConnection) {
             if (!createDisplay) {
                 continue;
             }
-            let display = createRemoteDisplay(participant.nickName, participant.nickName, mainDiv);
+            let display = createRemoteDisplay(participant.nickName, participant.nickName, mainDiv, displayOptions);
             participant.displays.push(display);
             if (pTrack.type === "VIDEO") {
                 display.videoMid = pTrack.mid;
@@ -241,20 +257,31 @@ const initRemoteDisplay = function(mainDiv, room, peerConnection) {
         }
     });
 
-    const createRemoteDisplay = function(id, name, mainDiv) {
+    const createRemoteDisplay = function(id, name, mainDiv, displayOptions) {
         const cell = document.createElement("div");
         cell.setAttribute("class", "text-center");
         cell.id = id;
         mainDiv.appendChild(cell);
-        const streamNameDisplay = document.createElement("div");
-        streamNameDisplay.innerHTML = "Published by: " + name;
-        streamNameDisplay.setAttribute("style","width:auto; height:auto;");
-        streamNameDisplay.setAttribute("class","text-center");
-        cell.appendChild(streamNameDisplay);
-        const qualityDisplay = document.createElement("div");
-        qualityDisplay.setAttribute("style","width:auto; height:auto;");
-        qualityDisplay.setAttribute("class","text-center");
-        cell.appendChild(qualityDisplay);
+        let publisherNameDisplay;
+        let currentQualityDisplay;
+        if (displayOptions.publisher) {
+            publisherNameDisplay = document.createElement("div");
+            publisherNameDisplay.innerHTML = "Published by: " + name;
+            publisherNameDisplay.setAttribute("style","width:auto; height:30px;");
+            publisherNameDisplay.setAttribute("class","text-center");
+            cell.appendChild(publisherNameDisplay);
+        }
+        if (displayOptions.quality) {
+            currentQualityDisplay = document.createElement("div");
+            currentQualityDisplay.innerHTML = "";
+            currentQualityDisplay.setAttribute("style","width:auto; height:30px;");
+            currentQualityDisplay.setAttribute("class","text-center");
+            cell.appendChild(currentQualityDisplay);
+        }
+        const qualitySwitchDisplay = document.createElement("div");
+        qualitySwitchDisplay.setAttribute("style","width:auto; height:30px;");
+        qualitySwitchDisplay.setAttribute("class","text-center");
+        cell.appendChild(qualitySwitchDisplay);
 
         let qualityDivs = [];
 
@@ -293,11 +320,22 @@ const initRemoteDisplay = function(mainDiv, room, peerConnection) {
                 audio.controls = "controls";
                 audio.muted = true;
                 audio.autoplay = true;
+                if (Browser().isSafariWebRTC()) {
+                    audio.setAttribute("playsinline", "");
+                    audio.setAttribute("webkit-playsinline", "");
+                    this.setWebkitEventHandlers(audio);
+                } else {
+                    this.setEventHandlers(audio);
+                }
                 cell.appendChild(audio);
                 audio.srcObject = stream;
                 audio.onloadedmetadata = function (e) {
                     audio.play().then(function() {
-                        audio.muted = false;
+                        if (Browser().isSafariWebRTC() && Browser().isiOS()) {
+                            console.warn("Audio track should be manually unmuted in iOS Safari");
+                        } else {
+                            audio.muted = false;
+                        }
                     });
                 };
             },
@@ -319,22 +357,19 @@ const initRemoteDisplay = function(mainDiv, room, peerConnection) {
                     return;
                 }
                 video = document.createElement("video");
+                video.controls = "controls";
                 video.muted = true;
-                if(Browser().isSafariWebRTC()) {
+                video.autoplay = true;
+                if (Browser().isSafariWebRTC()) {
                     video.setAttribute("playsinline", "");
                     video.setAttribute("webkit-playsinline", "");
+                    this.setWebkitEventHandlers(video);
+                } else {
+                    this.setEventHandlers(video);
                 }
                 streamDisplay.appendChild(video);
                 video.srcObject = stream;
-                video.onloadedmetadata = function (e) {
-                    video.play().then(function() {
-                        video.muted = false;
-                    });
-                };
-                video.addEventListener("resize", function (event) {
-                    streamNameDisplay.innerHTML = "Published by: " + name + "<br/>Current resolution: " + video.videoWidth + "x" + video.videoHeight;
-                    resizeVideo(event.target);
-                });
+                this.setResizeHandler(video);
             },
             setTrackInfo: function(trackInfo) {
                 if (trackInfo && trackInfo.quality) {
@@ -357,7 +392,7 @@ const initRemoteDisplay = function(mainDiv, room, peerConnection) {
                             qualityDiv.style.color = "blue";
                             room.changeQuality(trackInfo.id, trackInfo.quality[i]);
                         });
-                        qualityDisplay.appendChild(qualityDiv);
+                        qualitySwitchDisplay.appendChild(qualityDiv);
                     }
                 }
             },
@@ -377,6 +412,47 @@ const initRemoteDisplay = function(mainDiv, room, peerConnection) {
             },
             hasVideo: function() {
                 return video !== null || this.videoMid !== undefined;
+            },
+            setResizeHandler: function(video) {
+                video.addEventListener("resize", function (event) {
+                    if (displayOptions.publisher) {
+                        publisherNameDisplay.innerHTML = "Published by: " + name;
+                    }
+                    if (displayOptions.quality) {
+                        currentQualityDisplay.innerHTML = video.videoWidth + "x" + video.videoHeight;
+                    }
+                    resizeVideo(event.target);
+                });
+            },
+            setEventHandlers: function(video) {
+                // Ignore play/pause button
+                video.addEventListener("pause", function () {
+                    console.log("Media paused by click, continue...");
+                    video.play();
+                });
+            },
+            setWebkitEventHandlers: function(video) {
+                let needRestart = false;
+                let isFullscreen = false;
+                // Use webkitbeginfullscreen event to detect full screen mode in iOS Safari
+                video.addEventListener("webkitbeginfullscreen", function () {
+                    isFullscreen = true;
+                });                
+                video.addEventListener("pause", function () {
+                    if (needRestart) {
+                        console.log("Media paused after fullscreen, continue...");
+                        video.play();
+                        needRestart = false;
+                    } else {
+                        console.log("Media paused by click, continue...");
+                        video.play();
+                    }
+                });
+                video.addEventListener("webkitendfullscreen", function () {
+                    video.play();
+                    needRestart = true;
+                    isFullscreen = false;
+                });
             },
             audioMid: undefined,
             videoMid: undefined

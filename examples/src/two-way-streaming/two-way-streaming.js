@@ -300,7 +300,11 @@ const unPublishStreams = function(state) {
 const playStreams = function(state) {
     if (state.isConnected() && state.isActive()) {
         //create remote display item to show remote streams
-        remoteDisplay = initRemoteDisplay(document.getElementById("remoteVideo"), state.room, state.pc);
+        remoteDisplay = initRemoteDisplay({
+            div: document.getElementById("remoteVideo"),
+            room: state.room,
+            peerConnection: state.pc
+        });
         state.room.join(state.pc);
     }
     $("#" + state.buttonId()).prop('disabled', false);
