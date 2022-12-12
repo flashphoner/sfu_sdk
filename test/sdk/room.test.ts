@@ -1,8 +1,9 @@
 import {Sfu, RoomEvent} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
-import {RoomMessage} from "../../src/sdk/constants";
+import {AddRemoveTracks, RoomMessage} from "../../src/sdk/constants";
 
 const wrtc = require("wrtc");
+const {RTCVideoSource} = require('wrtc').nonstandard
 const RTCAudioSourceSineWave = require("../lib/rtcaudiosourcesinewave");
 
 async function connect(userConfig: {
@@ -71,6 +72,62 @@ describe("room", () => {
         room.pc().removeTrack(aSender);
         await room.updateState();
         sfu.disconnect();
+    });
+    it("should set contentType", async () => {
+        const sfu0 = await connect(TEST_GROUP_USER0);
+        const sfu1 = await connect(TEST_GROUP_USER1);
+        const room0 = sfu0.createRoom({
+            ...TEST_ROOM
+        });
+        const room1 = sfu1.createRoom({
+            ...TEST_ROOM
+        });
+
+        const rtcConnection = new wrtc.RTCPeerConnection();
+        const aSource = new RTCAudioSourceSineWave();
+        const aTrack1 = aSource.createTrack();
+        const aTrack2 = aSource.createTrack();
+
+        const vSource = new RTCVideoSource();
+        const vTrack1 = vSource.createTrack();
+        const vTrack2 = vSource.createTrack();
+
+        rtcConnection.addTrack(aTrack1);
+        rtcConnection.addTrack(aTrack2);
+        rtcConnection.addTrack(vTrack1);
+        const contentTypes = ["mic-1", "mic-2", "cam-1","cam-2"]
+
+        const config = {
+            [aTrack1.id]: contentTypes[0].valueOf(),
+            [aTrack2.id]: contentTypes[1].valueOf(),
+            [vTrack1.id]: contentTypes[2].valueOf()
+        };
+        const updateConfig = {...config,
+            [vTrack2]:contentTypes[3].valueOf()}
+
+        room0.on(RoomEvent.ADD_TRACKS, (msg) => {
+            const message = msg as AddRemoveTracks;
+            expect(message).toBeTruthy();
+            message.info.info.forEach((info) => {
+                const index = contentTypes.indexOf(info.contentType);
+                expect(index).toBeGreaterThan(-1);
+                contentTypes.splice(index, 1);
+            });
+        });
+
+        await room1.join(rtcConnection, null, config);
+        await room0.join(new wrtc.RTCPeerConnection());
+
+        rtcConnection.addTrack(vTrack2);
+        await room1.updateState(updateConfig);
+
+        sfu0.disconnect();
+        sfu1.disconnect()
+        aSource.close();
+        aTrack1.stop();
+        aTrack2.stop();
+        vTrack1.stop();
+        vTrack2.stop();
     });
     //relates to zapp-64
     it.skip("should send message", async () => {
