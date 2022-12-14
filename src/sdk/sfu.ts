@@ -102,6 +102,9 @@ export class Sfu {
     }
 
     public disconnect() {
+        if (this.#_room) {
+            this.#_room.leaveRoom();
+        }
         if (this.#connection) {
             this.#connection.close();
         }
