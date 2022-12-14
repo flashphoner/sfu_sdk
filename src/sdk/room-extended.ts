@@ -14,18 +14,26 @@ import {
     RoomScreenSharingConfigEvent,
     StopTrackEvent
 } from "./constants";
+import {PrefixFunction} from "./logger";
 
 export class RoomExtended extends Room {
 
     #config: RoomExtendedConfig;
 
-    public constructor(connection: Connection, id: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig) {
+    public constructor(connection: Connection, id: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, loggerPrefix?: PrefixFunction) {
        super(connection, name, pin, nickname, creationTime);
        this._id = id;
        if (!config.participantsConfig) {
            config.participantsConfig = {};
        }
        this.#config = config;
+       if (loggerPrefix) {
+           this.logger.setPrefix(() => {
+               return "[Room] " + loggerPrefix();
+           })
+       } else {
+           this.logger.setPrefix(() => "[Room]");
+       }
     }
 
     public config() {

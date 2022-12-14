@@ -13,7 +13,7 @@ describe("connection", () => {
                 roomName: "test"
             }
         });
-        connection.close();
+        await connection.close();
     });
     it("should send message", async () => {
         const connection = new Connection((message, data) => {}, () => {}, () => {}, () => {});

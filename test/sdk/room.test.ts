@@ -1,4 +1,4 @@
-import {Sfu, RoomEvent} from "../../src";
+import {RoomEvent, Sfu} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
 import {AddRemoveTracks, RoomMessage} from "../../src/sdk/constants";
 
@@ -25,7 +25,7 @@ describe("room", () => {
             ...TEST_ROOM
         });
         expect(room).toBeTruthy();
-        sfu.disconnect();
+        await sfu.disconnect();
     });
     it("should join room", async () => {
         const sfu = await connect(TEST_GROUP_USER0);
@@ -34,7 +34,7 @@ describe("room", () => {
         });
         const state = await room.join(new wrtc.RTCPeerConnection());
         expect(state.name).toEqual(TEST_GROUP_USER0.nickname);
-        sfu.disconnect();
+        await sfu.disconnect();
     });
     it("should leave room", async () => {
         const sfu = await connect(TEST_GROUP_USER0);
@@ -44,7 +44,7 @@ describe("room", () => {
         await room.join(new wrtc.RTCPeerConnection());
         const state = await room.leaveRoom();
         expect(state.name).toEqual(TEST_GROUP_USER0.nickname);
-        sfu.disconnect();
+        await sfu.disconnect();
     });
     it("should destroy room", async () => {
         const sfu = await connect(TEST_GROUP_USER0);
@@ -53,7 +53,7 @@ describe("room", () => {
         });
         await room.join(new wrtc.RTCPeerConnection());
         await room.destroyRoom();
-        sfu.disconnect();
+        await sfu.disconnect();
     });
     it("should update state", async () => {
         const sfu = await connect(TEST_GROUP_USER0);
@@ -71,7 +71,7 @@ describe("room", () => {
         aSource.close();
         room.pc().removeTrack(aSender);
         await room.updateState();
-        sfu.disconnect();
+        await sfu.disconnect();
     });
     it("should set contentType", async () => {
         const sfu0 = await connect(TEST_GROUP_USER0);
@@ -137,7 +137,7 @@ describe("room", () => {
         });
         await room.join(new wrtc.RTCPeerConnection());
         await room.sendMessage(TEST_MESSAGE_ROOM);
-        sfu.disconnect();
+        await sfu.disconnect();
     });
     describe("notifications", () => {
         //relates to zapp-64
@@ -152,13 +152,13 @@ describe("room", () => {
                 ...TEST_ROOM
             });
             await room1.join(new wrtc.RTCPeerConnection());
-            room1.on(RoomEvent.MESSAGE, (msg) => {
+            room1.on(RoomEvent.MESSAGE, async (msg) => {
                 const message = msg as RoomMessage;
                 expect(message).toBeTruthy();
                 expect(message.message.nickName).toEqual(TEST_GROUP_USER0.nickname);
                 expect(message.message.message).toEqual(TEST_MESSAGE_ROOM);
-                sfu0.disconnect();
-                sfu1.disconnect();
+                await sfu0.disconnect();
+                await sfu1.disconnect();
                 done();
             });
             await room0.sendMessage(TEST_MESSAGE_ROOM);

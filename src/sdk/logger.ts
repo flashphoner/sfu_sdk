@@ -1,3 +1,4 @@
+export type PrefixFunction = () => string;
 
 export enum Verbosity {
     ERROR,
@@ -7,55 +8,46 @@ export enum Verbosity {
     TRACE
 }
 
-type PrefixFunction = () => string;
-let prefix:PrefixFunction = () => "";
-let level = Verbosity.ERROR;
+class Logger {
+    #prefix: PrefixFunction = () => "";
+    #level: Verbosity = Verbosity.ERROR;
 
-const setPrefix = (func:PrefixFunction) => {
-    if (typeof func !== "function") {
-        throw new Error("Prefix must be a function");
+    setPrefix = (func:PrefixFunction) => {
+        if (typeof func !== "function") {
+            throw new Error("Prefix must be a function");
+        }
+        this.#prefix = func;
+    };
+
+    setVerbosity = (verbosityLevel: Verbosity) => {
+        this.#level = verbosityLevel;
     }
-    prefix = func;
-};
 
-const setVerbosity = (verbosityLevel: Verbosity) => {
-    level = verbosityLevel;
+    error = (...args) => {
+        if (this.#level >= Verbosity.ERROR) {
+            console.error(this.#prefix(), ...args);
+        }
+    };
+    warn = (...args) => {
+        if (this.#level >= Verbosity.WARN) {
+            console.warn(this.#prefix(), ...args);
+        }
+    };
+    info = (...args) => {
+        if (this.#level >= Verbosity.INFO) {
+            console.info(this.#prefix(), ...args);
+        }
+    };
+    debug = (...args) => {
+        if (this.#level >= Verbosity.DEBUG) {
+            console.debug(this.#prefix(), ...args);
+        }
+    };
+    trace = (...args) => {
+        if (this.#level >= Verbosity.TRACE) {
+            console.trace(this.#prefix(), ...args);
+        }
+    };
 }
 
-const error = (...args) => {
-    if (level >= Verbosity.ERROR) {
-        console.error(prefix(), ...args);
-    }
-};
-const warn = (...args) => {
-    if (level >= Verbosity.WARN) {
-        console.warn(prefix(), ...args);
-    }
-};
-const info = (...args) => {
-    if (level >= Verbosity.INFO) {
-        console.info(prefix(), ...args);
-    }
-};
-const debug = (...args) => {
-    if (level >= Verbosity.DEBUG) {
-        console.debug(prefix(), ...args);
-    }
-};
-const trace = (...args) => {
-    if (level >= Verbosity.TRACE) {
-        console.trace(prefix(), ...args);
-    }
-};
-
-
-
-export default {
-    setPrefix,
-    setVerbosity,
-    error,
-    warn,
-    info,
-    debug,
-    trace
-}
+export default Logger;

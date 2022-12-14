@@ -1,11 +1,10 @@
-const wrtc = require("wrtc");
-import {RoomState, SfuEvent, Sfu} from "../../src";
+import {RoomState, Sfu, SfuEvent} from "../../src";
 
 describe("sfu", () => {
     it("should connect", (done) => {
        const sfu = new Sfu();
-       sfu.on(SfuEvent.CONNECTED, () => {
-           sfu.disconnect();
+       sfu.on(SfuEvent.CONNECTED, async () => {
+           await sfu.disconnect();
            done();
        });
        sfu.connect({
@@ -16,8 +15,8 @@ describe("sfu", () => {
     });
     it("should disconnect", (done) => {
         const sfu = new Sfu();
-        sfu.on(SfuEvent.CONNECTED, () => {
-            sfu.disconnect();
+        sfu.on(SfuEvent.CONNECTED, async () => {
+            await sfu.disconnect();
         }).on(SfuEvent.DISCONNECTED, () => {
             done();
         });

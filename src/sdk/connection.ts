@@ -1,5 +1,5 @@
-import logger from "./logger";
-import {InternalMessage, InternalApi} from "./constants";
+import {InternalApi, InternalMessage} from "./constants";
+import Logger, {Verbosity} from "./logger";
 
 type InitialUserData = {
     sipLogin: string,
@@ -19,13 +19,19 @@ export class Connection {
     private onBinaryData: OnBinaryDataCallback;
     private connected: boolean;
     private connectionTimeout: number;
+    private logger: Logger;
 
-    public constructor(onMessage: OnMessageCallback, onBinaryData: OnBinaryDataCallback, onError: Function, onClose: Function) {
+    public constructor(onMessage: OnMessageCallback, onBinaryData: OnBinaryDataCallback, onError: Function, onClose: Function, logger?: Logger) {
         this.connected = false;
         this.onMessage = onMessage;
         this.onBinaryData = onBinaryData;
         this.onError = onError;
         this.onClose = onClose;
+        this.logger = (logger) ? logger : new Logger();
+        if (!logger) {
+            this.logger.setPrefix(() => "[Connection]");
+            this.logger.setVerbosity(Verbosity.INFO);
+        }
     }
 
     public connect(options: {
@@ -41,7 +47,7 @@ export class Connection {
             if (options.timeout !== undefined && options.timeout > 0) {
                 that.connectionTimeout = window.setTimeout(function () {
                     if (that.ws.readyState === 0) {
-                        logger.warn("WS connection timeout");
+                        that.logger.warn("WS connection timeout");
                         that.ws.close();
                     }
                 }, options.timeout);
@@ -54,6 +60,7 @@ export class Connection {
                 }
             };
             that.ws.onclose = function (e) {
+                that.logger.debug("WebSocket connection closed, reason " + e.reason);
                 if (that.connected) {
                     that.onClose(e);
                 } else {
@@ -107,7 +114,7 @@ export class Connection {
     }
 
     public send(message: string, data: any) {
-        logger.info("==>", message, data);
+        this.logger.info("==>", message, data);
         if (this.ws) {
             this.ws.send(JSON.stringify({
                 message: message,
@@ -117,7 +124,7 @@ export class Connection {
     };
 
     public sendBinaryData(data: any) {
-        logger.info("==>", data.size);
+        this.logger.info("==>", data.size);
         if (this.ws) {
             this.ws.send(data);
         }
@@ -129,6 +136,7 @@ export class Connection {
             const self = this;
             return new Promise<void>(function (resolve) {
                 self.ws.onclose = function (e) {
+                    self.logger.debug("WebSocket connection closed, reason " + e.reason);
                     if (self.connected) {
                         self.onClose(e);
                     }

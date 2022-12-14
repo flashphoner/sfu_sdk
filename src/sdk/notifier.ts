@@ -41,4 +41,8 @@ export class Notifier<T extends string, A extends object> {
         }
     };
 
+    public clear() {
+        this.#subscribers = {};
+    }
+
 }

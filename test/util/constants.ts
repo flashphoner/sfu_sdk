@@ -65,6 +65,7 @@ export const PICTURE_FILE_NAME = "sample.jpeg";
 export const PICTURE_2M_FILE_NAME = "sample2.jpeg";
 export const DOWNLOAD_PATH = "../resources/downloads/"
 export const PICTURE_FILE_PATH = "../resources/" + PICTURE_FILE_NAME;
+export const PICTURE_2M_FILE_PATH = "../resources/" + PICTURE_2M_FILE_NAME;
 export const PDF_FILE_PATH = "../resources/" + PDF_FILE_NAME;
 
 export const TEST_PUBLIC_CHANNEL = {
@@ -97,6 +98,13 @@ export const TEST_PICTURE_ATTACHMENT = {
     id: 0
 }
 
+export const TEST_BIG_PICTURE_ATTACHMENT = {
+    type: MessageAttachmentType.picture,
+    name: PICTURE_2M_FILE_NAME,
+    size: fs.readFileSync(path.resolve(__dirname, PICTURE_2M_FILE_PATH)).length,
+    id: 2
+}
+
 export const TEST_PDF_ATTACHMENT = {
     type: MessageAttachmentType.file,
     name: PDF_FILE_NAME,
@@ -108,6 +116,12 @@ export const TEST_PICTURE_ATTACHMENT_DATA = {
     payload: Buffer.from(new Uint8Array(fs.readFileSync(path.resolve(__dirname, PICTURE_FILE_PATH)))).buffer,
     size: TEST_PICTURE_ATTACHMENT.size,
     id: TEST_PICTURE_ATTACHMENT.id
+}
+
+export const TEST_BIG_PICTURE_ATTACHMENT_DATA = {
+    payload: Buffer.from(new Uint8Array(fs.readFileSync(path.resolve(__dirname, PICTURE_2M_FILE_PATH)))).buffer,
+    size: TEST_BIG_PICTURE_ATTACHMENT.size,
+    id: TEST_BIG_PICTURE_ATTACHMENT.id
 }
 
 export const TEST_PDF_ATTACHMENT_DATA = {

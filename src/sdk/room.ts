@@ -20,6 +20,7 @@ import {
     RoomState, WaitingRoomUpdate, UserNickname
 } from "./constants";
 import {Connection} from "./connection";
+import Logger from "./logger";
 
 export class Room {
     static readonly #CONTROL_CHANNEL = "control";
@@ -39,6 +40,7 @@ export class Room {
     } = {};
     #dChannel: RTCDataChannel;
     #_creationTime: number;
+    protected logger: Logger;
 
     public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number) {
         this.connection = connection;
@@ -48,10 +50,11 @@ export class Room {
         this._pin = pin;
         this._nickname = nickname;
         this.#_creationTime = creationTime;
+        this.logger = new Logger();
     }
 
     #dChannelSend(msg: string) {
-        logger.info("dchannel ", "==>", msg);
+        this.logger.info("dchannel ", "==>", msg);
         this.#dChannel.send(msg);
     };
     
@@ -75,7 +78,7 @@ export class Room {
 
     //TODO refactor types
     public async processEvent(e: InternalMessage) {
-        logger.info("<==", e);
+        this.logger.info("<==", e);
         if (e.type === RoomEvent.REMOTE_SDP) {
             if (this.#_state !== RoomState.FAILED && this.#_state !== RoomState.DISPOSED && this.#_pc.signalingState !== "closed") {
                 try {
@@ -98,7 +101,7 @@ export class Room {
                             break;
                     }
                 } catch (error) {
-                    logger.error("Failed to process remote sdp", error);
+                    this.logger.error("Failed to process remote sdp", error);
                 }
             }
         } else if (e.type === RoomEvent.ROLE_ASSIGNED) {
@@ -189,7 +192,7 @@ export class Room {
         this.#dChannel = this.#_pc.createDataChannel(Room.#CONTROL_CHANNEL);
         const self = this;
         this.#dChannel.onmessage = (msg) => {
-            logger.info("dchannel ", "<==", msg);
+            this.logger.info("dchannel ", "<==", msg);
             const message: InternalMessage = JSON.parse(msg.data);
             if (message.type === RoomEvent.MESSAGE) {
                 const msg = message as RoomMessage;
@@ -210,7 +213,7 @@ export class Room {
                             self.notifier.notify(message.type, msg);
                         }
                     } catch (e) {
-                        logger.info("Failed to process inner message: " + msg.message);
+                        this.logger.info("Failed to process inner message: " + msg.message);
                         self.notifier.notify(message.type, msg);
                     }
                 }

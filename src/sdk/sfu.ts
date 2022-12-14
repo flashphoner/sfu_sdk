@@ -2,7 +2,7 @@ import {Connection} from "./connection";
 import {InternalApi, InternalMessage, RoomState, SfuEvent, State, UserNickname} from "./constants";
 import {Notifier} from "./notifier";
 import {Room} from "./room";
-import logger, {Verbosity} from "./logger";
+import Logger, {Verbosity} from "./logger";
 
 export class Sfu {
     #connection: Connection;
@@ -12,9 +12,10 @@ export class Sfu {
     #_room: Room;
     //TODO(naz): Provide union instead of InternalMessage
     #notifier: Notifier<SfuEvent, InternalMessage> = new Notifier<SfuEvent, InternalMessage>();
-
+    #logger: Logger;
     constructor() {
-        logger.setVerbosity(Verbosity.ERROR);
+        this.#logger = new Logger();
+        this.#logger.setVerbosity(Verbosity.ERROR);
     }
 
     public connect(options: {

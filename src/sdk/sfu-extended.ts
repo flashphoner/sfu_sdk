@@ -50,8 +50,8 @@ import {
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
-import logger, {Verbosity} from "./logger";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
+import Logger, {PrefixFunction, Verbosity} from "./logger";
 
 type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment;
 
@@ -70,9 +70,16 @@ export class SfuExtended {
     #notifier: Notifier<SfuEvent, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
     #attachmentState: Array<Attachment> = [];
     #binaryChunkSize: number;
+    #logger: Logger = new Logger();
+    #loggerPrefix: PrefixFunction;
 
-    constructor(logLevel?: Verbosity) {
-        logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
+    constructor(logLevel?: Verbosity, prefix?: PrefixFunction) {
+        this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
+        if (prefix) {
+            this.#loggerPrefix = prefix;
+            this.#logger.setPrefix(prefix);
+        }
+        this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
     }
 
     public connect(options: {
@@ -127,7 +134,7 @@ export class SfuExtended {
         const self = this;
         this.#connection = new Connection(
             (name: string, data: InternalMessage[]) => {
-                logger.debug("onMessage: ", data[0]);
+                this.#logger.debug("onMessage: ", data[0]);
                 switch (name) {
                     case InternalApi.DEFAULT_METHOD:
                         //filter messages
@@ -245,7 +252,7 @@ export class SfuExtended {
                             this.#notifier.notify(SfuEvent.CHAT_SEARCH_RESULT, messagesEvent);
                         } else if (data[0].type === RoomEvent.CREATED) {
                             const state = data[0] as CreatedRoom;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.name, state.pin, this.user().nickname, state.creationTime, state.config);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.name, state.pin, this.user().nickname, state.creationTime, state.config, this.#loggerPrefix);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -277,7 +284,7 @@ export class SfuExtended {
                             promises.resolve(data[0].internalMessageId, room);
                         } else if (data[0].type === RoomEvent.AVAILABLE) {
                             const state = data[0] as RoomAvailable;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.name, state.pin, this.user().nickname, state.creationTime, state.config);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.name, state.pin, this.user().nickname, state.creationTime, state.config, this.#loggerPrefix);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -310,7 +317,7 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.USER_ROOMS) {
                             const state = data[0] as UserRoomsEvent;
                             state.rooms.forEach((info) => {
-                                const room = new RoomExtended(this.#connection, info.id, info.name, info.pin, this.user().nickname, info.creationTime, info.config);
+                                const room = new RoomExtended(this.#connection, info.id, info.name, info.pin, this.user().nickname, info.creationTime, info.config, this.#loggerPrefix);
                                 this.#rooms[room.id()] = room;
                                 const self = this;
                                 const cleanup = () => {
@@ -394,7 +401,7 @@ export class SfuExtended {
                                 this.#notifyMessageAttachmentState(attachment, AttachmentState.PENDING);
                             }
                         } else {
-                            logger.info("Unable to find attachment " + id);
+                            this.#logger.info("Unable to find attachment " + id);
                         }
                         break;
                     default:
@@ -414,7 +421,8 @@ export class SfuExtended {
                 } else {
                     self.#notifier.notify(SfuEvent.CONNECTION_FAILED, e as InternalMessage);
                 }
-            }
+            },
+            this.#logger
         );
     }
 
@@ -1091,12 +1099,9 @@ export class SfuExtended {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<RoomExtended>((resolve, reject) => {
-            const id = uuidv4();
-            promises.add(id, resolve, reject);
             self.#emmitAction(InternalApi.ROOM_AVAILABLE, {
                 id: options.id,
-                pin: options.pin,
-                internalMessageId: id
+                pin: options.pin
             }, resolve, reject);
         });
     };
@@ -1108,8 +1113,6 @@ export class SfuExtended {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<void>((resolve, reject) => {
-            const id = uuidv4();
-            promises.add(id, resolve, reject);
             self.#emmitAction(InternalApi.ROOM_EXISTS, {
                 id: options.id,
                 pin: options.pin
