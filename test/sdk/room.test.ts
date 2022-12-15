@@ -68,8 +68,8 @@ describe("room", () => {
 
         await room.updateState({});
         //await waitForPeerConnectionStableState(room.pc());
-        aTrack.stop();
-        aSource.close();
+        // aTrack.stop();
+        // aSource.close();
         room.pc().removeTrack(aSender);
         await room.updateState();
         await sfu.disconnect();
