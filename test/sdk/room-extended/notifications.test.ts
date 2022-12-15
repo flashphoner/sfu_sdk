@@ -405,7 +405,13 @@ describe("notifications", () => {
                 id: bobRoom.id()
             });
             await aliceRoom.join(alicePc);
-            
+
+            await waitForRoomEvent(RoomEvent.JOINED,
+                bobRoom,
+                (room) => true,
+                () => {}
+                )
+
             await bobRoom.assignRole(TEST_USER_1.nickname, ParticipantRole.OWNER);
             expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
             

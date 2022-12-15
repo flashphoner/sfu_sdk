@@ -1,6 +1,7 @@
 import {RoomEvent, Sfu} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
 import {AddRemoveTracks, RoomMessage} from "../../src/sdk/constants";
+import {Verbosity} from "../../src/sdk/logger";
 
 const wrtc = require("wrtc");
 const {RTCVideoSource} = require('wrtc').nonstandard
@@ -10,7 +11,7 @@ async function connect(userConfig: {
     nickname: string
     logGroup: string
 }) {
-    const sfu = new Sfu();
+    const sfu = new Sfu(Verbosity.DEBUG, () => "[" + userConfig.nickname + " | " + expect.getState().currentTestName + "]");
     await sfu.connect({
         url: url,
         ...userConfig
@@ -103,9 +104,9 @@ describe("room", () => {
             [vTrack1.id]: contentTypes[2].valueOf()
         };
         const updateConfig = {...config,
-            [vTrack2]:contentTypes[3].valueOf()}
+            [vTrack2.id]: contentTypes[3].valueOf()}
 
-        room0.on(RoomEvent.ADD_TRACKS, (msg) => {
+        room0.on(RoomEvent.ADD_TRACKS, async (msg) => {
             const message = msg as AddRemoveTracks;
             expect(message).toBeTruthy();
             message.info.info.forEach((info) => {
@@ -113,6 +114,7 @@ describe("room", () => {
                 expect(index).toBeGreaterThan(-1);
                 contentTypes.splice(index, 1);
             });
+
         });
 
         await room1.join(rtcConnection, null, config);
@@ -121,13 +123,8 @@ describe("room", () => {
         rtcConnection.addTrack(vTrack2);
         await room1.updateState(updateConfig);
 
-        sfu0.disconnect();
-        sfu1.disconnect()
-        aSource.close();
-        aTrack1.stop();
-        aTrack2.stop();
-        vTrack1.stop();
-        vTrack2.stop();
+        await sfu0.disconnect();
+        await sfu1.disconnect();
     });
     //relates to zapp-64
     it.skip("should send message", async () => {

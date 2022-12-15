@@ -2,7 +2,7 @@ import {Connection} from "./connection";
 import {InternalApi, InternalMessage, RoomState, SfuEvent, State, UserNickname} from "./constants";
 import {Notifier} from "./notifier";
 import {Room} from "./room";
-import Logger, {Verbosity} from "./logger";
+import Logger, {PrefixFunction, Verbosity} from "./logger";
 
 export class Sfu {
     #connection: Connection;
@@ -12,10 +12,16 @@ export class Sfu {
     #_room: Room;
     //TODO(naz): Provide union instead of InternalMessage
     #notifier: Notifier<SfuEvent, InternalMessage> = new Notifier<SfuEvent, InternalMessage>();
-    #logger: Logger;
-    constructor() {
-        this.#logger = new Logger();
-        this.#logger.setVerbosity(Verbosity.ERROR);
+    #logger: Logger = new Logger();
+    #loggerPrefix: PrefixFunction;
+
+    constructor(logLevel?: Verbosity, prefix?: PrefixFunction) {
+        this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
+        if (prefix) {
+            this.#loggerPrefix = prefix;
+            this.#logger.setPrefix(prefix);
+        }
+        this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
     }
 
     public connect(options: {
@@ -43,6 +49,7 @@ export class Sfu {
         return new Promise<void>(async (resolve, reject) => {
             self.#connection = new Connection(
                 (name, data) =>  {
+                    this.#logger.debug("onMessage: ", data[0]);
                     switch (name) {
                         case InternalApi.DEFAULT_METHOD:
                             if (data[0].roomId && data[0].roomId.length > 0) {
@@ -70,7 +77,8 @@ export class Sfu {
                 () => {
                     self.#_state = State.DISCONNECTED;
                     self.#notifier.notify(SfuEvent.DISCONNECTED);
-                }
+                },
+                this.#logger
             );
             await this.#connection.connect(connectionConfig);
             self.#_state = State.CONNECTED;
