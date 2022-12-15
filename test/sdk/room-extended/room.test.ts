@@ -162,8 +162,8 @@ describe("room", () => {
         const aSender = room.pc().addTrack(aTrack);
 
         await room.updateState({});
-        aTrack.stop();
-        aSource.close();
+        // aTrack.stop();
+        // aSource.close();
         room.pc().removeTrack(aSender);
         await room.updateState();
     });
