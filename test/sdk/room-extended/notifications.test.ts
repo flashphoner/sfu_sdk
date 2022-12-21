@@ -20,23 +20,19 @@ const RTCAudioSourceSineWave = require("../../lib/rtcaudiosourcesinewave");
 describe("notifications", () => {
     let bob: SfuExtended;
     let alice: SfuExtended;
-    let bobPc: RTCPeerConnection;
-    let alicePc: RTCPeerConnection;
     beforeEach(async () => {
         const users = await waitForUsers();
         bob = users.bob;
         alice = users.alice;
-        bobPc = new wrtc.RTCPeerConnection();
-        alicePc = new wrtc.RTCPeerConnection();
     })
     afterEach(async() => {
         await bob.disconnect();
         await alice.disconnect();
-        bobPc = null;
-        alicePc = null;
     })
     describe("waiting room", () => {
         it("Should authorize waiting participant", async (done) => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -63,6 +59,8 @@ describe("notifications", () => {
             await aliceRoom.join(alicePc)
         });
         it('Should authorize waiting participant after the second attempt', async (done) => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -104,7 +102,8 @@ describe("notifications", () => {
             await room2.join(new wrtc.RTCPeerConnection());
         });
         it("Should kick waiting participant", async () => {
-            
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -126,7 +125,8 @@ describe("notifications", () => {
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.AUTHORIZATION_FAILED);
         });
         it("Should move participant to waiting room", async (done) => {
-            
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -159,7 +159,8 @@ describe("notifications", () => {
             aliceRoom.join(alicePc)
         });
         it("Should subscribe to waiting participant", async (done) => {
-            
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -187,7 +188,8 @@ describe("notifications", () => {
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
         });
         it("Should unsubscribe from waiting participant", async (done) => {
-            
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -218,6 +220,8 @@ describe("notifications", () => {
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
         });
         it("Waiting participant should receive error at meeting end", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -240,6 +244,8 @@ describe("notifications", () => {
     })
     describe("roles", () => {
         it("Should assign role", async (done) => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -268,6 +274,8 @@ describe("notifications", () => {
             await aliceRoom.join(alicePc);
         });
         it("Should reclaim owner rights", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -299,6 +307,8 @@ describe("notifications", () => {
                 (room) => room.role());
         });
         it("previous owner should enter the room without current owner approval", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             let bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -343,6 +353,8 @@ describe("notifications", () => {
             await bobRoom.join(new wrtc.RTCPeerConnection());
         });
         it("Owner should reclaim ownership after reconnection", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             let bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -361,7 +373,13 @@ describe("notifications", () => {
                 id: bobRoom.id()
             });
             await aliceRoom.join(alicePc);
-            
+
+            await waitForRoomEvent(RoomEvent.JOINED,
+                bobRoom,
+                (room) => true,
+                () => {}
+            )
+
             await bobRoom.assignRole(TEST_USER_1.nickname, ParticipantRole.OWNER);
             expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
             
@@ -386,6 +404,8 @@ describe("notifications", () => {
                 (room) => room.role());
         });
         it("Owner should re-enter the room without approval after disconnect", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             let bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -438,6 +458,8 @@ describe("notifications", () => {
                 (room) => room.role());
         });
         it("Should receive participants roles", async (done) => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -474,6 +496,8 @@ describe("notifications", () => {
     })
     describe("tracks", () => {
         it("Should mute participant's audio", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -490,6 +514,8 @@ describe("notifications", () => {
             expect(bobRoom.config().participantsConfig[TEST_USER_1.nickname].audioMuted).toBeTruthy();
         });
         it("Should mute participant's video", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -506,6 +532,8 @@ describe("notifications", () => {
             expect(bobRoom.config().participantsConfig[TEST_USER_1.nickname].videoMuted).toBeTruthy();
         });
         it("Should mute participant's screen sharing", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -524,6 +552,8 @@ describe("notifications", () => {
     })
     describe("errors and rejects", () => {
         it("Should receive error on using wrong pin", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -537,6 +567,8 @@ describe("notifications", () => {
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.WRONG_PIN);
         });
         it("Should receive error when nickname is already taken", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -553,6 +585,8 @@ describe("notifications", () => {
             await expect(connect(TEST_USER_0)).rejects.toBeTruthy();
         });
         it("Should reject renaming participant if nickname is already taken", async (done) => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -577,6 +611,8 @@ describe("notifications", () => {
             await waitForPeerConnectionStableState(alicePc);
         });
         it("Should receive error when trying to join to locked room", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -592,6 +628,8 @@ describe("notifications", () => {
             await bobRoom.destroyRoom();
         });
         it("Should reject participant's attempt to change nickname if setting canChangeNickname is turned off", async () => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
                 ...TEST_ROOM
             });
@@ -612,6 +650,7 @@ describe("notifications", () => {
         });
     });
     it("Room available should convey initial config", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -624,6 +663,8 @@ describe("notifications", () => {
         expect(aliceRoom.config()).toBeTruthy();
     });
     it("Should remove room from inner collection on left", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -640,6 +681,8 @@ describe("notifications", () => {
         await bobRoom.destroyRoom();
     });
     it("Should remove room from inner collection on ended", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -655,6 +698,8 @@ describe("notifications", () => {
         await waitForRoomEvent(RoomEvent.ENDED, aliceRoom, (room) => alice.getRoom({id: aliceRoom.id()}) === undefined, function () {});
     });
     it("Should receive control message", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -678,6 +723,8 @@ describe("notifications", () => {
         await aliceRoom.join(alicePc);
     });
     it("Should kick participant from room", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -704,6 +751,8 @@ describe("notifications", () => {
     });
 
     it("Should rename second participant", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -732,6 +781,8 @@ describe("notifications", () => {
     });
 
     it("Second participant should change nickname after join room", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });

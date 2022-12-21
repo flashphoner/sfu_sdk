@@ -19,7 +19,9 @@ describe("calendar", () => {
     it("Should add event", async () => {
         const calendarEvent = await sfu.addCalendarEvent(CALENDAR_EVENT);
         const calendar = await sfu.getUserCalendar();
-        expect(calendar.events).toHaveProperty(calendarEvent.id);
+        expect(calendar.events.length).toBeGreaterThan(0);
+        const event = calendar.events.find(e => e.id === calendarEvent.id);
+        expect(event).toBeTruthy()
         await sfu.removeCalendarEvent(calendarEvent);
     });
     it("Should update event", async () => {
@@ -33,7 +35,9 @@ describe("calendar", () => {
     it("Should remove event", async () => {
         const calendarEvent = await sfu.addCalendarEvent(CALENDAR_EVENT);
         let calendar = await sfu.getUserCalendar();
-        expect(calendar.events).toHaveProperty(calendarEvent.id);
+        expect(calendar.events.length).toBeGreaterThan(0);
+        const event = calendar.events.find(e => e.id === calendarEvent.id);
+        expect(event).toBeTruthy()
         await sfu.removeCalendarEvent(calendarEvent);
         calendar = await sfu.getUserCalendar();
         expect(calendar.events[calendarEvent.id]).toBeFalsy();

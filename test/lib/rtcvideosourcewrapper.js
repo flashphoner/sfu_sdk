@@ -6,7 +6,7 @@
 
 const { RTCVideoSource } = require('wrtc').nonstandard;
 
-export class RTCVideoSourceWrapper {
+class RTCVideoSourceWrapper {
     constructor() {
         const source = new RTCVideoSource();
         const width = 320;

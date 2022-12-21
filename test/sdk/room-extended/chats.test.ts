@@ -10,26 +10,19 @@ import {
 } from "../../../src/sdk/constants";
 import {waitForPeerConnectionStableState} from "../../util/pcUtils";
 import {waitForUsers} from "../../util/utils";
-
 const wrtc = require("wrtc");
 
 describe("chats", () => {
     let bob: SfuExtended;
     let alice: SfuExtended;
-    let bobPc: RTCPeerConnection;
-    let alicePc: RTCPeerConnection;
     beforeEach(async () => {
         const users = await waitForUsers();
         bob = users.bob;
         alice = users.alice;
-        bobPc = new wrtc.RTCPeerConnection();
-        alicePc = new wrtc.RTCPeerConnection();
     })
     afterEach(async() => {
         await bob.disconnect();
         await alice.disconnect();
-        bobPc = null;
-        alicePc = null;
     })
     it("Should create chat on creating meeting", async (done) => {
         bob.on(SfuEvent.NEW_CHAT, async (msg) => {
@@ -49,6 +42,7 @@ describe("chats", () => {
         });
     });
     it("Should remove chat on ending meeting", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -74,6 +68,8 @@ describe("chats", () => {
         await bobRoom.leaveRoom();
     })
     it("Should remove participant from chat on exit from room", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -117,6 +113,8 @@ describe("chats", () => {
         await waitForPeerConnectionStableState(alicePc);
     });
     it("Should remove participant from chat on moving to waiting room", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -158,19 +156,27 @@ describe("chats", () => {
         await waitForPeerConnectionStableState(alicePc);
     })
     it("Should send message to second participant", async (done) => {
-        bob.on(SfuEvent.MESSAGE, async (msg) => {
-            const message = msg as Message;
-            expect(message).toBeTruthy();
-            const rooms = await bob.loadActiveRooms();
-            const chatRoom = rooms.find(room => room.id === message.chatId);
-            expect(chatRoom).toBeTruthy();
-            if (chatRoom) {
-                const room = bob.getRoom({id: chatRoom.id});
-                expect(message.chatId).toEqual(room.id());
-                await room.destroyRoom();
-            }
-            done();
-        })
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
+        bob
+            .on(SfuEvent.MESSAGE, async (msg) => {
+                const message = msg as Message;
+                expect(message).toBeTruthy();
+                const rooms = await bob.loadActiveRooms();
+                const chatRoom = rooms.find(room => room.id === message.chatId);
+                expect(chatRoom).toBeTruthy();
+                if (chatRoom) {
+                    const room = bob.getRoom({id: chatRoom.id});
+                    expect(message.chatId).toEqual(room.id());
+                    await room.destroyRoom();
+                }
+                done();
+            })
+            .on(SfuEvent.CHAT_UPDATED, async (msg) => {
+                const chat = msg as UserSpecificChatInfo;
+                expect(chat.members.length).toEqual(2);
+                await bob.sendMessage({body: "Test from Bob", chatId: roomChatId})
+            })
 
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
@@ -181,9 +187,6 @@ describe("chats", () => {
         expect(roomChatId).toBeTruthy();
 
         await bobRoom.configureWaitingRoom(false);
-        bobRoom.on(RoomEvent.JOINED, async (msg) => {
-            await bob.sendMessage({body: "Test from Bob", chatId: roomChatId})
-        })
 
         const aliceRoom = await alice.roomAvailable({
             id: bobRoom.id(),
@@ -198,6 +201,7 @@ describe("chats", () => {
         await aliceRoom.join(alicePc);
     })
     it("Owner should update chat receive policy", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
@@ -212,6 +216,8 @@ describe("chats", () => {
         await bobRoom.destroyRoom();
     })
     it("Should fail to send message if chat receive policy is NOBODY", async (done) => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
