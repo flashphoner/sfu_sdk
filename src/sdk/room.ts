@@ -1,7 +1,6 @@
 import {v4 as uuidv4} from 'uuid';
 import promises from "./promises";
 import {Notifier} from "./notifier";
-import logger from "./logger";
 import {
     AddRemoveTracks,
     CreatedRoom,
@@ -439,4 +438,5 @@ export class Room {
     public creationTime() {
         return this.#_creationTime;
     }
+
 }

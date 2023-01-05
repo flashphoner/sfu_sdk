@@ -2,7 +2,7 @@ import {RoomEvent, SfuExtended} from "../../../src";
 import {TEST_MESSAGE_ROOM, TEST_ROOM, TEST_USER_0, TEST_USER_1} from "../../util/constants";
 import {
     ControlMessageEvent,
-    EvictedFromRoom,
+    EvictedFromRoom, PlacedInLobbyEvent,
     InternalMessage,
     JoinedRoom,
     ParticipantRole,
@@ -549,6 +549,116 @@ describe("notifications", () => {
             await bobRoom.setParticipantScreenSharingMuted(TEST_USER_1.nickname, true);
             expect(bobRoom.config().participantsConfig[TEST_USER_1.nickname].screenSharingMuted).toBeTruthy();
         });
+    })
+    describe("hold", () => {
+        it("Should hold participant if room doesn't allow to join at any time", async (done) => {
+            const bobPmiSettings = await bob.getUserPmiSettings();
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: false});
+
+            const aliceRoom = await alice.roomAvailable({
+                id: bob.user().pmi,
+                pin: bobPmiSettings.pmiSettings.accessCode
+            });
+            expect(aliceRoom).toBeTruthy();
+
+            aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, async (msg) => {
+                const holdEvent = msg as PlacedInLobbyEvent;
+                expect(holdEvent).toBeTruthy();
+                await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+                done();
+            })
+
+            await aliceRoom.join(new wrtc.RTCPeerConnection());
+        })
+        it("Should join if room allow to join at any time", async () => {
+            const bobPmiSettings = await bob.getUserPmiSettings();
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: true, useWaitingRoom: false});
+
+            const aliceRoom = await alice.roomAvailable({
+                id: bob.user().pmi,
+                pin: bobPmiSettings.pmiSettings.accessCode
+            });
+            expect(aliceRoom).toBeTruthy();
+
+            await aliceRoom.join(new wrtc.RTCPeerConnection());
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+        })
+        it("Should change participant's state from hold to joined after owner enter the room", async (done) => {
+            const bobPmiSettings = await bob.getUserPmiSettings();
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: false, useWaitingRoom: false});
+
+            const ownerJoinRoom = async () => {
+                const bobRoom = await bob.roomAvailable({
+                    id: bob.user().pmi,
+                    pin: bobPmiSettings.pmiSettings.accessCode
+                });
+                expect(bobRoom).toBeTruthy();
+
+                bobRoom.on(RoomEvent.JOINED, (msg) => {
+                    const joinedEvent = msg as JoinedRoom;
+                    if (joinedEvent.name === alice.user().nickname) {
+                        done();
+                    }
+                })
+
+                await bobRoom.join(new wrtc.RTCPeerConnection());
+            }
+
+            const aliceRoom = await alice.roomAvailable({
+                id: bob.user().pmi,
+                pin: bobPmiSettings.pmiSettings.accessCode
+            });
+            expect(aliceRoom).toBeTruthy();
+
+            aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, async (msg) => {
+                const holdEvent = msg as PlacedInLobbyEvent;
+                expect(holdEvent).toBeTruthy();
+                await ownerJoinRoom();
+            })
+
+            await aliceRoom.join(new wrtc.RTCPeerConnection());
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+        })
+        it("Should hold and then place participant into waiting room after owner enter the room", async (done) => {
+            const bobPmiSettings = await bob.getUserPmiSettings();
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: false, useWaitingRoom: true});
+
+            const ownerJoinRoom = async () => {
+
+                const waitingListHandler = async (msg) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
+                    const waitingList = msg as WaitingListEvent;
+                    expect(waitingList.users.length).toBeGreaterThan(0);
+                    await bobRoom.authorizeWaitingList(waitingList.users[0].id, true);
+                    done();
+                }
+
+                const bobRoom = await bob.roomAvailable({
+                    id: bob.user().pmi,
+                    pin: bobPmiSettings.pmiSettings.accessCode
+                });
+                expect(bobRoom).toBeTruthy();
+
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+
+                await bobRoom.join(new wrtc.RTCPeerConnection());
+            }
+
+            const aliceRoom = await alice.roomAvailable({
+                id: bob.user().pmi,
+                pin: bobPmiSettings.pmiSettings.accessCode
+            });
+            expect(aliceRoom).toBeTruthy();
+
+            aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, async (msg) => {
+                const holdEvent = msg as PlacedInLobbyEvent;
+                expect(holdEvent).toBeTruthy();
+                await ownerJoinRoom();
+            })
+
+            await aliceRoom.join(new wrtc.RTCPeerConnection());
+            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+        })
     })
     describe("errors and rejects", () => {
         it("Should receive error on using wrong pin", async () => {

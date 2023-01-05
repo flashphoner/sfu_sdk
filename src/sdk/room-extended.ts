@@ -19,10 +19,11 @@ import {PrefixFunction} from "./logger";
 export class RoomExtended extends Room {
 
     #config: RoomExtendedConfig;
-
-    public constructor(connection: Connection, id: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, loggerPrefix?: PrefixFunction) {
+    #owner: string;
+    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, loggerPrefix?: PrefixFunction) {
        super(connection, name, pin, nickname, creationTime);
        this._id = id;
+       this.#owner = owner;
        if (!config.participantsConfig) {
            config.participantsConfig = {};
        }
@@ -366,6 +367,10 @@ export class RoomExtended extends Room {
         } else {
             super.processEvent(e);
         }
+    }
+
+    public owner() {
+        return this.#owner;
     }
 
     #resolveOrNotify(e: InternalMessage, type: RoomEvent, value: boolean | {}) {

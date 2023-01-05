@@ -42,6 +42,8 @@ export enum RoomEvent {
     CONTROL_MESSAGE = "CONTROL_MESSAGE",
     JOINED = "JOINED",
     LEFT = "LEFT",
+    PLACED_IN_LOBBY = "PLACED_IN_LOBBY",
+    PLACED_IN_WAITING_ROOM = "PLACED_IN_WAITING_ROOM",
     DETACHED = "DETACHED",
     EVICTED = "EVICTED",
     DROPPED = "DROPPED",
@@ -350,6 +352,7 @@ export type RolesListEvent = InternalMessage & {
 
 export type CreatedRoom = InternalMessage & {
     name: string,
+    owner: string,
     pin: string,
     inviteId: string,
     chatId: string,
@@ -360,6 +363,7 @@ export type CreatedRoom = InternalMessage & {
 
 export type RoomInfo = {
     id: string,
+    owner: string,
     name: string,
     pin: string,
     creationTime: number,
@@ -372,6 +376,7 @@ export type UserRoomsEvent = InternalMessage & {
 
 export type RoomAvailable = InternalMessage & {
     name: string,
+    owner: string,
     pin: string,
     creationTime: number,
     config: RoomExtendedConfig
@@ -405,6 +410,14 @@ export type RoomExtendedConfig = {
     canChangeNickname: boolean,
     screenSharingConfig: RoomExtendedScreenSharingConfig,
     participantsConfig?: RoomExtendedParticipantsConfig
+}
+
+export type PlacedInWaitingRoomEvent = InternalMessage & {
+    name: UserNickname
+}
+
+export type PlacedInLobbyEvent = InternalMessage & {
+    name: UserNickname
 }
 
 export type JoinedRoom = InternalMessage & {
