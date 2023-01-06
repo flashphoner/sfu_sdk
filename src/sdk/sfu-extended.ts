@@ -803,10 +803,15 @@ export class SfuExtended {
 
     public loadChatMessages(params: {
         chatId: string,
-        limit?: number
-        timeFrame: {
+        timeFrame?: {
             start: number,
-            end: number
+            end: number,
+            limit?: number
+        },
+        boundaries?: {
+            dateMark: number,
+            lowerLimit: number,
+            upperLimit: number
         }
     }) {
         this.#checkAuthenticated();

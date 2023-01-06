@@ -190,13 +190,50 @@ describe("chat", () => {
 
             const onlyTwo = await bob.loadChatMessages({
                 chatId: chat.id,
-                limit: 2,
+                timeFrame: {
+                    start: 0,
+                    end: -1,
+                    limit: 2
+                }
+            })
+            expect(onlyTwo.length).toEqual(2);
+            await bob.deleteChat(chat);
+        });
+        it("Should perform partial messages loading based on boundaries", async () => {
+            const chat = await bob.createChat({});
+            //populate with 5 messages 100ms apart
+            for (let i = 0; i < 5; i++) {
+                await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY + i
+                });
+                await new Promise(r => setTimeout(r, 100));
+            }
+            const allMessages = await bob.loadChatMessages({
+                chatId: chat.id,
                 timeFrame: {
                     start: 0,
                     end: -1
                 }
-            })
-            expect(onlyTwo.length).toEqual(2);
+            });
+            expect(allMessages.length).toEqual(5);
+
+            allMessages.sort((a, b) => a.date - b.date);
+
+            const center = await bob.loadChatMessages({
+                chatId: chat.id,
+                boundaries: {
+                    dateMark: allMessages[2].date,
+                    lowerLimit: 2,
+                    upperLimit: 1
+                }
+            });
+            expect(center.length).toEqual(3);
+            center.sort((a, b) => a.date - b.date);
+
+            expect(center[0].id).toEqual(allMessages[1].id);
+            expect(center[1].id).toEqual(allMessages[2].id);
+            expect(center[2].id).toEqual(allMessages[3].id);
             await bob.deleteChat(chat);
         });
         it("Should perform chat search", async () => {
@@ -216,11 +253,28 @@ describe("chat", () => {
                 chatId: chat.id,
                 body: "last message"
             });
-            const searchResults = await bob.searchChatMessages({
+            let searchResults = await bob.searchChatMessages({
                 chatId: chat.id,
                 searchString: searchString
             });
             expect(searchResults.length).toEqual(3);
+            searchResults = await bob.searchChatMessages({
+                chatId: chat.id,
+                searchString: "needle"
+            });
+            expect(searchResults.length).toEqual(3);
+            expect(searchResults.length).toEqual(3);
+            searchResults = await bob.searchChatMessages({
+                chatId: chat.id,
+                searchString: "a needle"
+            });
+            expect(searchResults.length).toEqual(3);
+            expect(searchResults.length).toEqual(3);
+            searchResults = await bob.searchChatMessages({
+                chatId: chat.id,
+                searchString: "a need"
+            });
+            expect(searchResults.length).toEqual(0);
             await bob.deleteChat(chat);
         });
         
