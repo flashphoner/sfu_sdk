@@ -3,8 +3,7 @@ import {SfuEvent, SfuExtended} from "../../../src";
 import {waitForUser} from "../../util/utils";
 
 //TODO(naz): add/remove should return object, add should return id that was created at server side
-//TODO(igor): enable tests after zapp-353
-describe.skip("calendar", () => {
+describe("calendar", () => {
     let sfu: SfuExtended;
     beforeEach(async () => {
         sfu = await waitForUser();
