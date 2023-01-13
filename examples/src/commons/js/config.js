@@ -32,7 +32,8 @@ const getStreams = async function(tracks) {
             streams.push({
                 stream: stream,
                 encodings: track.encodings,
-                source: track.source
+                source: track.source,
+                type: track.type
             });
         }
     }

@@ -110,6 +110,7 @@ const createUUID = function (length) {
     return uuid.substring(0, length);
 }
 
+// Browser detection
 const Browser = function() {
     const isIE = function () {
         return /*@cc_on!@*/false || !!document.documentMode;
@@ -176,7 +177,7 @@ const Browser = function() {
     }
 }
 
-
+// A workaround to play audio automatically in Safari
 const playFirstSound = function (parent, preloader) {
     return new Promise(function (resolve, reject) {
         let audio = document.createElement("audio");

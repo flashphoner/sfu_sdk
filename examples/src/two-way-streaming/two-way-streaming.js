@@ -8,7 +8,8 @@ let playState;
 const PUBLISH = "publish";
 const PLAY = "play";
 const STOP = "stop";
-const PRELOADER_URL="../commons/media/silence.mp3"
+const PRELOADER_URL="../commons/media/silence.mp3";
+const MAX_AWAIT_MS=5000;
 
 
 /**
@@ -56,36 +57,32 @@ const CurrentState = function(prefix) {
         pc: null,
         session: null,
         room: null,
+        roomEnded: false,
+        timeout: null,
         timer: null,
+        promise: null,
+        starting: false,
         set: function(pc, session, room) {
             state.pc = pc;
             state.session = session;
             state.room = room;
+            state.roomEnded = false;
+            state.timeout = null;
+            state.timer = null;
+            state.promise = null;
         },
         clear: function() {
             state.stopWaiting();
             state.room = null;
             state.session = null;
             state.pc = null;
+            state.roomEnded = false;
+            state.timeout = null;
+            state.timer = null;
+            state.promise = null;
         },
-        waitFor: function(div, timeout) {
-            state.stopWaiting();
-            state.timer = setTimeout(function () {
-                if (div.innerHTML !== "") {
-                    // Enable stop button
-                    $("#" + state.buttonId()).prop('disabled', false);
-                }
-                else if (state.isConnected()) {
-                    setStatus(state.errInfoId(), "No media capturing started in " + timeout + " ms, stopping", "red");
-                    onStopClick(state);
-                }
-            }, timeout);        
-        },
-        stopWaiting: function() {
-            if (state.timer) {
-                clearTimeout(state.timer);
-                state.timer = null;                
-            }
+        setRoomEnded: function() {
+            state.roomEnded = true;
         },
         buttonId: function() {
             return state.prefix + "Btn";
@@ -109,10 +106,56 @@ const CurrentState = function(prefix) {
             return (prefix === value);
         },
         isActive: function() {
-            return (state.room && state.pc);
+            return (state.room && !state.roomEnded && state.pc);
         },
         isConnected: function() {
             return (state.session && state.session.state() == constants.SFU_STATE.CONNECTED);
+        },
+        isRoomEnded: function() {
+            return state.roomEnded;
+        },
+        waitFor: async function(promise, ms) {
+            // Create a promise that rejects in <ms> milliseconds
+            state.promise = promise;
+            state.timeout = new Promise((resolve, reject) => {
+                state.resolve = resolve;
+                state.timer = setTimeout(() => {
+                    clearTimeout(state.timer);
+                    state.timer = null;
+                    state.promise = null;
+                    state.timeout = null;
+                    reject('Operation timed out in '+ ms + ' ms.')
+                }, ms)
+            });
+
+            // Returns a race between our timeout and the passed in promise
+            Promise.race([
+                    state.promise,
+                    state.timeout
+            ]).then(() => {
+                state.stopWaiting();
+            }).catch((e) => {
+                setStatus(state.errInfoId(), e, "red");
+            });
+        },
+        stopWaiting: function() {
+            if (state.timer) {
+                clearTimeout(state.timer);
+                state.timer = null;
+            }
+            if (state.timeout) {
+                state.resolve();
+                state.timeout = null;
+            }
+            if (state.promise) {
+                state.promise = null;
+            }
+        },
+        setStarting: function(value) {
+            state.starting = value;
+        },
+        isStarting: function() {
+            return state.starting;
         }
     };
     return state;
@@ -154,7 +197,7 @@ const init = function() {
  */
 const connect = function(state) {
     //create peer connection
-    pc = new RTCPeerConnection();
+    let pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = getRoomConfig(mainConfig);
     roomConfig.url = $("#url").val();
@@ -191,10 +234,24 @@ const onConnected = function(state) {
     // Add errors displaying
     state.room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
         setStatus(state.errInfoId(), e, "red");
-        stopStreaming(state);
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
     }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
         setStatus(state.errInfoId(), e.operation + " failed: " + e.error, "red");
-        stopStreaming(state);
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
+    }).on(constants.SFU_ROOM_EVENT.ENDED, function () {
+        setStatus(state.errInfoId(), "Room "+state.room.name()+" has ended", "red");
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
+    }).on(constants.SFU_ROOM_EVENT.DROPPED, function () {
+        setStatus(state.errInfoId(), "Dropped from the room "+state.room.name()+" due to network issues", "red");
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
     });
     startStreaming(state);
 }
@@ -204,18 +261,27 @@ const onDisconnected = function(state) {
         onStartClick(state);
     }).prop('disabled', false);
     $("#" + state.inputId()).prop('disabled', false);
-    // Check if other session is active
-    if ((state.is(PUBLISH) && playState.session)
-       || (state.is(PLAY) && publishState.session)) {
-        return;
+    // Enable other session buttons
+    let otherState = getOtherState(state);
+    if (!otherState.session) {
+        $("#" + otherState.buttonId()).prop('disabled', false);
+        $("#" + otherState.inputId()).prop('disabled', false);
+        $('#url').prop('disabled', false);
+        $("#roomName").prop('disabled', false);
     }
-    $('#url').prop('disabled', false);
-    $("#roomName").prop('disabled', false);
 }
 
 const onStartClick = function(state) {
-    if (validateForm("connectionForm") && validateForm(state.formId())) {
+    if (validateForm("connectionForm", state.errInfoId())
+      && validateForm(state.formId(), state.errInfoId())
+       && validateName(state, state.errInfoId())) {
+        state.setStarting(true);
+        let otherState = getOtherState(state);
         $("#" + state.buttonId()).prop('disabled', true);
+        // Disable other session button to prevent a simultaneous connections
+        if (!otherState.isStarting()) {
+            $("#" + otherState.buttonId()).prop('disabled', true);
+        }
         if (state.is(PLAY) && Browser().isSafariWebRTC()) {
             playFirstSound(document.getElementById("main"), PRELOADER_URL).then(function () {
                 connect(state);
@@ -227,27 +293,34 @@ const onStartClick = function(state) {
 }
 
 const onStopClick = function(state) {
+    state.setStarting(false);
     $("#" + state.buttonId()).prop('disabled', true);
     stopStreaming(state);
-    if (state.isConnected()) {
-        state.session.disconnect();
-    }
 }
 
-const startStreaming = function(state) {
+const startStreaming = async function(state) {
     if (state.is(PUBLISH)) {
-        publishStreams(state);
+        await publishStreams(state);
     } else if (state.is(PLAY)) {
-        playStreams(state);
+        await playStreams(state);
+    }
+    state.setStarting(false);
+    // Enable session buttons
+    let otherState = getOtherState(state);
+    $("#" + state.buttonId()).prop('disabled', false);
+    if (!otherState.isStarting()) {
+        $("#" + otherState.buttonId()).prop('disabled', false);
     }
 }
 
-const stopStreaming = function(state) {
-    state.stopWaiting();
+const stopStreaming = async function(state) {
     if (state.is(PUBLISH)) {
         unPublishStreams(state);
     } else if (state.is(PLAY)) {
         stopStreams(state);
+    }
+    if (state.isConnected()) {
+        state.waitFor(state.session.disconnect(), MAX_AWAIT_MS);
     }
 }
 
@@ -265,28 +338,23 @@ const publishStreams = async function(state) {
                 let config = {};
                 //add our local streams to the room (to PeerConnection)
                 streams.forEach(function (s) {
+                    let contentType = s.type || s.source;
                     //add local stream to local display
-                    localDisplay.add(s.stream.id, $("#" + state.inputId()).val(), s.stream);
+                    localDisplay.add(s.stream.id, $("#" + state.inputId()).val(), s.stream, contentType);
                     //add each track to PeerConnection
                     s.stream.getTracks().forEach((track) => {
-                        if (s.source === "screen") {
-                            config[track.id] = s.source;
-                        }
+                        config[track.id] = contentType;
                         addTrackToPeerConnection(state.pc, s.stream, track, s.encodings);
                         subscribeTrackToEndedEvent(state.room, track, state.pc);
                     });
                 });
-                state.room.join(state.pc, null, config);
-                // TODO: Use room state or promises to detect if publishing started to enable stop button
-                state.waitFor(document.getElementById("localVideo"), 3000);
+                //start WebRTC negotiation
+                state.waitFor(state.room.join(state.pc, null, config), MAX_AWAIT_MS);
             }
         } catch(e) {
             console.error("Failed to capture streams: " + e);
             setStatus(state.errInfoId(), e.name, "red");
-            state.stopWaiting();
-            if (state.isConnected()) { 
-                onStopClick(state);
-            }
+            onStopClick(state);
         }
     }
 }
@@ -297,17 +365,23 @@ const unPublishStreams = function(state) {
     }
 }
 
-const playStreams = function(state) {
+const playStreams = async function(state) {
     if (state.isConnected() && state.isActive()) {
-        //create remote display item to show remote streams
-        remoteDisplay = initRemoteDisplay({
-            div: document.getElementById("remoteVideo"),
-            room: state.room,
-            peerConnection: state.pc
-        });
-        state.room.join(state.pc);
+        try {
+            //create remote display item to show remote streams
+            remoteDisplay = initRemoteDisplay({
+                div: document.getElementById("remoteVideo"),
+                room: state.room,
+                peerConnection: state.pc
+            });
+            //start WebRTC negotiation
+            state.waitFor(state.room.join(state.pc), MAX_AWAIT_MS);
+        } catch(e) {
+            console.error("Failed to play streams: " + e);
+            setStatus(state.errInfoId(), e.name, "red");
+            onStopClick(state);
+        }
     }
-    $("#" + state.buttonId()).prop('disabled', false);
 }
 
 const stopStreams = function(state) {
@@ -351,14 +425,17 @@ const setStatus = function (status, text, color) {
     field.innerText = text;
 }
 
-const validateForm = function (formId) {
-    var valid = true;
+const validateForm = function (formId, errorInfoId) {
+    let valid = true;
+    // Validate empty fields
     $('#' + formId + ' :text').each(function () {
         if (!$(this).val()) {
             highlightInput($(this));
             valid = false;
+            setStatus(errorInfoId, "Fields cannot be empty", "red");
         } else {
             removeHighlight($(this));
+            setStatus(errorInfoId, "");
         }
     });
     return valid;
@@ -372,7 +449,29 @@ const validateForm = function (formId) {
     }
 }
 
+const validateName = function (state) {
+    let valid = true;
+    // Validate other nickname
+    let nameToCheck = $("#" + state.inputId()).val();
+    let otherState = getOtherState(state);
+
+    if (nameToCheck === $("#" + otherState.inputId()).val()) {
+        if (otherState.isActive() || otherState.isConnected()) {
+            valid = false;
+            setStatus(state.errInfoId(), "Cannot connect with the same name", "red");
+        }
+    }
+    return valid;
+}
+
 const buttonText = function (string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+const getOtherState = function(state) {
+    if (state.is(PUBLISH)) {
+        return playState;
+    } else if (state.is(PLAY)) {
+        return publishState;
+    }
+}

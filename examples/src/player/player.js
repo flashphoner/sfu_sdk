@@ -5,7 +5,9 @@ let remoteDisplay;
 let playState;
 const PLAY = "play";
 const STOP = "stop";
-const PRELOADER_URL="../commons/media/silence.mp3"
+const PRELOADER_URL="../commons/media/silence.mp3";
+const MAX_AWAIT_MS=5000;
+
 
 /**
  * Default publishing config
@@ -28,15 +30,31 @@ const CurrentState = function(prefix) {
         pc: null,
         session: null,
         room: null,
+        roomEnded: false,
+        timeout: null,
+        timer: null,
+        promise: null,
         set: function(pc, session, room) {
             state.pc = pc;
             state.session = session;
             state.room = room;
+            state.roomEnded = false;
+            state.timeout = null;
+            state.timer = null;
+            state.promise = null;
         },
         clear: function() {
+            state.stopWaiting();
             state.room = null;
             state.session = null;
             state.pc = null;
+            state.roomEnded = false;
+            state.timeout = null;
+            state.timer = null;
+            state.promise = null;
+        },
+        setRoomEnded: function() {
+            state.roomEnded = true;
         },
         buttonId: function() {
             return state.prefix + "Btn";
@@ -58,6 +76,52 @@ const CurrentState = function(prefix) {
         },
         is: function(value) {
             return (prefix === value);
+        },
+        isActive: function() {
+            return (state.room && !state.roomEnded && state.pc);
+        },
+        isConnected: function() {
+            return (state.session && state.session.state() == constants.SFU_STATE.CONNECTED);
+        },
+        isRoomEnded: function() {
+            return state.roomEnded;
+        },
+        waitFor: async function(promise, ms) {
+            // Create a promise that rejects in <ms> milliseconds
+            state.promise = promise;
+            state.timeout = new Promise((resolve, reject) => {
+                state.resolve = resolve;
+                state.timer = setTimeout(() => {
+                    clearTimeout(state.timer);
+                    state.timer = null;
+                    state.promise = null;
+                    state.timeout = null;
+                    reject('Operation timed out in '+ ms + ' ms.')
+                }, ms)
+            });
+
+            // Returns a race between our timeout and the passed in promise
+            Promise.race([
+                state.promise,
+                state.timeout
+            ]).then(() => {
+                state.stopWaiting();
+            }).catch((e) => {
+                setStatus(state.errInfoId(), e, "red");
+            });
+        },
+        stopWaiting: function() {
+            if (state.timer) {
+                clearTimeout(state.timer);
+                state.timer = null;
+            }
+            if (state.timeout) {
+                state.resolve();
+                state.timeout = null;
+            }
+            if (state.promise) {
+                state.promise = null;
+            }
         }
     };
     return state;
@@ -120,20 +184,38 @@ const connect = function(state) {
     });
 }
 
-const onConnected = function(state) {
+const onConnected = async function(state) {
     $("#" + state.buttonId()).text("Stop").off('click').click(function () {
         onStopClick(state);
-    }).prop('disabled', false);
+    });
     $('#url').prop('disabled', true);
     $("#roomName").prop('disabled', true);
     $("#" + state.inputId()).prop('disabled', true);
     // Add errors displaying
     state.room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
         setStatus(state.errInfoId(), e, "red");
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
     }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
         setStatus(state.errInfoId(), e.operation + " failed: " + e.error, "red");
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
+    }).on(constants.SFU_ROOM_EVENT.ENDED, function (e) {
+        setStatus(state.errInfoId(), "Room "+state.room.name()+" has ended", "red");
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
+    }).on(constants.SFU_ROOM_EVENT.DROPPED, function (e) {
+        setStatus(state.errInfoId(), "Dropped from the room "+state.room.name()+" due to network issues", "red");
+        state.setRoomEnded();
+        state.stopWaiting();
+        onStopClick(state);
     });
-    playStreams(state);
+    await playStreams(state);
+    // Enable button after starting playback #WCS-3635
+    $("#" + state.buttonId()).prop('disabled', false);
 }
 
 const onDisconnected = function(state) {
@@ -158,20 +240,29 @@ const onStartClick = function(state) {
     }
 }
 
-const onStopClick = function(state) {
+const onStopClick = async function(state) {
     $("#" + state.buttonId()).prop('disabled', true);
     stopStreams(state);
-    state.session.disconnect();
+    if (state.isConnected()) {
+        state.waitFor(state.session.disconnect(), MAX_AWAIT_MS);
+    }
 }
 
-const playStreams = function(state) {
+const playStreams = async function(state) {
     //create remote display item to show remote streams
-    remoteDisplay = initRemoteDisplay({
-        div: document.getElementById("remoteVideo"),
-        room: state.room,
-        peerConnection: state.pc
-    });
-    state.room.join(state.pc);
+    try {
+        remoteDisplay = initRemoteDisplay({
+            div: document.getElementById("remoteVideo"),
+            room: state.room,
+            peerConnection: state.pc
+        });
+        // Start WebRTC negotiation
+        state.waitFor(state.room.join(state.pc), MAX_AWAIT_MS);
+    } catch(e) {
+        console.error("Failed to play streams: " + e);
+        setStatus(state.errInfoId(), e.name, "red");
+        onStopClick(state);
+    }
 }
 
 const stopStreams = function(state) {
