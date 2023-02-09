@@ -377,6 +377,16 @@ describe("chat", () => {
                 to: TEST_USER_1.username
             });
         })
+        it("Chat should be renamed after changing user's nickname", async () => {
+            const chatOriginal = await bob.createChat({});
+            const newNickname = "newBob";
+            await bob.changeUserNickname(newNickname);
+            const chats = await bob.getUserChats();
+            const chatRenamed = chats[chatOriginal.id];
+            expect(chatRenamed.name).toEqual(newNickname);
+            await bob.changeUserNickname(TEST_USER_0.nickname)
+            await bob.deleteChat(chatRenamed);
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});

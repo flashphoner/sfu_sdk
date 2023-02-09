@@ -38,6 +38,8 @@ import {
     UserCalendarEvent,
     UserEmail,
     UserId,
+    UserPassword,
+    UserPmiSettings,
     UserListEvent,
     UserNickname,
     UserRoomsEvent,
@@ -46,20 +48,25 @@ import {
     ChatError,
     ChatReceivePolicy,
     ChatSearchResultEvent,
-    MessageStatusBulkEvent, UserPmiSettings
+    MessageStatusBulkEvent,
+    UserEmailChangedEvent,
+    UserNicknameChangedEvent,
+    UserInfo,
+    UserInfoEvent,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 
-type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment;
+type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo;
 
 export class SfuExtended {
 
     #connection: Connection;
     #_user: {
         username: UserId,
+        email: UserEmail,
         nickname: UserNickname,
         pmi: string
     }
@@ -109,6 +116,7 @@ export class SfuExtended {
         this.#binaryChunkSize = options.binaryChunkSize ? options.binaryChunkSize : ATTACHMENT_CHUNK_SIZE;
         return new Promise<{
             username: UserId,
+            email: UserEmail,
             nickname: UserNickname,
             pmi: string
         }>(async (resolve, reject) => {
@@ -116,6 +124,7 @@ export class SfuExtended {
                 const userCredentials = await this.#connection.connect(connectionConfig);
                 self.#_user = {
                     username: userCredentials.sipLogin,
+                    email: userCredentials.email,
                     nickname: userCredentials.sipVisibleName,
                     pmi: userCredentials.pmi
                 }
@@ -364,6 +373,20 @@ export class SfuExtended {
                             const room = this.#rooms[data[0].roomId];
                             if (room) {
                                 room.processEvent(data[0]);
+                            }
+                        } else if (data[0].type === SfuEvent.USER_INFO) {
+                            const event = data[0] as UserInfoEvent;
+                            promises.resolve(event.internalMessageId, event.userInfo)
+                            this.#notifier.notify(SfuEvent.USER_INFO, event.userInfo);
+                        } else if (data[0].type === SfuEvent.USER_EMAIL_CHANGED) {
+                            const event = data[0] as UserEmailChangedEvent;
+                            if (promises.resolve(event.internalMessageId)) {
+                                this.#_user.email = event.email;
+                            }
+                        } else if (data[0].type === SfuEvent.USER_NICKNAME_CHANGED) {
+                            const event = data[0] as UserNicknameChangedEvent;
+                            if (promises.resolve(event.internalMessageId)) {
+                                this.#_user.nickname = event.nickname;
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -719,6 +742,80 @@ export class SfuExtended {
             }, resolve, reject);
         });
     }
+
+    public getUserInfo() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<UserInfo>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_USER_INFO, {}, resolve, reject);
+        })
+    }
+
+    public changeUserEmail(email: UserEmail) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CHANGE_USER_EMAIL, {
+                email: email
+            }, resolve, reject);
+        })
+    };
+
+    public changeUserPassword(currentPassword: UserPassword, newPassword: UserPassword) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CHANGE_USER_PASSWORD, {
+                password: {
+                    currentPassword: currentPassword,
+                    newPassword: newPassword
+                }
+            }, resolve, reject);
+        })
+    };
+
+    public changeUserNickname(nickname: UserNickname) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CHANGE_USER_NICKNAME, {
+                nickname: nickname
+            }, resolve, reject);
+        })
+    };
+
+    public changeUserPhoneNumber(phoneNumber: string) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CHANGE_USER_PHONE_NUMBER, {
+                phoneNumber: phoneNumber
+            }, resolve, reject);
+        })
+    };
+
+    public changeUserHostKey(hostKey: string) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CHANGE_USER_HOST_KEY, {
+                hostKey: hostKey
+            }, resolve, reject);
+        })
+    };
+
+    public changeUserTimezone(id: string, offset: string) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CHANGE_USER_TIMEZONE, {
+                timezone: {
+                    id: id,
+                    offset: offset
+                }
+            }, resolve, reject);
+        })
+    };
 
     public addCalendarEvent(event: {
         title: string,

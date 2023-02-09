@@ -3,6 +3,7 @@ import Logger, {Verbosity} from "./logger";
 
 type InitialUserData = {
     sipLogin: string,
+    email: string,
     sipVisibleName: string,
     pmi: string
 }

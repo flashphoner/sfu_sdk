@@ -28,7 +28,10 @@ export enum SfuEvent {
     USER_ROOMS = "USER_ROOMS",
     ATTACHMENT = "ATTACHMENT",
     SFU_USER_PMI_SETTINGS = "SFU_USER_PMI_SETTINGS",
-    UPDATE_USER_PMI_SETTINGS = "UPDATE_USER_PMI_SETTINGS"
+    UPDATE_USER_PMI_SETTINGS = "UPDATE_USER_PMI_SETTINGS",
+    USER_INFO = "USER_INFO",
+    USER_EMAIL_CHANGED = "USER_EMAIL_CHANGED",
+    USER_NICKNAME_CHANGED = "USER_NICKNAME_CHANGED",
 }
 
 export enum RoomEvent {
@@ -158,7 +161,14 @@ export enum Operations {
     PARTICIPANT_VIDEO_MUTED = "PARTICIPANT_VIDEO_MUTED",
     PARTICIPANT_SCREEN_SHARING_MUTED = "PARTICIPANT_SCREEN_SHARING_MUTED",
     RENAME_PARTICIPANT = "RENAME_PARTICIPANT",
-    TURN_OFF_PARTICIPANT_SCREEN_SHARING = "TURN_OFF_PARTICIPANT_SCREEN_SHARING"
+    TURN_OFF_PARTICIPANT_SCREEN_SHARING = "TURN_OFF_PARTICIPANT_SCREEN_SHARING",
+    GET_USER_INFO = "GET_USER_INFO",
+    CHANGE_USER_EMAIL = "CHANGE_USER_EMAIL",
+    CHANGE_USER_PASSWORD = "CHANGE_USER_PASSWORD",
+    CHANGE_USER_NICKNAME = "CHANGE_USER_NICKNAME",
+    CHANGE_USER_PHONE_NUMBER = "CHANGE_USER_PHONE_NUMBER",
+    CHANGE_USER_HOST_KEY = "CHANGE_USER_HOST_KEY",
+    CHANGE_USER_TIMEZONE = "CHANGE_USER_TIMEZONE"
 }
 
 export enum ParticipantRole {
@@ -265,7 +275,14 @@ export enum InternalApi {
     SET_PARTICIPANT_AUDIO_MUTED = "setParticipantAudioMuted",
     SET_PARTICIPANT_VIDEO_MUTED = "setParticipantVideoMuted",
     SET_PARTICIPANT_SCREEN_SHARING_MUTED = "setParticipantScreenSharingMuted",
-    TURN_OFF_PARTICIPANT_SCREEN_SHARING = "turnOffParticipantScreenSharing"
+    TURN_OFF_PARTICIPANT_SCREEN_SHARING = "turnOffParticipantScreenSharing",
+    GET_USER_INFO = "getUserInfo",
+    CHANGE_USER_EMAIL = "changeUserEmail",
+    CHANGE_USER_PASSWORD = "changeUserPassword",
+    CHANGE_USER_NICKNAME = "changeUserNickname",
+    CHANGE_USER_PHONE_NUMBER = "changeUserPhoneNumber",
+    CHANGE_USER_HOST_KEY = "changeUserHostKey",
+    CHANGE_USER_TIMEZONE = "changeUserTimezone"
 }
 
 export enum ContactError {
@@ -293,6 +310,14 @@ export enum RoomError {
     CANCEL_JOIN_ROOM = "Joining to room canceled by user",
     ROOM_IS_LOCKED = "Room is locked",
     RENAMING_PROHIBITED = "Renaming prohibited by the owner"
+}
+
+export enum UserInfoError {
+    EMAIL_ADDRESS_ALREADY_TAKEN = "User with this email already exists",
+    CURRENT_PASSWORD_IS_INCORRECT = "You entered incorrect current password",
+    CURRENT_PASSWORD_IS_NULL = "Current password can't be null",
+    NEW_PASSWORD_IS_NULL = "New password can't be null",
+    PASSWORD_POLICY_ERROR = "New password should be at least 6 characters"
 }
 
 export const ATTACHMENT_CHUNK_SIZE = 100000;
@@ -649,6 +674,15 @@ export type User = {
     invite: Invite;
 }
 
+export type UserInfo = {
+    id: UserId,
+    email: UserEmail,
+    nickname: UserNickname,
+    phoneNumber: UserPhoneNumber,
+    hostKey: UserHostKey,
+    timezone: UserTimezone
+}
+
 export type UserListEvent = InternalMessage & {
     list: Array<User>
 }
@@ -791,6 +825,20 @@ export type UserPmiSettings = InternalMessage & {
     }
 }
 
+export type UserInfoEvent = InternalMessage & {
+    userInfo: UserInfo
+}
+
+export type UserEmailChangedEvent = InternalMessage & {
+    userId: UserId,
+    email: UserEmail
+}
+
+export type UserNicknameChangedEvent = InternalMessage & {
+    userId: UserId,
+    nickname: UserNickname
+}
+
 export type OperationFailedEvent = InternalMessage & {
     operation: Operations,
     error: string,
@@ -803,3 +851,14 @@ export type UserId = string;
 export type UserNickname = string;
 
 export type UserEmail = string;
+
+export type UserPassword = string;
+
+export type UserPhoneNumber = string;
+
+export type UserHostKey = string;
+
+export type UserTimezone = {
+    id: string,
+    offset: string
+}
