@@ -511,7 +511,7 @@ export class SfuExtended {
 
     public getSendingAttachmentsHandler(attachments: Array<MessageAttachmentData>, messageId: string) {
         const self = this;
-        const cancelledAttachments: {[key: number]: {resolve: Function, reject: Function}} = {};
+        const cancelledAttachments: {[key: number]: {status: AttachmentStatus}} = {};
         let promiseForWaitResultMessageStatus: {resolve: Function, reject: Function};
         let resultMessageStatus: MessageStatus;
         let uploadedAttachments: Array<number> = [];
@@ -569,11 +569,8 @@ export class SfuExtended {
                             resolve(attachmentState);
                         }
                     } else {
-                        const result = await cancelUploadAttachment(attachment.id);
-                        const attachmentState = result as AttachmentStatus;
-                        cancellationPromise.resolve(attachmentState);
                         delete cancelledAttachments[id];
-                        resolve(attachmentState);
+                        resolve(cancellationPromise.status);
                         break;
                     }
                 }
@@ -586,14 +583,12 @@ export class SfuExtended {
                     self.#checkAuthenticated();
                     if (attachments.length) {
                         for (let i = 0; i < attachments.length; i++) {
-                            const cancellationPromise = cancelledAttachments[attachments[i].id];
+                            const attachmentId = attachments[i].id;
+                            const cancellationPromise = cancelledAttachments[attachmentId];
                             if (cancellationPromise === undefined) {
                                 await uploadAttachment(attachments[i]);
                             } else {
-                                const result = await cancelUploadAttachment(attachments[i].id);
-                                const attachmentState = result as AttachmentStatus;
-                                cancellationPromise.resolve(attachmentState);
-                                delete cancelledAttachments[attachments[i].id];
+                                delete cancelledAttachments[attachmentId];
                             }
                         }
                         const result = await sendMessageWithAttachments(messageId);
@@ -608,7 +603,9 @@ export class SfuExtended {
                 }),
                 cancel: (attachment: MessageAttachment) => new Promise<AttachmentStatus>(async function (resolve, reject) {
                     if (!uploadedAttachments.includes(attachment.id)) {
-                        cancelledAttachments[attachment.id] = {resolve, reject};
+                        const result = await cancelUploadAttachment(attachment.id);
+                        cancelledAttachments[attachment.id] =  {status: result};
+                        resolve(result);
                     } else {
                         reject(new Error(ChatError.CAN_NOT_CANCEL_UPLOADED_ATTACHMENT));
                     }
