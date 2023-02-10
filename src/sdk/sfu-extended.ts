@@ -53,6 +53,8 @@ import {
     UserNicknameChangedEvent,
     UserInfo,
     UserInfoEvent,
+    MessageEdited,
+    MessageDeleted
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -387,6 +389,16 @@ export class SfuExtended {
                             const event = data[0] as UserNicknameChangedEvent;
                             if (promises.resolve(event.internalMessageId)) {
                                 this.#_user.nickname = event.nickname;
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_MESSAGE_EDITED) {
+                            const message = data[0] as MessageEdited;
+                            if (!promises.resolve(data[0].internalMessageId, message)) {
+                                this.#notifier.notify(SfuEvent.CHAT_MESSAGE_EDITED, message);
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_MESSAGE_DELETED) {
+                            const message = data[0] as MessageDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, message)) {
+                                this.#notifier.notify(SfuEvent.CHAT_MESSAGE_DELETED, message);
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -979,6 +991,40 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.RENAME_CHAT, {id: chat.id, name: chat.name}, resolve, reject);
         });
     };
+
+    public editChatMessage(msg: {
+        chatId: string,
+        messageId: string,
+        body: string,
+        attachmentsToSend?: Array<MessageAttachment>,
+        attachmentIdsToDelete?: number[]
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<MessageStatus>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.EDIT_CHAT_MESSAGE, {
+                id: msg.messageId,
+                chatId: msg.chatId,
+                body: msg.body,
+                attachments: msg.attachmentsToSend,
+                attachmentIdsToDelete: msg.attachmentIdsToDelete
+            }, resolve, reject);
+        });
+    }
+
+    public deleteChatMessage(msg: {
+        chatId: string,
+        messageId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<MessageStatus>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_CHAT_MESSAGE, {
+                id: msg.messageId,
+                chatId: msg.chatId,
+            }, resolve, reject);
+        });
+    }
 
     public addMemberToChat(chat: {
         id: string,

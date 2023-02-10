@@ -32,6 +32,8 @@ export enum SfuEvent {
     USER_INFO = "USER_INFO",
     USER_EMAIL_CHANGED = "USER_EMAIL_CHANGED",
     USER_NICKNAME_CHANGED = "USER_NICKNAME_CHANGED",
+    CHAT_MESSAGE_EDITED = "CHAT_MESSAGE_EDITED",
+    CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED"
 }
 
 export enum RoomEvent {
@@ -168,7 +170,9 @@ export enum Operations {
     CHANGE_USER_NICKNAME = "CHANGE_USER_NICKNAME",
     CHANGE_USER_PHONE_NUMBER = "CHANGE_USER_PHONE_NUMBER",
     CHANGE_USER_HOST_KEY = "CHANGE_USER_HOST_KEY",
-    CHANGE_USER_TIMEZONE = "CHANGE_USER_TIMEZONE"
+    CHANGE_USER_TIMEZONE = "CHANGE_USER_TIMEZONE",
+    EDIT_CHAT_MESSAGE = "EDIT_CHAT_MESSAGE",
+    DELETE_CHAT_MESSAGE = "DELETE_CHAT_MESSAGE"
 }
 
 export enum ParticipantRole {
@@ -282,7 +286,9 @@ export enum InternalApi {
     CHANGE_USER_NICKNAME = "changeUserNickname",
     CHANGE_USER_PHONE_NUMBER = "changeUserPhoneNumber",
     CHANGE_USER_HOST_KEY = "changeUserHostKey",
-    CHANGE_USER_TIMEZONE = "changeUserTimezone"
+    CHANGE_USER_TIMEZONE = "changeUserTimezone",
+    EDIT_CHAT_MESSAGE = "editChatMessage",
+    DELETE_CHAT_MESSAGE = "deleteChatMessage"
 }
 
 export enum ContactError {
@@ -294,7 +300,11 @@ export enum ChatError {
     CAN_NOT_SEND_NULL_MESSAGE = "Can't send null message",
     CAN_NOT_SEND_MESSAGE_WITHOUT_CHAT_ID = "Can't send message without a chatId",
     USER_MUST_BE_A_CHAT_MEMBER_TO_SEND_MESSAGES = "User must be a chat member to send messages",
-    CAN_NOT_CANCEL_UPLOADED_ATTACHMENT = "Can't cancel uploading attachment, attachment has uploaded state"
+    CAN_NOT_CANCEL_UPLOADED_ATTACHMENT = "Can't cancel uploading attachment, attachment has uploaded state",
+    EDIT_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS = "Failed to edit message, chat doesn't exist",
+    EDIT_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to edit message, message doesn't exist",
+    DELETE_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS = "Failed to delete message, chat doesn't exist",
+    DELETE_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to delete message, message doesn't exist"
 }
 
 export enum RoomError {
@@ -566,6 +576,8 @@ export type MessageStatus = {
     date: number;
     attachments: Array<MessageAttachment>;
     deliveryStatus: MessageDeliveryStatus;
+    edited: boolean,
+    dateOfEdit: number
 }
 
 export type AttachmentStatus = {
@@ -624,6 +636,8 @@ export type Message = {
     attachments: Array<MessageAttachment>;
     deliveryStatus: MessageDeliveryStatus;
     privateMessage: boolean;
+    edited: boolean;
+    dateOfEdit: number;
 }
 
 export type SfuMessageEvent = InternalMessage & {
@@ -837,6 +851,16 @@ export type UserEmailChangedEvent = InternalMessage & {
 export type UserNicknameChangedEvent = InternalMessage & {
     userId: UserId,
     nickname: UserNickname
+}
+
+export type MessageEdited = InternalMessage & {
+    chatId: string,
+    message: Message
+}
+
+export type MessageDeleted = InternalMessage & {
+    chatId: string,
+    messageId: string
 }
 
 export type OperationFailedEvent = InternalMessage & {

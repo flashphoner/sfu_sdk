@@ -2,7 +2,8 @@ import {
     ATTACHMENTS,
     ATTACHMENTS_PAYLOAD,
     DOWNLOAD_PATH,
-    TEST_BIG_PICTURE_ATTACHMENT, TEST_BIG_PICTURE_ATTACHMENT_DATA,
+    TEST_BIG_PICTURE_ATTACHMENT,
+    TEST_BIG_PICTURE_ATTACHMENT_DATA,
     TEST_PDF_ATTACHMENT,
     TEST_PDF_ATTACHMENT_DATA,
     TEST_PICTURE_ATTACHMENT,
@@ -16,10 +17,17 @@ import {
 import {
     ATTACHMENT_CHUNK_SIZE,
     AttachmentState,
-    AttachmentStatus, ChannelSendPolicy, ChannelType,
-    ChatError, Message,
-    MessageState, MessageStatusBulkEvent,
-    SfuEvent, UserSpecificChatInfo
+    AttachmentStatus,
+    ChannelSendPolicy,
+    ChannelType,
+    ChatError,
+    Message,
+    MessageDeleted,
+    MessageEdited,
+    MessageState,
+    MessageStatusBulkEvent,
+    SfuEvent,
+    UserSpecificChatInfo
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -376,7 +384,7 @@ describe("chat", () => {
                 body: MESSAGE_BODY,
                 to: TEST_USER_1.username
             });
-        })
+        });
         it("Chat should be renamed after changing user's nickname", async () => {
             const chatOriginal = await bob.createChat({});
             const newNickname = "newBob";
@@ -386,6 +394,184 @@ describe("chat", () => {
             expect(chatRenamed.name).toEqual(newNickname);
             await bob.changeUserNickname(TEST_USER_0.nickname)
             await bob.deleteChat(chatRenamed);
+        });
+        it("Should edit chat message", async () => {
+            const editedBody = "edited message body";
+            let chat = await bob.createChat({});
+            const message = await bob.sendMessage({
+                body: MESSAGE_BODY,
+                chatId: chat.id,
+                attachments: [TEST_PICTURE_ATTACHMENT]
+            });
+            const attachmentsData = [];
+            attachmentsData.push({
+                id: TEST_PICTURE_ATTACHMENT.id,
+                payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+            })
+            const handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
+            await handler.sendAttachments();
+            await bob.editChatMessage({chatId: chat.id, messageId: message.id, body: editedBody});
+            const messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }});
+            const messageAfterEdit = messages.find((msg) => msg.id === message.id);
+            expect(messageAfterEdit).toBeTruthy();
+            expect(messageAfterEdit.body).toEqual(editedBody);
+            expect(messageAfterEdit.edited).toBe(true);
+            expect(messageAfterEdit.dateOfEdit).toBeTruthy();
+
+            await bob.deleteChat({id: chat.id});
+        });
+        it("Should edit chat message and delete attachment", async () => {
+            const editedBody = "edited message body";
+            let chat = await bob.createChat({});
+
+            const status = await bob.sendMessage({
+                chatId: chat.id,
+                body: MESSAGE_BODY,
+                attachments: [
+                    TEST_PICTURE_ATTACHMENT
+                ]
+            });
+            expect(status).toBeTruthy();
+            expect(status.id).toBeTruthy();
+            expect(status.date).toBeTruthy();
+            expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+            expect(status.attachments).toBeTruthy();
+            expect(status.attachments.length).toEqual(1);
+
+            const attachmentsData = [];
+            attachmentsData.push({
+                id: status.attachments[0].id,
+                payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+            })
+            const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
+            await handler.sendAttachments();
+
+            const attachmentId = status.attachments[0].id;
+            await bob.editChatMessage({chatId: chat.id, messageId: status.id, body: editedBody, attachmentIdsToDelete: [attachmentId]});
+
+            const messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }});
+            const messageAfterEdit = messages.find((msg) => msg.id === status.id);
+            expect(messageAfterEdit).toBeTruthy();
+            expect(messageAfterEdit.body).toEqual(editedBody);
+            expect(messageAfterEdit.attachments.length).toEqual(0);
+            expect(messageAfterEdit.edited).toBe(true);
+            expect(messageAfterEdit.dateOfEdit).toBeTruthy();
+
+            await bob.deleteChat({id: chat.id});
+        });
+        it("Should edit chat message and add attachments", async () => {
+            const editedBody = "edited message body";
+            let chat = await bob.createChat({});
+            const message = await bob.sendMessage({body: MESSAGE_BODY, chatId: chat.id});
+
+            await bob.editChatMessage({
+                chatId: chat.id,
+                messageId: message.id,
+                body: editedBody,
+                attachmentsToSend: [TEST_PICTURE_ATTACHMENT]
+            });
+
+            const attachmentsData = [];
+            attachmentsData.push({
+                id: TEST_PICTURE_ATTACHMENT.id,
+                payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+            })
+            const handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
+            await handler.sendAttachments();
+
+            const messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }});
+            const messageAfterEdit = messages.find((msg) => msg.id === message.id);
+            expect(messageAfterEdit).toBeTruthy();
+            expect(messageAfterEdit.body).toEqual(editedBody);
+            expect(messageAfterEdit.attachments.length).toBe(1);
+            expect(messageAfterEdit.attachments[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+            expect(messageAfterEdit.edited).toBe(true);
+            expect(messageAfterEdit.dateOfEdit).toBeTruthy();
+
+            await bob.deleteChat({id: chat.id});
+        });
+        it("Should delete and add a new attachment when editing", async () => {
+            const editedBody = "edited message body";
+            let chat = await bob.createChat({});
+            const message = await bob.sendMessage({
+                body: MESSAGE_BODY,
+                chatId: chat.id,
+                attachments: [TEST_PICTURE_ATTACHMENT]
+            });
+
+            const attachmentsData = [];
+            attachmentsData.push({
+                id: TEST_PICTURE_ATTACHMENT.id,
+                payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+            })
+
+            let handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
+            await handler.sendAttachments();
+
+            await bob.editChatMessage({
+                chatId: chat.id,
+                messageId: message.id,
+                body: editedBody,
+                attachmentIdsToDelete: [0],
+                attachmentsToSend: [TEST_PDF_ATTACHMENT]
+            });
+
+            attachmentsData.splice(0, 1);
+            attachmentsData.push({
+                id: TEST_PDF_ATTACHMENT.id,
+                payload: TEST_PDF_ATTACHMENT_DATA.payload,
+            })
+
+            handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
+            await handler.sendAttachments();
+
+            const messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }});
+            const messageAfterEdit = messages.find((msg) => msg.id === message.id);
+            expect(messageAfterEdit).toBeTruthy();
+            expect(messageAfterEdit.body).toEqual(editedBody);
+            expect(messageAfterEdit.attachments.length).toBe(1);
+            expect(messageAfterEdit.attachments[0].name).toEqual(TEST_PDF_ATTACHMENT.name);
+            expect(messageAfterEdit.edited).toBe(true);
+            expect(messageAfterEdit.dateOfEdit).toBeTruthy();
+
+            await bob.deleteChat({id: chat.id});
+        });
+        it("Should delete message", async () => {
+            let chat = await bob.createChat({});
+            const message = await bob.sendMessage({body: MESSAGE_BODY, chatId: chat.id});
+
+            await bob.deleteChatMessage({chatId: chat.id, messageId: message.id});
+
+            const messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }});
+            expect(messages).toBeTruthy();
+            expect(messages.length).toBe(0);
+
+            await bob.deleteChat({id: chat.id});
         });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
@@ -821,6 +1007,72 @@ describe("chat", () => {
                     chatId: chat0.id,
                     body: MESSAGE_BODY
                 });
+            });
+            it("Chat member should be notified about editing message", async () => {
+                const editedBody = "edited message body";
+                let chat = await bob.createChat({
+                    members: [TEST_USER_1.username]
+                });
+
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+
+                const waitForMessageEditedEvent = (sfu: SfuExtended, messageId: string): Promise<MessageEdited> => {
+                    return new Promise<MessageEdited>((resolve, reject) => {
+                        sfu.on(SfuEvent.CHAT_MESSAGE_EDITED, (msg) => {
+                            const messageEdited = msg as MessageEdited;
+                            if (messageEdited && messageEdited.message.id === messageId) {
+                                resolve(messageEdited);
+                            }
+                        })
+                    })
+                };
+
+                const editPromise = bob.editChatMessage({chatId: chat.id, messageId: status.id, body: editedBody});
+                const editedMessage = await waitForMessageEditedEvent(alice, status.id);
+                expect(editedMessage).toBeTruthy();
+                expect(editedMessage.message.body).toEqual(editedBody);
+                expect(editedMessage.message.edited).toBe(true);
+                expect(editedMessage.message.dateOfEdit).toBeTruthy();
+                await editPromise;
+
+                await bob.deleteChat({id: chat.id});
+            });
+            it("Chat member should be notified about deleting message", async () => {
+                let chat = await bob.createChat({
+                    members: [TEST_USER_1.username]
+                });
+
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+
+                const waitForMessageDeletedEvent = (sfu: SfuExtended, messageId: string): Promise<MessageDeleted> => {
+                    return new Promise<MessageDeleted>((resolve, reject) => {
+                        sfu.on(SfuEvent.CHAT_MESSAGE_DELETED, (msg) => {
+                            const messageDeleted = msg as MessageDeleted;
+                            if (messageDeleted && messageDeleted.chatId === chat.id && messageDeleted.messageId === messageId) {
+                                resolve(messageDeleted);
+                            }
+                        })
+                    })
+                };
+
+                const deletePromise = bob.deleteChatMessage({chatId: chat.id, messageId: status.id});
+                const deletedMessage = await waitForMessageDeletedEvent(alice, status.id);
+                expect(deletedMessage).toBeTruthy();
+                await deletePromise;
+
+                await bob.deleteChat({id: chat.id});
             });
         });
     });
