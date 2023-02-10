@@ -514,7 +514,7 @@ export class SfuExtended {
         const cancelledAttachments: {[key: number]: {status: AttachmentStatus}} = {};
         let promiseForWaitResultMessageStatus: {resolve: Function, reject: Function};
         let resultMessageStatus: MessageStatus;
-        let uploadedAttachments: Array<number> = [];
+        let attachmentsIsReady = false;
 
         function sendMessageWithAttachments(messageId: string) {
             return new Promise<MessageStatus>(function (resolve, reject) {
@@ -525,9 +525,9 @@ export class SfuExtended {
             })
         }
 
-        function cancelUploadAttachment(attachmentId: number) {
+        function cancelSendAttachment(attachmentId: number) {
             return new Promise<AttachmentStatus>(function (resolve, reject) {
-                self.#emmitAction(InternalApi.CANCEL_UPLOAD_ATTACHMENT, {
+                self.#emmitAction(InternalApi.CANCEL_SENDING_ATTACHMENT, {
                     id: attachmentId}, resolve, reject);
             })
         }
@@ -565,7 +565,6 @@ export class SfuExtended {
                         const result = await sendAttachmentChunk(data, id, end, i);
                         const attachmentState = result as AttachmentStatus;
                         if (attachmentState.state === AttachmentState.UPLOADED) {
-                            uploadedAttachments.push(id);
                             resolve(attachmentState);
                         }
                     } else {
@@ -591,6 +590,7 @@ export class SfuExtended {
                                 delete cancelledAttachments[attachmentId];
                             }
                         }
+                        attachmentsIsReady = true;
                         const result = await sendMessageWithAttachments(messageId);
                         if (promiseForWaitResultMessageStatus) {
                             promiseForWaitResultMessageStatus.resolve(result);
@@ -602,12 +602,14 @@ export class SfuExtended {
                     }
                 }),
                 cancel: (attachment: MessageAttachment) => new Promise<AttachmentStatus>(async function (resolve, reject) {
-                    if (!uploadedAttachments.includes(attachment.id)) {
-                        const result = await cancelUploadAttachment(attachment.id);
-                        cancelledAttachments[attachment.id] =  {status: result};
+                    if (!attachmentsIsReady) {
+                        const result = await cancelSendAttachment(attachment.id);
+                        if (result.uploadedSize !== attachment.size) {
+                            cancelledAttachments[attachment.id] =  {status: result};
+                        }
                         resolve(result);
                     } else {
-                        reject(new Error(ChatError.CAN_NOT_CANCEL_UPLOADED_ATTACHMENT));
+                        reject(new Error(ChatError.CAN_NOT_CANCEL_SENDING_ATTACHMENT));
                     }
                 }),
                 waitAndGetMessageStatus: () => new Promise<MessageStatus>(function (resolve, reject) {

@@ -13,7 +13,7 @@ export class SendingAttachmentsHandler {
         return this.#sendMessageAttachments.send();
     }
 
-    public cancelUploadAttachment(attachment: MessageAttachment) {
+    public cancelSendingAttachment(attachment: MessageAttachment) {
         return this.#sendMessageAttachments.cancel(attachment);
     }
 

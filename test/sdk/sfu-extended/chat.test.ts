@@ -642,7 +642,7 @@ describe("chat", () => {
                 })
                 const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
                 handler.sendAttachments();
-                handler.cancelUploadAttachment(status.attachments[0]);
+                handler.cancelSendingAttachment(status.attachments[0]);
                 const result = await handler.waitAndGetMessageStatus();
                 expect(result.state).toEqual(MessageState.DELIVERY_CANCELLED);
                 expect(result.attachments).toHaveLength(0);
@@ -680,11 +680,45 @@ describe("chat", () => {
 
                 const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
                 handler.sendAttachments();
-                handler.cancelUploadAttachment(status.attachments[0]);
-                handler.cancelUploadAttachment(status.attachments[1]);
+                handler.cancelSendingAttachment(status.attachments[0]);
+                handler.cancelSendingAttachment(status.attachments[1]);
                 const result = await handler.waitAndGetMessageStatus();
                 expect(result.state).toEqual(MessageState.DELIVERY_CANCELLED);
                 expect(result.attachments).toHaveLength(0);
+                await bob.deleteChat(chat);
+            });
+            it("Should send message with multiple attachments and should cancel sending uploaded attachment", async () => {
+                const chat = await bob.createChat({});
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                    attachments: ATTACHMENTS
+                });
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+                expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                expect(status.attachments).toBeTruthy();
+
+                const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
+
+                const waitAndCancel = (): Promise<AttachmentStatus> => {
+                    return new Promise<AttachmentStatus>((resolve) => {
+                        bob.on(SfuEvent.MESSAGE_ATTACHMENT_STATE, (msg) => {
+                            const attachmentStatus = msg as AttachmentStatus;
+                            if (attachmentStatus.id === status.attachments[0].id && attachmentStatus.state === AttachmentState.UPLOADED) {
+                                handler.cancelSendingAttachment(status.attachments[0]);
+                                resolve(attachmentStatus);
+                            }
+                        });
+                    })
+                }
+                handler.sendAttachments();
+                await waitAndCancel();
+                const result = await handler.waitAndGetMessageStatus();
+                expect(result.state).toEqual(MessageState.NO_DELIVERY_NO_READ);
+                expect(result.attachments).toHaveLength(1);
+                expect(result.attachments[0].id).toBe(status.attachments[1].id);
                 await bob.deleteChat(chat);
             });
             it("Should send a few messages with attachment", async () => {
@@ -876,7 +910,7 @@ describe("chat", () => {
                 })
                 const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
                 await handler.sendAttachments();
-                await expect(handler.cancelUploadAttachment(status.attachments[0])).rejects.toEqual(new Error(ChatError.CAN_NOT_CANCEL_UPLOADED_ATTACHMENT));
+                await expect(handler.cancelSendingAttachment(status.attachments[0])).rejects.toEqual(new Error(ChatError.CAN_NOT_CANCEL_SENDING_ATTACHMENT));
                 const result = await handler.waitAndGetMessageStatus();
                 expect(result.state).toEqual(MessageState.NO_DELIVERY_NO_READ);
                 expect(result.attachments).toHaveLength(1);
