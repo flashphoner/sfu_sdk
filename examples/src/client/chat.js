@@ -22,10 +22,10 @@ const createChat = function(room, messages, input, sendButton) {
         }, chatOtherColour, chatEventColour);
     });
 
-    const sendMessage = function() {
+    const sendMessage = async function() {
         let message = input.value;
         input.value = "";
-        room.sendMessage(message);
+        await room.sendMessage(message);
         appendMessage({
             nickName: nickName.value,
             message: message

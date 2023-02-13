@@ -2,7 +2,6 @@ const constants = SFU.constants;
 const sfu = SFU;
 let localDisplay;
 let cControls;
-let pc;
 
 const defaultConfig = {
     room: {
@@ -38,7 +37,7 @@ const defaultConfig = {
 };
 
 /**
- * load config and show entrance modal
+ * Load track configuration and show entrance modal
  */
 const init = function() {
     //read config
@@ -48,44 +47,51 @@ const init = function() {
         //use default config
         cControls = createControls(defaultConfig);
     });
-    //create local display to show local streams
-    localDisplay = initLocalDisplay(document.getElementById("localDisplay"));
     //open entrance modal
     $('#entranceModal').modal('show');
 }
 
 /**
- * connect to server
+ * Connect to server and publish preconfigured streams
  */
-function connect() {
-    //hide modal
+async function connect() {
+    // hide modal
     $('#entranceModal').modal('hide');
-    //disable controls
+    // disable controls
     cControls.muteInput();
     //create peer connection
-    pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = cControls.roomConfig();
     //kick off connect to server and local room creation
-    const session = sfu.createRoom(roomConfig);
-    session.on(constants.SFU_EVENT.CONNECTED, function() {
+    try {
+        const session = await sfu.createRoom(roomConfig);
+        // Now we connected to the server (if no exception was thrown)
+        session.on(constants.SFU_EVENT.FAILED, function(e) {
+            displayError("CONNECTION FAILED: "+ e +". Refresh the page to enter the room again");
+        }).on(constants.SFU_EVENT.DISCONNECTED, function(e) {
+            displayError("DISCONNECTED. Refresh the page to enter the room again");
+        });
         const room = session.room();
-        //connected to server
+        room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
+            displayError(e);
+        }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
+            displayError(e.operation + " failed: " + e.error);
+        })
+
+        // create local display to show local streams
+        localDisplay = initLocalDisplay(document.getElementById("localDisplay"));
+        // display audio and video control tables
+        await cControls.displayTables();
+        cControls.onTrack(async function (s) {
+            await publishNewTrack(room, pc, s);
+        });
+        //create and bind chat to the new room
         const chatDiv = document.getElementById('messages');
         const chatInput = document.getElementById('localMessage');
         const chatButton = document.getElementById('sendMessage');
-        //create and bind chat to the new room
         createChat(room, chatDiv, chatInput, chatButton);
 
-        room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
-            const errField = document.getElementById("errorMsg");
-            errField.style.color = "red";
-            errField.innerText = e;
-        }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
-            const errField = document.getElementById("errorMsg");
-            errField.style.color = "red";
-            errField.innerText = e.operation + " failed: " + e.error;
-        })
         //setup remote display for showing remote audio/video tracks
         const remoteDisplay = document.getElementById("display");
         initRemoteDisplay(room, remoteDisplay, pc);
@@ -94,6 +100,25 @@ function connect() {
         let streams = cControls.getVideoStreams();
         //combine local video streams with audio streams
         streams.push.apply(streams, cControls.getAudioStreams());
+
+        // Publish preconfigured streams
+        publishPreconfiguredStreams(room, pc, streams);
+    } catch(e) {
+        console.error(e);
+        displayError(e);
+    }
+}
+
+
+/**
+ * Publish streams after entyering room according to configuration file
+ * 
+ * @param {*} room
+ * @param {*} pc
+ * @param {*} streams 
+ */
+const publishPreconfiguredStreams = async function(room, pc, streams) {
+    try {
         let config = {};
         //add our local streams to the room (to PeerConnection)
         streams.forEach(function (s) {
@@ -108,50 +133,124 @@ function connect() {
                 subscribeTrackToEndedEvent(room, track, pc);
             });
         });
-        //add callback for the new local stream to the local controls
-        cControls.onTrack(function (s) {
-            let config = {};
-            //add local stream to local display
-            localDisplay.add(s.stream.id, "local", s.stream);
-            //add each track to PeerConnection
-            s.stream.getTracks().forEach((track) => {
-                if (s.source === "screen") {
-                    config[track.id] = s.source;
-                }
-                addTrackToPeerConnection(pc, s.stream, track, s.encodings);
-                subscribeTrackToEndedEvent(room, track, pc);
-            });
-            //kickoff renegotiation
-            room.updateState(config);
-        });
         //join room
-        room.join(pc, null, config);
+        await room.join(pc, null, config);
+        // Enable Delete button for each preconfigured stream #WCS-3689
+        streams.forEach(function (s) {
+            $('#' + s.stream.id + "-button").prop('disabled', false);
+        });
+    } catch(e) {
+        console.error("Failed to publish a preconfigured streams: " + e);
+        displayError(e);
+        // Enable Delete button for each preconfigured stream #WCS-3689
+        streams.forEach(function (s) {
+            $('#' + s.stream.id + "-button").prop('disabled', false);
+        });
+    }
+}
+
+/**
+ * Publish a new media track to the room
+ * 
+ * @param {*} room
+ * @param {*} pc
+ * @param {*} media 
+ */
+const publishNewTrack = async function(room, pc, media) {
+    try {
+        let config = {};
+        //add local stream to local display
+        localDisplay.add(media.stream.id, "local", media.stream);
+        //add each track to PeerConnection
+        media.stream.getTracks().forEach((track) => {
+            if (media.source === "screen") {
+                config[track.id] = media.source;
+            }
+            addTrackToPeerConnection(pc, media.stream, track, media.encodings);
+            subscribeTrackToEndedEvent(room, track, pc);
+        });
+        // Clean error message
+        displayError("");
+        //kickoff renegotiation
+        await room.updateState(config);
+        // Enable Delete button for a new stream #WCS-3689
+        $('#' + media.stream.id + "-button").prop('disabled', false);
+    } catch(e) {
+        console.error("Failed to publish a new track: " + e);
+        displayError(e);
+        // Enable Delete button for a new stream #WCS-3689
+        $('#' + media.stream.id + "-button").prop('disabled', false);
+    }
+}
+
+/**
+ * Subscribe to track ended event to renegotiate WebRTC connection
+ * 
+ * @param {*} room 
+ * @param {*} track 
+ * @param {*} pc 
+ */
+const subscribeTrackToEndedEvent = function(room, track, pc) {
+    track.addEventListener("ended", async function() {
+        try {
+            //track ended, see if we need to cleanup
+            let negotiate = false;
+            for (const sender of pc.getSenders()) {
+                if (sender.track === track) {
+                    pc.removeTrack(sender);
+                    //track found, set renegotiation flag
+                    negotiate = true;
+                    break;
+                }
+            }
+            // Clean error message
+            displayError("");
+            if (negotiate) {
+                //kickoff renegotiation
+                await room.updateState();
+            }
+        } catch(e) {
+            displayError(e);
+            console.error("Failed to update room state: " + e);
+        }
     });
 }
 
-const subscribeTrackToEndedEvent = function(room, track, pc) {
-    track.addEventListener("ended", function() {
-        //track ended, see if we need to cleanup
-        let negotiate = false;
-        for (const sender of pc.getSenders()) {
-            if (sender.track === track) {
-                pc.removeTrack(sender);
-                //track found, set renegotiation flag
-                negotiate = true;
-                break;
-            }
-        }
-        if (negotiate) {
-            //kickoff renegotiation
-            room.updateState();
-        }
-    });
-};
-
+/**
+ * Add track to WebRTC PeerConnection
+ * 
+ * @param {*} pc 
+ * @param {*} stream 
+ * @param {*} track 
+ * @param {*} encodings 
+ */
 const addTrackToPeerConnection = function(pc, stream, track, encodings) {
     pc.addTransceiver(track, {
         direction: "sendonly",
         streams: [stream],
         sendEncodings: encodings ? encodings : [] //passing encoding types for video simulcast tracks
     });
+}
+
+/**
+ * Display error message
+ * 
+ * @param {*} text 
+ */
+const displayError = function(text) {
+    const errField = document.getElementById("errorMsg");
+    errField.style.color = "red";
+    errField.innerText = text;
+}
+
+/**
+ * Entrance modal cancelled, we do not enter to a room
+ */
+const cancel = function() {
+    //hide modal
+    $('#entranceModal').modal('hide');
+    //disable controls
+    cControls.muteInput();
+    // display the error message
+    displayError("Please refresh the page, fill the entrance modal and enter a room to publish or play streams");
 }

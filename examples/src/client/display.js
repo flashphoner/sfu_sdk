@@ -327,7 +327,7 @@ const initRemoteDisplay = function(room, mainDiv, peerConnection) {
                         qualityDiv.innerText = trackInfo.quality[i];
                         qualityDiv.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
                         qualityDiv.style.color = "red";
-                        qualityDiv.addEventListener('click', function(){
+                        qualityDiv.addEventListener('click', async function(){
                             console.log("Clicked on quality " + trackInfo.quality[i] + " trackId " + trackInfo.id);
                             if (qualityDiv.style.color === "red") {
                                 return;
@@ -338,7 +338,7 @@ const initRemoteDisplay = function(room, mainDiv, peerConnection) {
                                 }
                             }
                             qualityDiv.style.color = "blue";
-                            room.changeQuality(trackInfo.id, trackInfo.quality[i]);
+                            await room.changeQuality(trackInfo.id, trackInfo.quality[i]);
                         });
                         qualityDisplay.appendChild(qualityDiv);
                     }
@@ -348,13 +348,13 @@ const initRemoteDisplay = function(room, mainDiv, peerConnection) {
                         tidDiv.innerText = "TID"+i;
                         tidDiv.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
                         tidDiv.style.color = "gray";
-                        tidDiv.addEventListener('click', function(){
+                        tidDiv.addEventListener('click', async function(){
                             console.log("Clicked on TID " + i + " trackId " + trackInfo.id);
                             for (let c = 0; c < tidDivs.length; c++) {
                                 tidDivs[c].style.color = "gray";
                             }
                             tidDiv.style.color = "blue";
-                            room.changeQuality(trackInfo.id, null, i);
+                            await room.changeQuality(trackInfo.id, null, i);
                         });
                         tidDisplay.appendChild(tidDiv);
                     }

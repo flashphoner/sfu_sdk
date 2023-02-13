@@ -1,13 +1,13 @@
 import {Sfu, RoomEvent, SfuEvent, State} from "@flashphoner/sfusdk";
 
-export function createRoom(options: {
+export async function createRoom(options: {
     url: string,
     roomName: string,
     pin: string,
     nickname: string
 }) {
     const sfu = new Sfu();
-    sfu.connect({
+    await sfu.connect({
         url: options.url,
         nickname: options.nickname,
         logGroup: options.roomName

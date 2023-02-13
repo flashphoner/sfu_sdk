@@ -391,7 +391,7 @@ const initRemoteDisplay = function(options) {
                             qualityDiv.innerText = trackInfo.quality[i];
                             qualityDiv.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
                             qualityDiv.style.color = "red";
-                            qualityDiv.addEventListener('click', function(){
+                            qualityDiv.addEventListener('click', async function(){
                                 console.log("Clicked on quality " + trackInfo.quality[i] + " trackId " + trackInfo.id);
                                 if (qualityDiv.style.color === "red") {
                                     return;
@@ -402,7 +402,7 @@ const initRemoteDisplay = function(options) {
                                     }
                                 }
                                 qualityDiv.style.color = "blue";
-                                room.changeQuality(trackInfo.id, trackInfo.quality[i]);
+                                await room.changeQuality(trackInfo.id, trackInfo.quality[i]);
                             });
                             qualitySwitchDisplay.appendChild(qualityDiv);
                         }

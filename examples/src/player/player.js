@@ -155,7 +155,7 @@ const init = function() {
 /**
  * connect to server
  */
-const connect = function(state) {
+const connect = async function(state) {
     //create peer connection
     pc = new RTCPeerConnection();
     //get config object for room creation
@@ -167,21 +167,27 @@ const connect = function(state) {
     setStatus(state.statusId(), "");
     setStatus(state.errInfoId(), "");
     // connect to server and create a room if not
-    const session = sfu.createRoom(roomConfig);
-    session.on(constants.SFU_EVENT.CONNECTED, function() {
+    try {
+        const session = await sfu.createRoom(roomConfig);
+        // Set up session ending events
+        session.on(constants.SFU_EVENT.DISCONNECTED, function() {
+            state.clear();
+            onDisconnected(state);
+            setStatus(state.statusId(), "DISCONNECTED", "green");
+        }).on(constants.SFU_EVENT.FAILED, function(e) {
+            state.clear();
+            onDisconnected(state);
+            setStatus(state.statusId(), "FAILED", "red");
+            setStatus(state.errInfoId(), e.status + " " + e.statusText, "red");
+        });
+        // Connected successfully
         state.set(pc, session, session.room());
         onConnected(state);
         setStatus(state.statusId(), "ESTABLISHED", "green");
-    }).on(constants.SFU_EVENT.DISCONNECTED, function() {
-        state.clear();
-        onDisconnected(state);
-        setStatus(state.statusId(), "DISCONNECTED", "green");
-    }).on(constants.SFU_EVENT.FAILED, function(e) {
-        state.clear();
-        onDisconnected(state);
+    } catch(e) {
         setStatus(state.statusId(), "FAILED", "red");
-        setStatus(state.errInfoId(), e.status + " " + e.statusText, "red");
-    });
+        setStatus(state.errInfoId(), e, "red");
+    }
 }
 
 const onConnected = async function(state) {

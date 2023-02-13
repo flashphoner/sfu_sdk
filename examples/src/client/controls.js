@@ -70,64 +70,62 @@ const createControls = function(config) {
     controls.entrance.roomPin.value = config.room.pin;
     controls.entrance.nickName.value = config.room.nickName;
 
-    const addAudioTrackRow = function(track) {
-        getMedia([track]).then(function(stream){
-            let button = '<button id="' + stream.id + '-button" class="btn btn-primary">Delete</button>';
-            const row = controls.tables.audio.row.add({
-                source: track.source,
-                channels: track.channels,
-                action: button,
-                stream: stream
-            }).node();
-            controls.tables.audio.draw();
+    const addAudioTrackRow = async function(track) {
+        const stream = await getMedia([track]);
+        let button = '<button id="' + stream.id + '-button" class="btn btn-primary">Delete</button>';
+        const row = controls.tables.audio.row.add({
+            source: track.source,
+            channels: track.channels,
+            action: button,
+            stream: stream
+        }).node();
+        controls.tables.audio.draw();
 
-            $('#' + stream.id + "-button").on('click', function(){
-                //terminate stream
-                console.log("terminate stream " + stream.id);
-                let track = stream.getAudioTracks()[0];
-                track.stop();
-                track.dispatchEvent(new Event("ended"));
-            });
-            stream.getTracks()[0].onended = function() {
-                controls.tables.audio.row(row).remove().draw();
-            }
-            trackCallback({
-                stream: stream,
-                encodings: track.encodings,
-                source: track.source
-            });
+        $('#' + stream.id + "-button").on('click', function(){
+            //terminate stream
+            console.log("terminate audio stream " + stream.id);
+            let track = stream.getAudioTracks()[0];
+            track.stop();
+            track.dispatchEvent(new Event("ended"));
+        }).prop('disabled', true);
+        stream.getTracks()[0].onended = function() {
+            controls.tables.audio.row(row).remove().draw();
+        }
+        trackCallback({
+            stream: stream,
+            encodings: track.encodings,
+            source: track.source
         });
     }
 
-    const addVideoTrackRow = function(track) {
-        getMedia([track]).then(function(stream){
-            let button = '<button id="' + stream.id + '-button" class="btn btn-primary">Delete</button>';
-            const row = controls.tables.video.row.add({
-                source: track.source,
-                width: track.width,
-                height: track.height,
-                codec: track.codec,
-                action: button,
-                stream: stream,
-                encodings: track.encodings
-            }).node();
-            controls.tables.video.draw();
+    const addVideoTrackRow = async function(track) {
+        const stream = await getMedia([track]);
+        let button = '<button id="' + stream.id + '-button" class="btn btn-primary">Delete</button>';
+        const row = controls.tables.video.row.add({
+            source: track.source,
+            width: track.width,
+            height: track.height,
+            codec: track.codec,
+            action: button,
+            stream: stream,
+            encodings: track.encodings,
+        }).node();
+        controls.tables.video.draw();
 
-            $('#' + stream.id + "-button").on('click', function(){
-                //terminate stream
-                console.log("terminate stream " + stream.id);
-                let track = stream.getVideoTracks()[0];
-                track.stop();
-                track.dispatchEvent(new Event("ended"));
-            });
-            stream.getTracks()[0].addEventListener("ended", function() {
-                controls.tables.video.row(row).remove().draw();
-            });
-            trackCallback({
-                stream: stream,
-                encodings: track.encodings,
-                source: track.source
-            });
+        $('#' + stream.id + "-button").on('click', function(){
+            //terminate stream
+            console.log("terminate video stream " + stream.id);
+            let track = stream.getVideoTracks()[0];
+            track.stop();
+            track.dispatchEvent(new Event("ended"));
+        }).prop('disabled', true);
+        stream.getTracks()[0].addEventListener("ended", function() {
+            controls.tables.video.row(row).remove().draw();
+        });
+        trackCallback({
+            stream: stream,
+            encodings: track.encodings,
+            source: track.source
         });
     }
 
@@ -147,28 +145,6 @@ const createControls = function(config) {
         details +='</table>';
         return details;
     }
-
-    // Add event listener for opening and closing details
-    $('#videoTracksTableBody').on('click', 'td.details-control', function () {
-        let tr = $(this).closest('tr');
-        let row = controls.tables.video.row(tr);
-        if (row.child.isShown()) {
-            // This row is already open - close it
-            row.child.hide();
-            tr.removeClass('shown');
-        } else {
-            // Open this row
-            row.child(format(row.data())).show();
-            tr.addClass('shown');
-        }
-    });
-
-    config.media.audio.tracks.forEach(function(track){
-        addAudioTrackRow(track);
-    })
-    config.media.video.tracks.forEach(function(track){
-        addVideoTrackRow(track);
-    })
 
     const muteForm = function(form) {
         for (const [key, value] of Object.entries(form)) {
@@ -220,63 +196,100 @@ const createControls = function(config) {
         return streams;
     }
 
-    document.getElementById("addVideoTrack").addEventListener("click", function(e){
-        let encodings = [];
-        controls.tables.encodings.rows().every(function() {
-            let encoding = this.data();
-            encodings.push({
-                rid: encoding.rid,
-                active: encoding.active,
-                maxBitrate: encoding.maxBitrate,
-                scaleResolutionDownBy: encoding.resolutionScale
-            })
-        });
-        let track = {
-            source: controls.addVideoTrack.source.value,
-            width: controls.addVideoTrack.width.value,
-            height: controls.addVideoTrack.height.value,
-            codec: controls.addVideoTrack.codec.value,
-            encodings: encodings
-        }
-        addVideoTrackRow(track);
-    });
-
-    $("#videoTrackEncodingsTable").on("click", ".remove", function(){
-        controls.tables.encodings.row($(this).parents('tr')).remove().draw();
-    });
-
-    document.getElementById("addVideoTrackEncoding").addEventListener("click", function(){
-        let button = '<button class="btn btn-primary remove">Delete</button>';
-        controls.tables.encodings.row.add({
-            rid: controls.addVideoEncoding.rid.value,
-            active: controls.addVideoEncoding.active.value,
-            maxBitrate: controls.addVideoEncoding.maxBitrate.value,
-            resolutionScale: controls.addVideoEncoding.resolutionScale.value,
-            action: button
-        }).draw();
-    });
-
-    document.getElementById("addAudioTrack").addEventListener("click", function(e){
-        let encodings = [];
-        let track = {
-            source: controls.addAudioTrack.source.value,
-            channels: controls.addAudioTrack.channels.value,
-            encodings: encodings
-        }
-        addAudioTrackRow(track);
-    });
-
     const onTrack = function(callback) {
         trackCallback = callback;
     }
 
+    const displayTables = async function() {
+        // Add event listener for opening and closing details
+        $('#videoTracksTableBody').on('click', 'td.details-control', function () {
+            let tr = $(this).closest('tr');
+            let row = controls.tables.video.row(tr);
+            if (row.child.isShown()) {
+                // This row is already open - close it
+                row.child.hide();
+                tr.removeClass('shown');
+            } else {
+                // Open this row
+                row.child(format(row.data())).show();
+                tr.addClass('shown');
+            }
+        });
+
+        // Add preconfigured audio and video tracks
+        for (const track of config.media.audio.tracks) {
+            await addAudioTrackRow(track);
+        }
+        for (const track of config.media.video.tracks) {
+            await addVideoTrackRow(track);
+        }
+
+        // Click event listener to add a new video track
+        document.getElementById("addVideoTrack").addEventListener("click", function(e){
+            let encodings = [];
+            controls.tables.encodings.rows().every(function() {
+                let encoding = this.data();
+                encodings.push({
+                    rid: encoding.rid,
+                    active: encoding.active,
+                    maxBitrate: encoding.maxBitrate,
+                    scaleResolutionDownBy: encoding.resolutionScale
+                })
+            });
+            let track = {
+                source: controls.addVideoTrack.source.value,
+                width: controls.addVideoTrack.width.value,
+                height: controls.addVideoTrack.height.value,
+                codec: controls.addVideoTrack.codec.value,
+                encodings: encodings
+            }
+            addVideoTrackRow(track);
+        });
+    
+        // Click event listener to remove video quality
+        $("#videoTrackEncodingsTable").on("click", ".remove", function(){
+            controls.tables.encodings.row($(this).parents('tr')).remove().draw();
+        });
+    
+        // Click event listener to add video quality
+        document.getElementById("addVideoTrackEncoding").addEventListener("click", function(){
+            let button = '<button class="btn btn-primary remove">Delete</button>';
+            controls.tables.encodings.row.add({
+                rid: controls.addVideoEncoding.rid.value,
+                active: controls.addVideoEncoding.active.value,
+                maxBitrate: controls.addVideoEncoding.maxBitrate.value,
+                resolutionScale: controls.addVideoEncoding.resolutionScale.value,
+                action: button
+            }).draw();
+        });
+
+        // Click event listener to add a new audio track
+        document.getElementById("addAudioTrack").addEventListener("click", function(e){
+            let encodings = [];
+            let track = {
+                source: controls.addAudioTrack.source.value,
+                channels: controls.addAudioTrack.channels.value,
+                encodings: encodings
+            }
+            addAudioTrackRow(track);
+        });
+    
+    }
+
+    const cleanTables = function() {
+        controls.tables.video.rows().remove().draw();
+        controls.tables.audio.rows().remove().draw();
+        controls.tables.encodings.rows().remove().draw();
+    }
 
     return {
         muteInput: muteInput,
         roomConfig: roomConfig,
+        displayTables: displayTables,
         getAudioStreams: getAudioStreams,
         getVideoStreams: getVideoStreams,
-        onTrack: onTrack
+        onTrack: onTrack,
+        cleanTables: cleanTables
     }
 }
 
