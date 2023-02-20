@@ -1,10 +1,16 @@
 const getRoomConfig = function(config) {
     let roomConfig = {
-        url: config.url || "ws://127.0.0.1:8080",
-        roomName: config.name || "ROOM1",
-        pin: config.pin || "1234",
-        nickname: config.nickName || "User1"        
+        url: config.room.url || "ws://127.0.0.1:8080",
+        roomName: config.room.name || "ROOM1",
+        pin: config.room.pin || "1234",
+        nickname: config.room.nickName || "User1"
     };
+    if (config.room.failedProbesThreshold !== undefined) {
+        roomConfig.failedProbesThreshold = config.room.failedProbesThreshold;
+    }
+    if (config.room.pingInterval !== undefined) {
+        roomConfig.pingInterval = config.room.pingInterval;
+    }
     return roomConfig;
 }
 
@@ -50,6 +56,7 @@ const getMedia = async function(track) {
         if (track.constraints) {
             constraints.audio = track.constraints;
         }
+        constraints.audio.stereo = track.channels !== 1
         if (track.channels && track.channels === 2) {
             constraints.audio.echoCancellation = false;
             constraints.audio.googEchoCancellation = false;

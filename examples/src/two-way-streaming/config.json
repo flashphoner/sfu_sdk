@@ -3,7 +3,9 @@
     "url": "ws://127.0.0.1:8080",
     "name": "ROOM1",
     "pin": "1234",
-    "nickName": "User1"
+    "nickName": "User1",
+    "failedProbesThreshold": 5,
+    "pingInterval": 5000
   },
   "media": {
     "audio": {

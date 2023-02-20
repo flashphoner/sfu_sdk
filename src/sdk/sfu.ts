@@ -1,5 +1,12 @@
 import {Connection} from "./connection";
-import {InternalApi, InternalMessage, RoomState, SfuEvent, State, UserNickname} from "./constants";
+import {
+    InternalApi,
+    InternalMessage,
+    RoomState,
+    SfuEvent,
+    State,
+    UserNickname
+} from "./constants";
 import {Notifier} from "./notifier";
 import {Room} from "./room";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
@@ -27,6 +34,8 @@ export class Sfu {
     public connect(options: {
         url: string,
         timeout?: number,
+        failedProbesThreshold?: number,
+        pingInterval?: number,
         nickname: UserNickname,
         logGroup: string
     }) {
@@ -38,7 +47,9 @@ export class Sfu {
         const connectionConfig = {
             url: options.url,
             appName: InternalApi.P_APP,
-            timeout: options.timeout ? options.timeout : 10000,
+            timeout: options.timeout,
+            failedProbesThreshold: options.failedProbesThreshold,
+            pingInterval: options.pingInterval,
             custom: {
                 nickname: options.nickname,
                 //TODO(naz): rename to logGroup
@@ -80,10 +91,16 @@ export class Sfu {
                 },
                 this.#logger
             );
-            await this.#connection.connect(connectionConfig);
-            self.#_state = State.CONNECTED;
-            this.#notifier.notify(SfuEvent.CONNECTED);
-            resolve();
+            try {
+                await this.#connection.connect(connectionConfig);
+                self.#_state = State.CONNECTED;
+                this.#notifier.notify(SfuEvent.CONNECTED);
+                resolve();
+            } catch(e) {
+                self.#_state = State.FAILED;
+                this.#notifier.notify(SfuEvent.FAILED, e);
+                reject(e);
+            }
         });
     };
 

@@ -171,20 +171,28 @@ const connect = async function(state) {
         const session = await sfu.createRoom(roomConfig);
         // Set up session ending events
         session.on(constants.SFU_EVENT.DISCONNECTED, function() {
+            onStopClick(state);
             state.clear();
             onDisconnected(state);
             setStatus(state.statusId(), "DISCONNECTED", "green");
         }).on(constants.SFU_EVENT.FAILED, function(e) {
+            onStopClick(state);
             state.clear();
             onDisconnected(state);
             setStatus(state.statusId(), "FAILED", "red");
-            setStatus(state.errInfoId(), e.status + " " + e.statusText, "red");
+            if (e.status && e.statusText) {
+                setStatus(state.errInfoId(), e.status + " " + e.statusText, "red");
+            } else if (e.type && e.info) {
+                setStatus(state.errInfoId(), e.type + ": " + e.info, "red");
+            }
         });
         // Connected successfully
         state.set(pc, session, session.room());
         onConnected(state);
         setStatus(state.statusId(), "ESTABLISHED", "green");
     } catch(e) {
+        state.clear();
+        onDisconnected(state);
         setStatus(state.statusId(), "FAILED", "red");
         setStatus(state.errInfoId(), e, "red");
     }

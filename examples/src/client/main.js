@@ -68,7 +68,13 @@ async function connect() {
         const session = await sfu.createRoom(roomConfig);
         // Now we connected to the server (if no exception was thrown)
         session.on(constants.SFU_EVENT.FAILED, function(e) {
-            displayError("CONNECTION FAILED: "+ e +". Refresh the page to enter the room again");
+            if (e.status && e.statusText) {
+                displayError("CONNECTION FAILED: " + e.status + " " + e.statusText);
+            } else if (e.type && e.info) {
+                displayError("CONNECTION FAILED: " + e.info);
+            } else {
+                displayError("CONNECTION FAILED: " + e);
+            }
         }).on(constants.SFU_EVENT.DISCONNECTED, function(e) {
             displayError("DISCONNECTED. Refresh the page to enter the room again");
         });

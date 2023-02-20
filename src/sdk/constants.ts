@@ -870,6 +870,10 @@ export type OperationFailedEvent = InternalMessage & {
     info: any
 }
 
+export type ConnectionFailedEvent = InternalMessage & {
+    info: string
+}
+
 export type UserId = string;
 
 export type UserNickname = string;
@@ -886,3 +890,11 @@ export type UserTimezone = {
     id: string,
     offset: string
 }
+
+export const WS_CONNECTION_TIMEOUT = 10000;
+
+// Set server ping timeout as WCS default setting
+export const WS_PING_INTERVAL_MS = 5000;
+
+// Set missing pings threshold as a half of WCS default setting
+export const WS_PINGS_MISSING_THRESHOLD = 5;

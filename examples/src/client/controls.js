@@ -163,12 +163,19 @@ const createControls = function(config) {
     }
 
     const roomConfig = function() {
-        return {
+        let roomConfig = {
             url: controls.entrance.url.value,
             roomName: controls.entrance.roomName.value,
             pin: controls.entrance.roomPin.value,
             nickname: controls.entrance.nickName.value
+        };
+        if (config.room.failedProbesThreshold !== undefined) {
+            roomConfig.failedProbesThreshold = config.room.failedProbesThreshold;
         }
+        if (config.room.pingInterval !== undefined) {
+            roomConfig.pingInterval = config.room.pingInterval;
+        }
+        return roomConfig;
     }
 
     const getVideoStreams = function() {
@@ -301,17 +308,28 @@ const getMedia = async function(tracks) {
         if (track.source === "mic") {
             //audio
             constraints.audio = {};
+            if (track.constraints) {
+                constraints.audio = track.constraints;
+            }
             constraints.audio.stereo = track.channels !== 1
+            if (track.channels && track.channels === 2) {
+                constraints.audio.echoCancellation = false;
+                constraints.audio.googEchoCancellation = false;
+            }
         } else if (track.source === "camera") {
-            constraints.video = {
-                width: track.width,
-                height: track.height
-            };
+            constraints.video = {};
+            if (track.constraints) {
+                constraints.video = track.constraints;
+            }
+            constraints.video.width = track.width;
+            constraints.video.height = track.height;
         } else if (track.source === "screen") {
-            constraints.video = {
-                width: track.width,
-                height: track.height
-            };
+            constraints.video = {};
+            if (track.constraints) {
+                constraints.video = track.constraints;
+            }
+            constraints.video.width = track.width;
+            constraints.video.height = track.height;
             screen = true;
         }
     });

@@ -1,6 +1,6 @@
 {
   "name": "@flashphoner/sfusdk",
-  "version": "2.0.11",
+  "version": "2.0.14",
   "description": "Official Flashphoner WebCallServer SFU SDK package",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

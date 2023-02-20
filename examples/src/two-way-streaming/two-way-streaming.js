@@ -211,24 +211,31 @@ const connect = async function(state) {
         const session = await sfu.createRoom(roomConfig);
         // Set up session ending events
         session.on(constants.SFU_EVENT.DISCONNECTED, function() {
+            onStopClick(state);
             state.clear();
             onDisconnected(state);
             setStatus(state.statusId(), "DISCONNECTED", "green");
         }).on(constants.SFU_EVENT.FAILED, function(e) {
+            onStopClick(state);
             state.clear();
             onDisconnected(state);
             setStatus(state.statusId(), "FAILED", "red");
-            setStatus(state.errInfoId(), e.status + " " + e.statusText, "red");
+            if (e.status && e.statusText) {
+                setStatus(state.errInfoId(), e.status + " " + e.statusText, "red");
+            } else if (e.type && e.info) {
+                setStatus(state.errInfoId(), e.type + ": " + e.info, "red");
+            }
         });
         // Connected successfully
         state.set(pc, session, session.room());
         onConnected(state);
         setStatus(state.statusId(), "ESTABLISHED", "green");
     } catch(e) {
+        state.clear();
+        onDisconnected(state);
         setStatus(state.statusId(), "FAILED", "red");
         setStatus(state.errInfoId(), e, "red");
-    }
-}
+    }}
 
 const onConnected = function(state) {
     $("#" + state.buttonId()).text("Stop").off('click').click(function () {
@@ -351,7 +358,7 @@ const publishStreams = async function(state) {
                     s.stream.getTracks().forEach((track) => {
                         config[track.id] = contentType;
                         addTrackToPeerConnection(state.pc, s.stream, track, s.encodings);
-                        subscribeTrackToEndedEvent(state, track);
+                        subscribeTrackToEndedEvent(state.room, track, state.pc);
                     });
                 });
                 //start WebRTC negotiation
@@ -396,10 +403,8 @@ const stopStreams = function(state) {
     }
 }
 
-const subscribeTrackToEndedEvent = function(state, track) {
-    let room = state.room;
-    let pc = state.pc;
-    track.addEventListener("ended", async function() {
+const subscribeTrackToEndedEvent = function(room, track, pc) {
+    track.addEventListener("ended", function() {
         //track ended, see if we need to cleanup
         let negotiate = false;
         for (const sender of pc.getSenders()) {
@@ -412,7 +417,7 @@ const subscribeTrackToEndedEvent = function(state, track) {
         }
         if (negotiate) {
             //kickoff renegotiation
-            state.waitFor(room.updateState(), MAX_AWAIT_MS);
+            room.updateState();
         }
     });
 };

@@ -115,7 +115,7 @@ const init = function() {
  */
 const connect = async function(state) {
     // Create peer connection
-    const pc = new RTCPeerConnection();
+    let pc = new RTCPeerConnection();
     // Create a config to connect to SFU room
     const roomConfig = {
         // Server websocket URL
@@ -135,20 +135,28 @@ const connect = async function(state) {
         const session = await sfu.createRoom(roomConfig);
         // Set up session ending events
         session.on(constants.SFU_EVENT.DISCONNECTED, function() {
+            onStopClick(state);
             state.clear();
             onDisconnected(state);
             setStatus("playStatus", "DISCONNECTED", "green");
         }).on(constants.SFU_EVENT.FAILED, function(e) {
+            onStopClick(state);
             state.clear();
             onDisconnected(state);
             setStatus("playStatus", "FAILED", "red");
-            setStatus("playErrorInfo", e.status + " " + e.statusText, "red");
+            if (e.status && e.statusText) {
+                setStatus("playErrorInfo", e.status + " " + e.statusText, "red");
+            } else if (e.type && e.info) {
+                setStatus("playErrorInfo", e.type + ": " + e.info, "red");
+            }
         });
         // Connected successfully
         state.set(pc, session, session.room());
         onConnected(state);
         setStatus("playStatus", "CONNECTING...", "black");
     } catch(e) {
+        state.clear();
+        onDisconnected(state);
         setStatus("playStatus", "FAILED", "red");
         setStatus("playErrorInfo", e, "red");
     }
