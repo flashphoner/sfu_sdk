@@ -54,7 +54,12 @@ import {
     UserInfo,
     UserInfoEvent,
     MessageEdited,
-    MessageDeleted, UserTimezone, UserHostKey, UserPhoneNumber
+    MessageDeleted,
+    UserTimezone,
+    UserHostKey,
+    UserPhoneNumber,
+    SignUpStatus,
+    UserManagementError
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -81,6 +86,7 @@ export class SfuExtended {
     #binaryChunkSize: number;
     #logger: Logger = new Logger();
     #loggerPrefix: PrefixFunction;
+    #signUpId: string = '';
 
     constructor(logLevel?: Verbosity, prefix?: PrefixFunction) {
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
@@ -479,6 +485,139 @@ export class SfuExtended {
             throw new Error("User isn't authenticated, current state " + this.#_state);
         }
     }
+
+    public signUp(options: {
+        url: string,
+        timeout?: number,
+        email: string,
+        password: string
+    }) {
+        const connectionConfig = this.#getConnectionConfigForAnonymousUser(options.url, options.timeout);
+        const self = this;
+        return new Promise<SignUpStatus>(async (resolve, reject) => {
+            if (self.#signUpId && promises.promised(self.#signUpId)) {
+                promises.reject(self.#signUpId, new Error(UserManagementError.EMAIL_IS_NOT_VERIFIED));
+                self.#signUpId = '';
+            }
+            if (self.#_state === State.CONNECTED) {
+                await self.disconnect();
+            }
+            self.#connection = new Connection(
+                (name: string, data: InternalMessage[]) => {
+                    if (name === InternalApi.DEFAULT_METHOD) {
+                        if (data[0].type === SfuEvent.SIGN_UP_STATUS) {
+                            const status = data[0] as SignUpStatus;
+                            if (status.verified) {
+                                promises.resolve(data[0].internalMessageId, status);
+                                self.#signUpId = '';
+                                self.disconnect();
+                                this.#notifier.notify(SfuEvent.SIGN_UP_STATUS, status);
+                            } else {
+                                this.#notifier.notify(SfuEvent.SIGN_UP_STATUS, status);
+                            }
+                        } else if (data[0].type === RoomEvent.OPERATION_FAILED && promises.promised(data[0].internalMessageId)) {
+                            promises.reject(data[0].internalMessageId, data[0] as OperationFailedEvent);
+                            self.#signUpId = '';
+                            self.disconnect();
+                        }
+                    }
+                },
+                () => {
+                },
+                (e) => {
+                    reject(new Error(UserManagementError.CONNECTION_ERROR));
+                    self.#signUpId = '';
+                    self.#_state = State.FAILED;
+                },
+                (e) => {
+                    if (e.reason === 'Normal disconnect') {
+                        promises.reject(self.#signUpId, new Error(UserManagementError.OPERATION_FAILED_BY_DISCONNECT));
+                        self.#_state = State.DISCONNECTED;
+                        self.#signUpId = '';
+                        self.disconnect();
+                    } else {
+                        promises.reject(self.#signUpId, new Error(UserManagementError.CONNECTION_FAILED));
+                        self.#_state = State.DISCONNECTED;
+                        self.#signUpId = '';
+                        self.disconnect();
+                    }
+                },
+                this.#logger);
+            await self.#connection.connect(connectionConfig);
+            self.#_state = State.CONNECTED;
+            const id = uuidv4();
+            self.#signUpId = id;
+            promises.add(id, resolve, reject);
+            self.#connection.send(InternalApi.SIGN_UP, {
+                email: options.email,
+                password: options.password,
+                internalMessageId: id
+            });
+        });
+    }
+
+    public removeUser(options: {
+        url: string,
+        timeout?: number,
+        id: string
+    }) {
+        const connectionConfig = this.#getConnectionConfigForAnonymousUser(options.url, options.timeout);
+        const self = this;
+        return new Promise<void>(async (resolve, reject) => {
+            const promiseId = uuidv4();
+            if (self.#_state === State.CONNECTED) {
+                await self.disconnect();
+            }
+            self.#connection = new Connection(
+                (name: string, data: InternalMessage[]) => {
+                    if (name === InternalApi.DEFAULT_METHOD) {
+                        if (data[0].type === SfuEvent.ACK && promises.promised(data[0].internalMessageId)) {
+                            promises.resolve(data[0].internalMessageId);
+                        } else if (data[0].type === RoomEvent.OPERATION_FAILED && promises.promised(data[0].internalMessageId)) {
+                            promises.reject(data[0].internalMessageId, data[0] as OperationFailedEvent);
+                        }
+                        self.disconnect();
+                    }
+                },
+                () => {
+                },
+                (e) => {
+                    reject(new Error(UserManagementError.CONNECTION_ERROR));
+                    self.#_state = State.FAILED;
+                },
+                (e) => {
+                    if (e.reason === 'Normal disconnect') {
+                        reject(new Error(UserManagementError.OPERATION_FAILED_BY_DISCONNECT));
+                        self.#_state = State.DISCONNECTED;
+                        self.disconnect();
+                    } else {
+                        reject(new Error(UserManagementError.CONNECTION_FAILED));
+                        self.#_state = State.DISCONNECTED;
+                        self.disconnect();
+                    }
+                },
+                this.#logger);
+            await self.#connection.connect(connectionConfig);
+            promises.add(promiseId, resolve, reject);
+            self.#connection.send(InternalApi.REMOVE_USER, {
+                id: options.id,
+                internalMessageId: promiseId
+            });
+        });
+    }
+
+    #getConnectionConfigForAnonymousUser(url: string, timeout?: number) {
+        return {
+            url: url,
+            appName: InternalApi.Z_USER_MANAGEMENT_APP,
+            timeout: timeout ? timeout : 10000,
+            custom: {
+                username: "",
+                password: "",
+                nickname: ""
+            }
+        };
+    };
 
     public sendMessage(msg: {
         body?: string,

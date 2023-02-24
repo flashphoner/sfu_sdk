@@ -33,7 +33,8 @@ export enum SfuEvent {
     USER_EMAIL_CHANGED = "USER_EMAIL_CHANGED",
     USER_NICKNAME_CHANGED = "USER_NICKNAME_CHANGED",
     CHAT_MESSAGE_EDITED = "CHAT_MESSAGE_EDITED",
-    CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED"
+    CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
+    SIGN_UP_STATUS = "SIGN_UP_STATUS"
 }
 
 export enum RoomEvent {
@@ -172,7 +173,9 @@ export enum Operations {
     CHANGE_USER_HOST_KEY = "CHANGE_USER_HOST_KEY",
     CHANGE_USER_TIMEZONE = "CHANGE_USER_TIMEZONE",
     EDIT_CHAT_MESSAGE = "EDIT_CHAT_MESSAGE",
-    DELETE_CHAT_MESSAGE = "DELETE_CHAT_MESSAGE"
+    DELETE_CHAT_MESSAGE = "DELETE_CHAT_MESSAGE",
+    SIGN_UP = "SIGN_UP",
+    REMOVE_USER = "REMOVE_USER"
 }
 
 export enum ParticipantRole {
@@ -189,6 +192,7 @@ export enum TrackType {
 export enum InternalApi {
     Z_APP = "sfuZClientApp",
     P_APP = "sfuApp",
+    Z_USER_MANAGEMENT_APP = "sfuZUserManagementApp",
     DEFAULT_METHOD = "sfuCallback",
     BINARY_DATA = "binaryData",
     JOIN_ROOM = "joinRoom",
@@ -288,7 +292,9 @@ export enum InternalApi {
     CHANGE_USER_HOST_KEY = "changeUserHostKey",
     CHANGE_USER_TIMEZONE = "changeUserTimezone",
     EDIT_CHAT_MESSAGE = "editChatMessage",
-    DELETE_CHAT_MESSAGE = "deleteChatMessage"
+    DELETE_CHAT_MESSAGE = "deleteChatMessage",
+    SIGN_UP = "signUp",
+    REMOVE_USER = "removeUser"
 }
 
 export enum ContactError {
@@ -328,6 +334,18 @@ export enum UserInfoError {
     CURRENT_PASSWORD_IS_NULL = "Current password can't be null",
     NEW_PASSWORD_IS_NULL = "New password can't be null",
     PASSWORD_POLICY_ERROR = "New password should be at least 6 characters"
+}
+
+export enum UserManagementError {
+    EMAIL_ADDRESS_ALREADY_TAKEN = "User with this email already exists",
+    USER_NOT_FOUND = "User not found",
+    USER_IS_NOT_REMOVED = "Failed to remove user",
+    EMAIL_IS_NOT_VERIFIED = "Email is not verified",
+    OPERATION_FAILED_BY_DISCONNECT = "Operation failed by disconnect",
+    CONNECTION_ERROR = "Connection error",
+    CONNECTION_FAILED = "Connection failed",
+    EMAIL_VERIFICATION_DECLINED = "Email verification is declined",
+    EMAIL_VERIFICATION_FAILED_BY_TIMEOUT = "Email verification failed by timeout"
 }
 
 export const ATTACHMENT_CHUNK_SIZE = 100000;
@@ -861,6 +879,12 @@ export type MessageEdited = InternalMessage & {
 export type MessageDeleted = InternalMessage & {
     chatId: string,
     messageId: string
+}
+
+export type SignUpStatus = InternalMessage & {
+    id: UserId,
+    nickname: UserNickname,
+    verified: boolean
 }
 
 export type OperationFailedEvent = InternalMessage & {
