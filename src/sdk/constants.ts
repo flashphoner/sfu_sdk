@@ -886,10 +886,7 @@ export type UserPhoneNumber = string;
 
 export type UserHostKey = string;
 
-export type UserTimezone = {
-    id: string,
-    offset: string
-}
+export type UserTimezone = string
 
 export const WS_CONNECTION_TIMEOUT = 10000;
 

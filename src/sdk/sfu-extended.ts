@@ -54,7 +54,7 @@ import {
     UserInfo,
     UserInfoEvent,
     MessageEdited,
-    MessageDeleted
+    MessageDeleted, UserTimezone, UserHostKey, UserPhoneNumber
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -795,7 +795,7 @@ export class SfuExtended {
         })
     };
 
-    public changeUserPhoneNumber(phoneNumber: string) {
+    public changeUserPhoneNumber(phoneNumber: UserPhoneNumber) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<void>(function (resolve, reject) {
@@ -805,7 +805,7 @@ export class SfuExtended {
         })
     };
 
-    public changeUserHostKey(hostKey: string) {
+    public changeUserHostKey(hostKey: UserHostKey) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<void>(function (resolve, reject) {
@@ -815,15 +815,12 @@ export class SfuExtended {
         })
     };
 
-    public changeUserTimezone(id: string, offset: string) {
+    public changeUserTimezone(timezone: UserTimezone) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<void>(function (resolve, reject) {
             self.#emmitAction(InternalApi.CHANGE_USER_TIMEZONE, {
-                timezone: {
-                    id: id,
-                    offset: offset
-                }
+                timezone: timezone
             }, resolve, reject);
         })
     };

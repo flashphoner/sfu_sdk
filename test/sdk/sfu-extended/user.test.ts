@@ -77,16 +77,39 @@ describe("user", () => {
         await bob.changeUserHostKey("");
     });
     it("Should change timezone", async () => {
-        const newTimezone = {
-            id: "Asia/Moscow",
-            offset: "GMT +3:00"
-        };
-        await bob.changeUserTimezone(newTimezone.id, newTimezone.offset);
+        const newTimezone = "Asia/Moscow, GMT +3:00";
+        await bob.changeUserTimezone(newTimezone);
         const userInfo = await bob.getUserInfo();
         expect(userInfo).toBeTruthy();
-        expect(userInfo.timezone.id).toEqual(newTimezone.id);
-        expect(userInfo.timezone.offset).toEqual(newTimezone.offset);
-        await bob.changeUserTimezone("", "");
+        expect(userInfo.timezone).toEqual(newTimezone);
+        await bob.changeUserTimezone("");
+    });
+    it("Should change user info and get it after reconnect", async () => {
+        const newEmail = "newEmail@flashphoner.com";
+        const newNickname = "newNickname";
+        const newPhoneNumber = "89999999999";
+        const newHostKey = "123123";
+        const newTimezone = "Asia/Moscow, GMT +3:00";
+        await bob.changeUserEmail(newEmail);
+        await bob.changeUserNickname(newNickname);
+        await bob.changeUserPhoneNumber(newPhoneNumber);
+        await bob.changeUserHostKey(newHostKey);
+        await bob.changeUserTimezone(newTimezone);
+        await bob.disconnect();
+
+        bob = await waitForUser();
+        const userInfo = await bob.getUserInfo();
+        expect(userInfo.email).toEqual(newEmail);
+        expect(userInfo.nickname).toEqual(newNickname);
+        expect(userInfo.phoneNumber).toEqual(newPhoneNumber);
+        expect(userInfo.hostKey).toEqual(newHostKey);
+        expect(userInfo.timezone).toEqual(newTimezone);
+
+        await bob.changeUserEmail(TEST_USER_0.username);
+        await bob.changeUserNickname(TEST_USER_0.nickname);
+        await bob.changeUserPhoneNumber("");
+        await bob.changeUserHostKey("");
+        await bob.changeUserTimezone("");
     });
     describe("secondUser", () => {
         it("Second user should get user list with updated email of first user", async () => {
