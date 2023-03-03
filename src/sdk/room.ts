@@ -56,7 +56,7 @@ export class Room {
         this.logger.info("dchannel ", "==>", msg);
         this.#dChannel.send(msg);
     };
-    
+
     #applyContentTypeConfig(sdp: string, config: {
         [key: string]: string
     }) {
@@ -250,7 +250,7 @@ export class Room {
             }
         });
     };
-    
+
     public updateState(config?: {
         [key: string]: string
     }) {
@@ -278,7 +278,7 @@ export class Room {
             }
         });
     };
-    
+
     public destroyRoom() {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -292,7 +292,7 @@ export class Room {
             });
         });
     };
-    
+
     public leaveRoom() {
         const self = this;
         return new Promise<LeftRoom>((resolve, reject) => {
@@ -306,7 +306,10 @@ export class Room {
             });
             if (self.#_pc) {
                 self.#_pc.close();
-                self.#_pc.dispatchEvent(new Event("connectionstatechange"));
+                // zapp-28, react-native-webrtc fire 'connectionstatechange' byself
+                if (typeof document !== 'undefined') {
+                    self.#_pc.dispatchEvent(new Event("connectionstatechange"));
+                }
             }
         });
     };
@@ -337,7 +340,7 @@ export class Room {
             });
         }));
     }
-    
+
     public sendMessage(msg: string) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -364,7 +367,7 @@ export class Room {
             }
         });
     };
-    
+
     public changeQuality(trackId: string, quality: string, tid: number) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -379,7 +382,7 @@ export class Room {
             });
         });
     };
-    
+
     public muteTrack(trackId: string, mute: boolean) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -392,12 +395,12 @@ export class Room {
             });
         });
     };
-    
+
     public on(event: RoomEvent, callback: (arg0: InternalMessage) => void): Room {
         this.notifier.add(event, callback);
         return this;
     };
-    
+
     public off(event: RoomEvent, callback: (arg0: InternalMessage) => void): Room {
         this.notifier.remove(event, callback);
         return this;
@@ -406,11 +409,11 @@ export class Room {
     public id() {
         return this._id;
     }
-    
+
     public name() {
         return this._name;
     }
-    
+
     public pin() {
         return this._pin;
     }
@@ -418,15 +421,15 @@ export class Room {
     public nickname() {
         return this._nickname;
     }
-    
+
     public pc() {
         return this.#_pc;
     }
-    
+
     public role() {
         return this.#_role;
     }
-    
+
     public invite() {
         return this.#inviteId;
     }

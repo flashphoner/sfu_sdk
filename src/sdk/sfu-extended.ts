@@ -65,6 +65,7 @@ import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
+import {Room} from "./room";
 
 type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo;
 
@@ -273,10 +274,7 @@ export class SfuExtended {
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
-                                if (self.#rooms[room.id()].pc()) {
-                                    self.#rooms[room.id()].pc().close();
-                                    self.#rooms[room.id()].pc().dispatchEvent(new Event("connectionstatechange"));
-                                }
+                                self.closePcAndFireEvent(room);
                                 delete self.#rooms[room.id()];
                             };
                             room.on(RoomEvent.LEFT, function (participant: LeftRoom) {
@@ -305,10 +303,7 @@ export class SfuExtended {
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
-                                if (self.#rooms[room.id()].pc()) {
-                                    self.#rooms[room.id()].pc().close();
-                                    self.#rooms[room.id()].pc().dispatchEvent(new Event("connectionstatechange"));
-                                }
+                                self.closePcAndFireEvent(room);
                                 delete self.#rooms[room.id()];
                             };
                             room.on(RoomEvent.LEFT, function (participant: LeftRoom) {
@@ -338,10 +333,7 @@ export class SfuExtended {
                                 this.#rooms[room.id()] = room;
                                 const self = this;
                                 const cleanup = () => {
-                                    if (self.#rooms[room.id()].pc()) {
-                                        self.#rooms[room.id()].pc().close();
-                                        self.#rooms[room.id()].pc().dispatchEvent(new Event("connectionstatechange"));
-                                    }
+                                    self.closePcAndFireEvent(room);
                                     delete self.#rooms[room.id()];
                                 };
                                 room.on(RoomEvent.LEFT, function (participant: LeftRoom) {
@@ -1447,4 +1439,13 @@ export class SfuExtended {
         return this;
     };
 
+    private closePcAndFireEvent(room: RoomExtended) {
+        if (this.#rooms[room.id()].pc()) {
+            this.#rooms[room.id()].pc().close();
+            // zapp-28, react-native-webrtc will fire 'connectionstatechange' event
+            if (typeof document !== 'undefined') {
+                this.#rooms[room.id()].pc().dispatchEvent(new Event("connectionstatechange"));
+            }
+        }
+    }
 }
