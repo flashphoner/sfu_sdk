@@ -34,7 +34,8 @@ export enum SfuEvent {
     USER_NICKNAME_CHANGED = "USER_NICKNAME_CHANGED",
     CHAT_MESSAGE_EDITED = "CHAT_MESSAGE_EDITED",
     CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
-    SIGN_UP_STATUS = "SIGN_UP_STATUS"
+    SIGN_UP_STATUS = "SIGN_UP_STATUS",
+    RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
 }
 
 export enum RoomEvent {
@@ -175,7 +176,8 @@ export enum Operations {
     EDIT_CHAT_MESSAGE = "EDIT_CHAT_MESSAGE",
     DELETE_CHAT_MESSAGE = "DELETE_CHAT_MESSAGE",
     SIGN_UP = "SIGN_UP",
-    REMOVE_USER = "REMOVE_USER"
+    REMOVE_USER = "REMOVE_USER",
+    RESET_PASSWORD = "RESET_PASSWORD"
 }
 
 export enum ParticipantRole {
@@ -294,7 +296,9 @@ export enum InternalApi {
     EDIT_CHAT_MESSAGE = "editChatMessage",
     DELETE_CHAT_MESSAGE = "deleteChatMessage",
     SIGN_UP = "signUp",
-    REMOVE_USER = "removeUser"
+    REMOVE_USER = "removeUser",
+    RESET_PASSWORD_REQUEST = "resetPasswordRequest",
+    RESET_PASSWORD = "resetPassword"
 }
 
 export enum ContactError {
@@ -345,7 +349,8 @@ export enum UserManagementError {
     CONNECTION_ERROR = "Connection error",
     CONNECTION_FAILED = "Connection failed",
     EMAIL_VERIFICATION_DECLINED = "Email verification is declined",
-    EMAIL_VERIFICATION_FAILED_BY_TIMEOUT = "Email verification failed by timeout"
+    EMAIL_VERIFICATION_FAILED_BY_TIMEOUT = "Email verification failed by timeout",
+    EMAIL_NOT_FOUND = "Email not found"
 }
 
 export const ATTACHMENT_CHUNK_SIZE = 100000;
@@ -885,6 +890,11 @@ export type SignUpStatus = InternalMessage & {
     id: UserId,
     nickname: UserNickname,
     verified: boolean
+}
+
+export type ResetPasswordRequestStatus = InternalMessage & {
+    email: string,
+    confirmed: boolean
 }
 
 export type OperationFailedEvent = InternalMessage & {

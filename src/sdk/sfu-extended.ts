@@ -59,13 +59,15 @@ import {
     UserHostKey,
     UserPhoneNumber,
     SignUpStatus,
-    UserManagementError
+    UserManagementError,
+    ResetPasswordRequestStatus
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {Room} from "./room";
+import {ResetPasswordHandler} from "./reset-password-handler";
 
 type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo;
 
@@ -88,6 +90,7 @@ export class SfuExtended {
     #logger: Logger = new Logger();
     #loggerPrefix: PrefixFunction;
     #signUpId: string = '';
+    #resetPasswordId: string = '';
 
     constructor(logLevel?: Verbosity, prefix?: PrefixFunction) {
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
@@ -547,6 +550,106 @@ export class SfuExtended {
             });
         });
     }
+
+    public resetPassword(options: {
+        url: string,
+        timeout?: number,
+        email: string
+    }) {
+        const connectionConfig = this.#getConnectionConfigForAnonymousUser(options.url, options.timeout);
+        const self = this;
+
+        const resetPasswordRequest = async (): Promise<ResetPasswordRequestStatus> => {
+            return new Promise<ResetPasswordRequestStatus>(function (resolve, reject) {
+                const promiseId = uuidv4();
+                self.#resetPasswordId = promiseId;
+                promises.add(promiseId, resolve, reject);
+                self.#connection.send(InternalApi.RESET_PASSWORD_REQUEST, {
+                    email: options.email,
+                    internalMessageId: promiseId
+                });
+            });
+        };
+
+        const resetPassword = async (password: string): Promise<void> => {
+            return new Promise<void>(function (resolve, reject) {
+                const promiseId = uuidv4();
+                self.#resetPasswordId = promiseId;
+                promises.add(promiseId, resolve, reject);
+                self.#connection.send(InternalApi.RESET_PASSWORD, {
+                    email: options.email,
+                    password: password,
+                    internalMessageId: promiseId
+                });
+            });
+        }
+
+        return new Promise<ResetPasswordHandler>(async (resolve, reject) => {
+            if (self.#resetPasswordId && promises.promised(self.#resetPasswordId)) {
+                promises.reject(self.#resetPasswordId, new Error(UserManagementError.EMAIL_IS_NOT_VERIFIED));
+                self.#resetPasswordId = '';
+            }
+            if (self.#_state === State.CONNECTED) {
+                await self.disconnect();
+            }
+            self.#connection = new Connection(
+                (name: string, data: InternalMessage[]) => {
+                    if (name === InternalApi.DEFAULT_METHOD) {
+                        if (data[0].type === SfuEvent.RESET_PASSWORD_REQUEST_STATUS) {
+                            const status = data[0] as ResetPasswordRequestStatus;
+                            if (status.confirmed) {
+                                promises.resolve(data[0].internalMessageId, status);
+                                self.#resetPasswordId = '';
+                                this.#notifier.notify(SfuEvent.RESET_PASSWORD_REQUEST_STATUS, status);
+                            } else {
+                                this.#notifier.notify(SfuEvent.RESET_PASSWORD_REQUEST_STATUS, status);
+                            }
+                        } else if (data[0].type === SfuEvent.ACK && promises.promised(data[0].internalMessageId)) {
+                            promises.resolve(data[0].internalMessageId);
+                            self.#resetPasswordId = '';
+                            self.disconnect();
+                        } else if (data[0].type === RoomEvent.OPERATION_FAILED && promises.promised(data[0].internalMessageId)) {
+                            promises.reject(data[0].internalMessageId, data[0] as OperationFailedEvent);
+                            self.#resetPasswordId = '';
+                            self.disconnect();
+                        }
+                    }
+                },
+                () => {
+                },
+                (e) => {
+                    reject(new Error(UserManagementError.CONNECTION_ERROR));
+                    self.#_state = State.FAILED;
+                },
+                (e) => {
+                    if (e.reason === 'Normal disconnect') {
+                        promises.reject(self.#resetPasswordId, new Error(UserManagementError.OPERATION_FAILED_BY_DISCONNECT));
+                        self.#resetPasswordId = '';
+                        self.#_state = State.DISCONNECTED;
+                        self.disconnect();
+                    } else {
+                        promises.reject(self.#resetPasswordId, new Error(UserManagementError.CONNECTION_FAILED));
+                        self.#resetPasswordId = '';
+                        self.#_state = State.DISCONNECTED;
+                        self.disconnect();
+                    }
+                },
+                this.#logger);
+            await self.#connection.connect(connectionConfig);
+            self.#_state = State.CONNECTED;
+            let status;
+            try {
+                status = await resetPasswordRequest();
+            } catch (error) {
+                reject(error);
+                return;
+            }
+            if (status.confirmed) {
+                resolve(new ResetPasswordHandler(resetPassword));
+            }
+        })
+    }
+
 
     public removeUser(options: {
         url: string,
