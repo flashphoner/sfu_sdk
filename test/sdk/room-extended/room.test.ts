@@ -1,4 +1,5 @@
 import {
+    CALENDAR_EVENT,
     MEETING_NICKNAME,
     PINLESS_TEST_ROOM,
     TEST_MESSAGE_ROOM,
@@ -119,6 +120,33 @@ describe("room", () => {
         const state = await room.join(bobPc, CUSTOM_NICKNAME);
         expect(state.name).toEqual(CUSTOM_NICKNAME);
         await room.destroyRoom();
+    });
+    it("Should create calendar event and second user should join without owner", async () => {
+        const event = CALENDAR_EVENT;
+        event.usePMI = false;
+        event.allowJoinAtAnyTime = true;
+        event.waitingRoom = false;
+        const calendarEvent = await bob.addCalendarEvent(event);
+        const bobPc = new wrtc.RTCPeerConnection();
+        const alicePc = new wrtc.RTCPeerConnection();
+
+        const room = await alice.roomAvailable({
+            id: calendarEvent.meetingId,
+            pin: calendarEvent.accessCode,
+            nickname: TEST_USER_1.nickname
+        });
+        let state = await room.join(alicePc);
+        expect(state.name).toEqual(TEST_USER_1.nickname);
+
+        const room1 = await bob.roomAvailable({
+            id: calendarEvent.meetingId,
+            pin: calendarEvent.accessCode,
+            nickname: TEST_USER_0.nickname
+        });
+        state = await room1.join(bobPc);
+        expect(state.name).toEqual(TEST_USER_0.nickname);
+        await room1.destroyRoom();
+        await bob.removeCalendarEvent(calendarEvent);
     });
     it("Should leave room", async () => {
         const bobPc = new wrtc.RTCPeerConnection();

@@ -68,7 +68,10 @@ export const CALENDAR_EVENT = {
     waitingRoom: true,
     usePMI: true,
     ownerVideo: false,
-    participantVideo: false
+    participantVideo: false,
+    allowJoinAtAnyTime: false,
+    useMuteAudioOnJoin: false,
+    useLocalAutoRecord: false
 }
 
 export const PDF_FILE_NAME = "sample.pdf";

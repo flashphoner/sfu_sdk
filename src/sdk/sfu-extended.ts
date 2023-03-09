@@ -1069,7 +1069,10 @@ export class SfuExtended {
         waitingRoom: boolean,
         usePMI: boolean,
         ownerVideo: boolean,
-        participantVideo: boolean
+        participantVideo: boolean,
+        allowJoinAtAnyTime: boolean,
+        useMuteAudioOnJoin: boolean,
+        useLocalAutoRecord: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1103,7 +1106,10 @@ export class SfuExtended {
         waitingRoom: boolean,
         usePMI: boolean,
         ownerVideo: boolean,
-        participantVideo: boolean
+        participantVideo: boolean,
+        allowJoinAtAnyTime: boolean,
+        useMuteAudioOnJoin: boolean,
+        useLocalAutoRecord: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1451,7 +1457,10 @@ export class SfuExtended {
         waitingRoom: boolean,
         usePMI: boolean,
         ownerVideo: boolean,
-        participantVideo: boolean
+        participantVideo: boolean,
+        allowJoinAtAnyTime: boolean,
+        useMuteAudioOnJoin: boolean,
+        useLocalAutoRecord: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;

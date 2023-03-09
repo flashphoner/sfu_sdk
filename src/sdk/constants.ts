@@ -750,6 +750,9 @@ export type CalendarEvent = {
     recurring: boolean;
     usePMI: boolean;
     waitingRoom: boolean;
+    allowJoinAtAnyTime: boolean;
+    useMuteAudioOnJoin: boolean;
+    useLocalAutoRecord: boolean;
 }
 export type Calendar = {
     events: Array<CalendarEvent>
