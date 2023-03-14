@@ -505,6 +505,66 @@ describe("chat", () => {
 
             await bob.deleteChat({id: chat.id});
         });
+        it("Should reject editing message without chatId", async () => {
+            await expect(bob.editChatMessage({
+                chatId: "",
+                messageId: "messageId",
+                body: "body"
+            })).rejects.toHaveProperty("error", ChatError.CAN_NOT_EDIT_MESSAGE_WITHOUT_CHAT_ID);
+        });
+        it("Should reject editing message without messageId", async () => {
+            await expect(bob.editChatMessage({
+                chatId: "chatId",
+                messageId: "",
+                body: "body"
+            })).rejects.toHaveProperty("error", ChatError.CAN_NOT_EDIT_MESSAGE_WITHOUT_MESSAGE_ID);
+        });
+        it("Should reject editing message if chat doesn't exist", async () => {
+            await expect(bob.editChatMessage({
+                chatId: "chatId",
+                messageId: "messageId",
+                body: "body"
+            })).rejects.toHaveProperty("error", ChatError.EDIT_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS);
+        });
+        it("Should reject editing message if message doesn't exist", async () => {
+            const chat = await bob.createChat({});
+            await expect(bob.editChatMessage({
+                chatId: chat.id,
+                messageId: "messageId",
+                body: "body"
+            })).rejects.toHaveProperty("error", ChatError.EDIT_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS);
+        });
+        it("Should reject editing message if message will have no content after that", async () => {
+            const chat = await bob.createChat({});
+            const status = await bob.sendMessage({
+                chatId: chat.id,
+                body: MESSAGE_BODY,
+                attachments: [
+                    TEST_PICTURE_ATTACHMENT
+                ]
+            });
+            expect(status).toBeTruthy();
+            expect(status.id).toBeTruthy();
+            expect(status.date).toBeTruthy();
+            expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+            expect(status.attachments).toBeTruthy();
+            expect(status.attachments.length).toEqual(1);
+
+            const attachmentsData = [];
+            attachmentsData.push({
+                id: status.attachments[0].id,
+                payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+            })
+            const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
+            await handler.sendAttachments();
+
+            const attachmentId = status.attachments[0].id;
+            await expect(bob.editChatMessage({chatId: chat.id,
+                messageId: status.id,
+                body: '',
+                attachmentIdsToDelete: [attachmentId]
+            })).rejects.toHaveProperty("error", ChatError.EDIT_MESSAGE_ERROR_MESSAGE_CAN_NOT_BE_WITHOUT_CONTENT);
+        });
         it("Should delete and add a new attachment when editing", async () => {
             const editedBody = "edited message body";
             let chat = await bob.createChat({});
@@ -569,7 +629,8 @@ describe("chat", () => {
                     end: -1
                 }});
             expect(messages).toBeTruthy();
-            expect(messages.length).toBe(0);
+            expect(messages.length).toBe(1);
+            expect(messages[0].status).toEqual(MessageState.DELETED);
 
             await bob.deleteChat({id: chat.id});
         });
@@ -1094,7 +1155,7 @@ describe("chat", () => {
                     return new Promise<MessageDeleted>((resolve, reject) => {
                         sfu.on(SfuEvent.CHAT_MESSAGE_DELETED, (msg) => {
                             const messageDeleted = msg as MessageDeleted;
-                            if (messageDeleted && messageDeleted.chatId === chat.id && messageDeleted.messageId === messageId) {
+                            if (messageDeleted && messageDeleted.chatId === chat.id && messageDeleted.messageId === messageId && messageDeleted.state === MessageState.DELETED) {
                                 resolve(messageDeleted);
                             }
                         })

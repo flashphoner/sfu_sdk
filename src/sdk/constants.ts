@@ -311,8 +311,11 @@ export enum ChatError {
     CAN_NOT_SEND_MESSAGE_WITHOUT_CHAT_ID = "Can't send message without a chatId",
     USER_MUST_BE_A_CHAT_MEMBER_TO_SEND_MESSAGES = "User must be a chat member to send messages",
     CAN_NOT_CANCEL_SENDING_ATTACHMENT = "Can't cancel sending attachment",
+    CAN_NOT_EDIT_MESSAGE_WITHOUT_CHAT_ID = "Can't edit message without chatId",
+    CAN_NOT_EDIT_MESSAGE_WITHOUT_MESSAGE_ID = "Can't edit message without messageId",
     EDIT_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS = "Failed to edit message, chat doesn't exist",
     EDIT_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to edit message, message doesn't exist",
+    EDIT_MESSAGE_ERROR_MESSAGE_CAN_NOT_BE_WITHOUT_CONTENT = "Failed to edit message, message must have body or attachments",
     DELETE_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS = "Failed to delete message, chat doesn't exist",
     DELETE_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to delete message, message doesn't exist"
 }
@@ -562,7 +565,8 @@ export enum MessageState {
     FULL_DELIVERY_PARTIAL_READ = "FULL_DELIVERY_PARTIAL_READ",
     FULL_DELIVERY_FULL_READ = "FULL_DELIVERY_FULL_READ",
     PENDING_ATTACHMENTS = "PENDING_ATTACHMENTS",
-    DELIVERY_CANCELLED = "DELIVERY_CANCELLED"
+    DELIVERY_CANCELLED = "DELIVERY_CANCELLED",
+    DELETED = "DELETED"
 }
 
 export enum DeliveryStatus {
@@ -886,7 +890,8 @@ export type MessageEdited = InternalMessage & {
 
 export type MessageDeleted = InternalMessage & {
     chatId: string,
-    messageId: string
+    messageId: string,
+    state: MessageState
 }
 
 export type SignUpStatus = InternalMessage & {
