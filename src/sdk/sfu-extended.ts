@@ -108,6 +108,8 @@ export class SfuExtended {
         nickname: UserNickname,
         timeout?: number,
         binaryChunkSize?: number
+        failedProbesThreshold?: number,
+        pingInterval?: number
     }) {
         if (!options) {
             throw new TypeError("No options provided");
@@ -116,6 +118,8 @@ export class SfuExtended {
             url: options.url,
             appName: InternalApi.Z_APP,
             timeout: options.timeout ? options.timeout : 10000,
+            failedProbesThreshold: options.failedProbesThreshold,
+            pingInterval: options.pingInterval,
             custom: {
                 username: options.username,
                 password: options.password,

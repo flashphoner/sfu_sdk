@@ -1,6 +1,7 @@
 import {SfuEvent, SfuExtended, State} from "../../../src";
 import {TEST_USER_0, url} from "../../util/constants";
 import {Verbosity} from "../../../src/sdk/logger";
+import {ConnectionFailedEvent} from "../../../src/sdk/constants";
 
 describe("connect", () => {
     let sfu: SfuExtended;
@@ -52,5 +53,18 @@ describe("connect", () => {
         expect(user.username).toEqual(TEST_USER_0.username);
         expect(user.nickname).toEqual(TEST_USER_0.nickname);
         expect(user.pmi).toBeTruthy();
+    });
+    it("Should disconnect by missing pings", (done) => {
+        sfu.on(SfuEvent.CONNECTION_FAILED, async (e) => {
+            const event = e as ConnectionFailedEvent;
+            expect(event.info).toMatch("connection seems to be down");
+            done();
+        });
+        sfu.connect({
+            url: url,
+            failedProbesThreshold: 2,
+            pingInterval: 100,
+            ...TEST_USER_0
+        });
     });
 })

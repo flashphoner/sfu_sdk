@@ -29,7 +29,7 @@ describe("connection", () => {
         });
         connection.send("ping", "");
     });
-    it("should fail on missing ping from server", async (done) => {
+    it("should fail on missing ping from server", (done) => {
         const connection = new Connection(
             (message, data) => {},
             () => {},
@@ -39,7 +39,7 @@ describe("connection", () => {
             },
             () => {}
         );
-        await connection.connect({
+        connection.connect({
             url: url,
             appName: InternalApi.P_APP,
             timeout: 1000,
