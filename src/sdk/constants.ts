@@ -36,6 +36,7 @@ export enum SfuEvent {
     CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
+    CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT"
 }
 
 export enum RoomEvent {
@@ -177,7 +178,8 @@ export enum Operations {
     DELETE_CHAT_MESSAGE = "DELETE_CHAT_MESSAGE",
     SIGN_UP = "SIGN_UP",
     REMOVE_USER = "REMOVE_USER",
-    RESET_PASSWORD = "RESET_PASSWORD"
+    RESET_PASSWORD = "RESET_PASSWORD",
+    GET_CHAT_MESSAGES_COUNT = "GET_CHAT_MESSAGES_COUNT"
 }
 
 export enum ParticipantRole {
@@ -252,6 +254,7 @@ export enum InternalApi {
     LOAD_CHAT = "loadChat",
     LOAD_CHAT_MESSAGES = "loadChatMessages",
     SEARCH_CHAT_MESSAGES = "searchChatMessages",
+    GET_CHAT_MESSAGES_COUNT = "getChatMessagesCount",
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
     RENAME_CHAT = "renameChat",
@@ -903,6 +906,11 @@ export type SignUpStatus = InternalMessage & {
 export type ResetPasswordRequestStatus = InternalMessage & {
     email: string,
     confirmed: boolean
+}
+
+export type ChatMessagesCount = InternalMessage & {
+    chatId: string,
+    messagesCount: number
 }
 
 export type OperationFailedEvent = InternalMessage & {

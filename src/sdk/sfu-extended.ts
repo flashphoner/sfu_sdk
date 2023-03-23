@@ -60,7 +60,8 @@ import {
     UserPhoneNumber,
     SignUpStatus,
     UserManagementError,
-    ResetPasswordRequestStatus
+    ResetPasswordRequestStatus,
+    ChatMessagesCount
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -256,6 +257,7 @@ export class SfuExtended {
                                 this.#notifier.notify(SfuEvent.CHAT_UPDATED, chat.info);
                             }
                         } else if (data[0].type === InternalApi.USER_CHATS) {
+                            //TODO: optimize - should use with if (zapp-420)
                             const chats = data[0] as ChatsEvent;
                             promises.resolve(data[0].internalMessageId, chats.chats);
                             this.#notifier.notify(SfuEvent.USER_CHATS, chats.chats);
@@ -404,6 +406,11 @@ export class SfuExtended {
                             const message = data[0] as MessageDeleted;
                             if (!promises.resolve(data[0].internalMessageId, message)) {
                                 this.#notifier.notify(SfuEvent.CHAT_MESSAGE_DELETED, message);
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_MESSAGES_COUNT) {
+                            const messagesCount = data[0] as ChatMessagesCount;
+                            if (!promises.resolve(data[0].internalMessageId, messagesCount)) {
+                                this.#notifier.notify(SfuEvent.CHAT_MESSAGES_COUNT, messagesCount);
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -1182,6 +1189,18 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.SEARCH_CHAT_MESSAGES, params, resolve, reject);
         });
     };
+
+    public getChatMessagesCount(chat: {
+        id: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatMessagesCount>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_CHAT_MESSAGES_COUNT, {
+                chatId: chat.id
+            }, resolve, reject);
+        });
+    }
 
     public createChat(chat: {
         id?: string,

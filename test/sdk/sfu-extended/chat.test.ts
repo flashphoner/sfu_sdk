@@ -634,6 +634,16 @@ describe("chat", () => {
 
             await bob.deleteChat({id: chat.id});
         });
+        it('should send few messages and get chat messages count', async () => {
+            let chat = await bob.createChat({});
+            for (let i = 0; i < 4; i++) {
+                await bob.sendMessage({body: MESSAGE_BODY, chatId: chat.id});
+            }
+            const result = await bob.getChatMessagesCount({id: chat.id});
+            expect(result.messagesCount).toBe(4);
+
+            await bob.deleteChat({id: chat.id});
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});
