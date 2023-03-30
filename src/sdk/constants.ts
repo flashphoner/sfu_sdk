@@ -392,13 +392,17 @@ export type FragmentedMessage = {
 
 export enum RemoteSdpType {
     OFFER = "offer",
-    ANSWER = "answer"
+    ANSWER = "answer",
+    ROLLBACK = "rollback"
 }
 
-export type RemoteSdp = InternalMessage & {
+export type RemoteSdp = InternalMessage & RemoteSdpInfo;
+
+export type RemoteSdpInfo = {
     info: {
         sdp: string,
-        type: RemoteSdpType
+        type: RemoteSdpType,
+        tid: string
     }
 }
 

@@ -157,6 +157,9 @@ const statsToTable = function(stats) {
     stats.participants.forEach(function(participant){
         for (const [key, value] of Object.entries(participant.incomingTracks)) {
             const srcTrack = src[tKey(key, value)];
+            if (!srcTrack) {
+                continue;
+            }
             bitrate_out += srcTrack.bitrate;
             tracks_out++;
         }
@@ -187,6 +190,9 @@ const statsToTable = function(stats) {
         });
         for (const [key, value] of Object.entries(participant.incomingTracks)) {
             const srcTrack = src[tKey(key, value)];
+            if (!srcTrack) {
+                continue;
+            }
             pStats.push(trackToTable(srcTrack, srcTrack.nickName, value));
             tracksIn++;
             bitrateIn += srcTrack.bitrate;
@@ -197,6 +203,5 @@ const statsToTable = function(stats) {
         pStats.push(metricToTable("bitrate_out", bitrateOut, participant.nickName));
         metrics[participant.nickName] = pStats;
     });
-
     return metrics;
 }

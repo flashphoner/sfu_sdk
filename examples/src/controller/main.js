@@ -54,7 +54,12 @@ const connect = function() {
         tData = statsToTable(stats);
         gData = statsToGraph(stats);
         gView.refreshSigma(gData);
-        tView.updateMetricTable(tData.WCS, "WCS");
+        //flatten tdata
+        const flatView = [];
+        for (const [k, v] of Object.entries(tData)) {
+            flatView.push(...v);
+        }
+        tView.updateMetricTable(flatView, "WCS");
     }
 
     gView.bindNodeClickEvents(function(e){

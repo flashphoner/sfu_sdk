@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import {v4 as uuidv4} from 'uuid';
 import {ChannelSendPolicy, ChannelType, MessageAttachmentType} from "../../src/sdk/constants";
 export const url = "ws://127.0.0.1:8080/";
 export const wrongWsUrl = "ws://127.0.0.1:8081/";

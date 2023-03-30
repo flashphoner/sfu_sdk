@@ -16,7 +16,7 @@ import {
     RemoteSdpType, RoleAssigned,
     RoomError,
     RoomEvent,
-    RoomState, WaitingRoomUpdate, UserNickname
+    RoomState, WaitingRoomUpdate, UserNickname, RemoteSdpInfo
 } from "./constants";
 import {Connection} from "./connection";
 import Logger from "./logger";
@@ -40,6 +40,12 @@ export class Room {
     #dChannel: RTCDataChannel;
     #_creationTime: number;
     protected logger: Logger;
+    _uid: string;
+    _crutch: {
+        settingRemoteOffer: boolean,
+        settingRemoteAnswer: boolean,
+        tid: string
+    }
 
     public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number) {
         this.connection = connection;
@@ -50,6 +56,12 @@ export class Room {
         this._nickname = nickname;
         this.#_creationTime = creationTime;
         this.logger = new Logger();
+        this._uid = uuidv4();
+        this._crutch = {
+            settingRemoteOffer: false,
+            settingRemoteAnswer: false,
+            tid: ""
+        }
     }
 
     #dChannelSend(msg: string) {
@@ -75,6 +87,17 @@ export class Room {
         return ret;
     };
 
+    async #setRemoteDescription(remoteSdp: RemoteSdpInfo) {
+        try {
+            await this.#_pc.setRemoteDescription(remoteSdp.info);
+        } catch (e) {
+            this.logger.warn(e);
+            this.logger.debug("Was trying to set " + remoteSdp.info.sdp);
+            this.logger.debug("Local sdp is " + this.#_pc.localDescription.sdp);
+            throw e;
+        }
+    };
+
     //TODO refactor types
     public async processEvent(e: InternalMessage) {
         this.logger.info("<==", e);
@@ -84,19 +107,47 @@ export class Room {
                     const remoteSdp = e as RemoteSdp;
                     switch (remoteSdp.info.type) {
                         case RemoteSdpType.OFFER:
-                            await this.#_pc.setRemoteDescription(remoteSdp.info);
+                            if (this._crutch.settingRemoteAnswer) {
+                                this.logger.debug(new Error("Clashing with the answer!"));
+                                function sleep(millis: number) {
+                                    return new Promise(resolve => setTimeout(resolve, millis));
+                                }
+                                while (this._crutch.settingRemoteAnswer) {
+                                    await sleep(100);
+                                    this.logger.debug("Waiting for answer " + this._crutch.settingRemoteAnswer);
+                                }
+                            }
+                            this._crutch.tid = remoteSdp.info.tid;
+                            this.logger.debug("setTid " + this._crutch.tid);
+                            this._crutch.settingRemoteOffer = true;
+                            if (this.#_pc.signalingState === "have-local-offer") {
+                                await this.#setRemoteDescription({
+                                    info: {
+                                        sdp: "",
+                                        type: RemoteSdpType.ROLLBACK,
+                                        tid: ""
+                                    }
+                                });
+                            }
+                            await this.#setRemoteDescription(remoteSdp);
                             const answer = await this.#_pc.createAnswer();
+                            answer.sdp = answer.sdp.replace(/a=sendrecv/g, "a=sendonly");
                             await this.#_pc.setLocalDescription(answer);
                             if (this.#_pc.connectionState !== "closed") {
                                 this.connection.send(InternalApi.UPDATE_ROOM_STATE, {
                                     id: this._id,
                                     pin: this._pin,
-                                    sdp: this.#_pc.localDescription.sdp
+                                    sdp: this.#_pc.localDescription.sdp,
+                                    tid: this._crutch.tid,
+                                    sdpType:RemoteSdpType.ANSWER
                                 });
                             }
+                            this._crutch.settingRemoteOffer = false;
                             break;
                         case RemoteSdpType.ANSWER:
-                            await this.#_pc.setRemoteDescription(remoteSdp.info);
+                            this._crutch.settingRemoteAnswer = true;
+                            await this.#setRemoteDescription(remoteSdp);
+                            this._crutch.settingRemoteAnswer = false;
                             break;
                     }
                 } catch (error) {
@@ -184,12 +235,15 @@ export class Room {
     public join(pc: RTCPeerConnection, nickname?: UserNickname,  config?: {
         [key: string]: string
     }) {
+        const self = this;
         this.#_pc = pc;
+        this.#_pc.addEventListener("signalingstatechange", () => {
+            this.logger.debug("Connection " + self._uid + " " + self.#_pc.signalingState);
+        })
         if (nickname) {
             this._nickname = nickname;
         }
         this.#dChannel = this.#_pc.createDataChannel(Room.#CONTROL_CHANNEL);
-        const self = this;
         this.#dChannel.onmessage = (msg) => {
             this.logger.info("dchannel ", "<==", msg);
             const message: InternalMessage = JSON.parse(msg.data);
@@ -232,6 +286,7 @@ export class Room {
                     if (config) {
                         offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
                     }
+                    offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
                     await self.#_pc.setLocalDescription(offer);
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
@@ -240,7 +295,8 @@ export class Room {
                         pin: self._pin,
                         sdp: offer.sdp,
                         nickname: nickname,
-                        internalMessageId: id
+                        internalMessageId: id,
+                        sdpType:RemoteSdpType.OFFER
                     });
                 } catch (e) {
                     reject(e);
@@ -258,9 +314,15 @@ export class Room {
         return new Promise<void>(async (resolve, reject) => {
             if (self.#_pc.signalingState !== "stable") {
                 reject("Peer connection signaling state is " + self.#_pc.signalingState + ". Can't update room while negotiation is in progress");
+                return;
             }
             try {
                 const offer = await self.#_pc.createOffer();
+                if (self._crutch.settingRemoteOffer) {
+                    reject("Setting remote offer");
+                    return;
+                }
+                offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
                 await self.#_pc.setLocalDescription(offer);
                 if (config) {
                     offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
@@ -271,7 +333,9 @@ export class Room {
                     id: self._id,
                     pin: self._pin,
                     sdp: offer.sdp,
-                    internalMessageId: id
+                    internalMessageId: id,
+                    sdpType:RemoteSdpType.OFFER,
+                    tid:this._crutch.tid
                 });
             } catch(e) {
                 reject(e);

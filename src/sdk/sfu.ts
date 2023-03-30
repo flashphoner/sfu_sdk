@@ -59,7 +59,7 @@ export class Sfu {
         const self = this;
         return new Promise<void>(async (resolve, reject) => {
             self.#connection = new Connection(
-                (name, data) =>  {
+                (name, data) => {
                     this.#logger.debug("onMessage: ", data[0]);
                     switch (name) {
                         case InternalApi.DEFAULT_METHOD:
@@ -127,19 +127,21 @@ export class Sfu {
         return this.#_room;
     }
 
-    public disconnect() {
+    public async disconnect() {
         if (this.#_room) {
-            this.#_room.leaveRoom();
+            if (this.#_room.state() == RoomState.JOINED) {
+                await this.#_room.leaveRoom();
+            }
         }
         if (this.#connection) {
             this.#connection.close();
         }
     }
-    
+
     public room() {
         return this.#_room;
     }
-    
+
     public nickname() {
         return this.#_nickname;
     }
