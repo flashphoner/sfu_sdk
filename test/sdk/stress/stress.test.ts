@@ -85,7 +85,8 @@ async function addRemoveTrackLoop(room: RoomExtended, interval: number = 1000) {
     }
 }
 
-describe("Stress test", () => {
+// Only for local or manual tests
+describe.skip("Stress test", () => {
     it("Should test server under many users", async (done) => {
         for (const user of users) {
             await user.connect();
