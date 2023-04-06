@@ -36,7 +36,8 @@ export enum SfuEvent {
     CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
-    CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT"
+    CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
+    MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT"
 }
 
 export enum RoomEvent {
@@ -179,7 +180,10 @@ export enum Operations {
     SIGN_UP = "SIGN_UP",
     REMOVE_USER = "REMOVE_USER",
     RESET_PASSWORD = "RESET_PASSWORD",
-    GET_CHAT_MESSAGES_COUNT = "GET_CHAT_MESSAGES_COUNT"
+    GET_CHAT_MESSAGES_COUNT = "GET_CHAT_MESSAGES_COUNT",
+    SEARCH_MESSAGE_ATTACHMENTS = "SEARCH_MESSAGE_ATTACHMENTS",
+    ADD_MESSAGE_TO_BOOKMARKS = "ADD_MESSAGE_TO_BOOKMARKS",
+    REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS"
 }
 
 export enum ParticipantRole {
@@ -301,7 +305,10 @@ export enum InternalApi {
     SIGN_UP = "signUp",
     REMOVE_USER = "removeUser",
     RESET_PASSWORD_REQUEST = "resetPasswordRequest",
-    RESET_PASSWORD = "resetPassword"
+    RESET_PASSWORD = "resetPassword",
+    SEARCH_MESSAGE_ATTACHMENTS = "searchMessageAttachments",
+    ADD_MESSAGE_TO_BOOKMARKS = "addMessageToBookmarks",
+    REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks"
 }
 
 export enum ContactError {
@@ -672,6 +679,7 @@ export type Message = {
     privateMessage: boolean;
     edited: boolean;
     dateOfEdit: number;
+    bookmarked: boolean;
 }
 
 export type SfuMessageEvent = InternalMessage & {
@@ -915,6 +923,32 @@ export type ResetPasswordRequestStatus = InternalMessage & {
 export type ChatMessagesCount = InternalMessage & {
     chatId: string,
     messagesCount: number
+}
+
+export enum MessageAttachmentMediaType {
+    media = "media",
+    other = "other"
+}
+
+export type AttachmentInfo = {
+    chatId: string;
+    messageId: string;
+    id: number;
+    name: string;
+    type: MessageAttachmentType,
+    mediaType: MessageAttachmentMediaType;
+    size: number;
+    from: string;
+    date: number;
+}
+
+export type MessageAttachmentsSearchResult = InternalMessage & {
+    attachmentsInfo: Array<AttachmentInfo>,
+    totalSize: number
+}
+
+export enum SortOrder {
+    ASC, DESC
 }
 
 export type OperationFailedEvent = InternalMessage & {

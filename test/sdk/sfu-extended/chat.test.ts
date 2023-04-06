@@ -27,6 +27,7 @@ import {
     MessageState,
     MessageStatusBulkEvent,
     SfuEvent,
+    SortOrder,
     UserSpecificChatInfo
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
@@ -644,6 +645,52 @@ describe("chat", () => {
 
             await bob.deleteChat({id: chat.id});
         });
+        it("Should add message to bookmarks", async () => {
+            const chat = await bob.createChat({});
+            const status = await bob.sendMessage({
+                chatId: chat.id,
+                body: MESSAGE_BODY
+            });
+            await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+            const messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }
+            });
+            expect(messages.length).toBe(1);
+            expect(messages[0].bookmarked).toBe(true);
+            await bob.deleteChat(chat);
+        });
+        it("Should remove message from bookmarks", async () => {
+            const chat = await bob.createChat({});
+            const status = await bob.sendMessage({
+                chatId: chat.id,
+                body: MESSAGE_BODY
+            });
+            await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+            let messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }
+            });
+            expect(messages.length).toBe(1);
+            expect(messages[0].bookmarked).toBe(true);
+            await bob.removeMessageFromBookmarks({chatId: chat.id, messageId: status.id});
+            messages = await bob.loadChatMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                }
+            });
+            expect(messages.length).toBe(1);
+            expect(messages[0].bookmarked).toBe(false);
+            await bob.deleteChat(chat);
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});
@@ -985,6 +1032,210 @@ describe("chat", () => {
                 const result = await handler.waitAndGetMessageStatus();
                 expect(result.state).toEqual(MessageState.NO_DELIVERY_NO_READ);
                 expect(result.attachments).toHaveLength(1);
+                await bob.deleteChat(chat);
+            });
+            it("Should search message attachments in chat", async () => {
+                const chat = await bob.createChat({});
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                    attachments: ATTACHMENTS
+                });
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+                expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                expect(status.attachments).toBeTruthy();
+
+                const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
+                await handler.sendAttachments();
+
+                const searchResult = await bob.searchMessageAttachments({
+                    chatId: chat.id,
+                    bookmarkedOnly: false,
+                    from: TEST_USER_0.username,
+                    timeFrame: {
+                        start: 0,
+                        end: -1,
+                    },
+                    searchString: "sam",
+                    sortOrder: SortOrder.ASC
+                });
+                expect(searchResult.attachmentsInfo.length).toBe(2);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
+                expect(searchResult.attachmentsInfo[0].date).toEqual(status.date);
+                expect(searchResult.attachmentsInfo[1].id).toEqual(1);
+                expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PDF_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[1].size).toEqual(TEST_PDF_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[1].from).toEqual(TEST_USER_0.username);
+                expect(searchResult.attachmentsInfo[1].date).toEqual(status.date);
+
+                await bob.deleteChat(chat);
+            });
+            it("Should search message attachments in chats", async () => {
+                const chats = await bob.getUserChats();
+                Object.keys(chats).map(async (id) => {
+                    await bob.deleteChat({id: id});
+                });
+
+                const firstChat = await bob.createChat({});
+                const secondChat = await bob.createChat({});
+                const firstStatus = await bob.sendMessage({
+                    chatId: firstChat.id,
+                    body: MESSAGE_BODY,
+                    attachments: [TEST_PICTURE_ATTACHMENT]
+                });
+
+                let attachmentsData = [];
+                attachmentsData.push({
+                    id: firstStatus.attachments[0].id,
+                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+                })
+                let handler = bob.getSendingAttachmentsHandler(attachmentsData, firstStatus.id);
+                await handler.sendAttachments();
+
+                const secondStatus = await bob.sendMessage({
+                    chatId: secondChat.id,
+                    body: MESSAGE_BODY,
+                    attachments: [TEST_PDF_ATTACHMENT]
+                });
+
+                attachmentsData = [];
+                attachmentsData.push({
+                    id: secondStatus.attachments[0].id,
+                    payload: TEST_PDF_ATTACHMENT_DATA.payload,
+                })
+                handler = bob.getSendingAttachmentsHandler(attachmentsData, secondStatus.id);
+                await handler.sendAttachments();
+
+                const searchResult = await bob.searchMessageAttachments({
+                    bookmarkedOnly: false,
+                    from: TEST_USER_0.username,
+                    timeFrame: {
+                        start: 0,
+                        end: -1,
+                    },
+                    searchString: "sam",
+                    sortOrder: SortOrder.DESC
+                });
+                expect(searchResult.attachmentsInfo.length).toBe(2);
+                expect(searchResult.attachmentsInfo[0].chatId).toEqual(secondChat.id);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(1);
+                expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PDF_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PDF_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
+                expect(searchResult.attachmentsInfo[0].date).toEqual(secondStatus.date);
+                expect(searchResult.attachmentsInfo[1].chatId).toEqual(firstChat.id);
+                expect(searchResult.attachmentsInfo[1].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[1].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[1].from).toEqual(TEST_USER_0.username);
+                expect(searchResult.attachmentsInfo[1].date).toEqual(firstStatus.date);
+
+
+                await bob.deleteChat(firstChat);
+                await bob.deleteChat(secondChat);
+            });
+            it("Should search message attachments in bookmarks", async () => {
+                const firstChat = await bob.createChat({});
+                const secondChat = await bob.createChat({});
+
+                const firstStatus = await bob.sendMessage({
+                    chatId: firstChat.id,
+                    body: MESSAGE_BODY,
+                    attachments: [TEST_PICTURE_ATTACHMENT]
+                });
+                let attachmentsData = [];
+                attachmentsData.push({
+                    id: firstStatus.attachments[0].id,
+                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+                })
+                let handler = bob.getSendingAttachmentsHandler(attachmentsData, firstStatus.id);
+                await handler.sendAttachments();
+
+                const secondStatus = await bob.sendMessage({
+                    chatId: secondChat.id,
+                    body: MESSAGE_BODY,
+                    attachments: [TEST_PICTURE_ATTACHMENT]
+                });
+                attachmentsData = [];
+                attachmentsData.push({
+                    id: firstStatus.attachments[0].id,
+                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+                })
+                handler = bob.getSendingAttachmentsHandler(attachmentsData, secondStatus.id);
+                await handler.sendAttachments();
+
+                await bob.addMessageToBookmarks({chatId: firstChat.id, messageId: firstStatus.id});
+                const searchResult = await bob.searchMessageAttachments({
+                    bookmarkedOnly: true,
+                    from: TEST_USER_0.username,
+                    timeFrame: {
+                        start: 0,
+                        end: -1,
+                    },
+                    searchString: "sam",
+                    sortOrder: SortOrder.ASC
+                });
+                expect(searchResult.attachmentsInfo.length).toBe(1);
+                expect(searchResult.attachmentsInfo[0].chatId).toEqual(firstChat.id);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
+                expect(searchResult.attachmentsInfo[0].date).toEqual(firstStatus.date);
+
+                await bob.deleteChat(firstChat);
+            });
+            it("Should send few messages and search message attachments based on boundaries", async () => {
+                const chat = await bob.createChat({});
+                for (let i = 0; i < 5; i++) {
+                    const status = await bob.sendMessage({
+                        chatId: chat.id,
+                        body: MESSAGE_BODY,
+                        attachments: [TEST_PICTURE_ATTACHMENT]
+                    });
+
+                    const attachmentData = [];
+                    attachmentData.push({
+                        id: 0,
+                        payload: TEST_PICTURE_ATTACHMENT_DATA
+                    });
+                    const handler = bob.getSendingAttachmentsHandler(attachmentData, status.id);
+                    await handler.sendAttachments();
+                }
+
+                const allAttachments = await bob.searchMessageAttachments({
+                    chatId: chat.id,
+                    bookmarkedOnly: false,
+                    from: TEST_USER_0.username,
+                    timeFrame: {
+                        start: 0,
+                        end: -1,
+                    },
+                    searchString: "sam",
+                    sortOrder: SortOrder.DESC
+                });
+
+                const searchResult = await bob.searchMessageAttachments({
+                    chatId: chat.id,
+                    bookmarkedOnly: false,
+                    from: TEST_USER_0.username,
+                    boundaries: {
+                        dateMark: allAttachments.attachmentsInfo[2].date,
+                        lowerLimit: 2,
+                        upperLimit: 1
+                    },
+                    searchString: "sam",
+                    sortOrder: SortOrder.DESC
+                });
+                expect(allAttachments.attachmentsInfo[1].messageId).toEqual(searchResult.attachmentsInfo[0].messageId);
+                expect(allAttachments.attachmentsInfo[2].messageId).toEqual(searchResult.attachmentsInfo[1].messageId);
+                expect(allAttachments.attachmentsInfo[3].messageId).toEqual(searchResult.attachmentsInfo[2].messageId);
+
                 await bob.deleteChat(chat);
             });
         })

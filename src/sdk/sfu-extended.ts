@@ -61,7 +61,10 @@ import {
     SignUpStatus,
     UserManagementError,
     ResetPasswordRequestStatus,
-    ChatMessagesCount
+    ChatMessagesCount,
+    MessageAttachmentsSearchResult,
+    MessageAttachmentMediaType,
+    SortOrder
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -411,6 +414,11 @@ export class SfuExtended {
                             const messagesCount = data[0] as ChatMessagesCount;
                             if (!promises.resolve(data[0].internalMessageId, messagesCount)) {
                                 this.#notifier.notify(SfuEvent.CHAT_MESSAGES_COUNT, messagesCount);
+                            }
+                        } else if (data[0].type === SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT) {
+                            const result = data[0] as MessageAttachmentsSearchResult;
+                            if (!promises.resolve(data[0].internalMessageId, result)) {
+                                this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT, result);
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -1202,6 +1210,40 @@ export class SfuExtended {
         });
     }
 
+    public searchMessageAttachments(params: {
+        chatId?: string,
+        attachmentsType?: MessageAttachmentMediaType,
+        bookmarkedOnly: boolean,
+        from?: UserId,
+        timeFrame?: {
+            start: number,
+            end: number,
+            limit?: number
+        },
+        boundaries?: {
+            dateMark: number,
+            lowerLimit: number,
+            upperLimit: number
+        }
+        searchString?: string,
+        sortOrder: SortOrder
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<MessageAttachmentsSearchResult>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.SEARCH_MESSAGE_ATTACHMENTS, {
+                chatId: params.chatId,
+                attachmentTypes: params.attachmentsType,
+                bookmarkedOnly: params.bookmarkedOnly,
+                from: params.from,
+                timeFrame: params.timeFrame,
+                boundaries: params.boundaries,
+                searchString: params.searchString,
+                sortOrder: params.sortOrder,
+            }, resolve, reject);
+        });
+    };
+
     public createChat(chat: {
         id?: string,
         name?: string,
@@ -1281,6 +1323,34 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.DELETE_CHAT_MESSAGE, {
                 id: msg.messageId,
                 chatId: msg.chatId,
+            }, resolve, reject);
+        });
+    }
+
+    public addMessageToBookmarks(msg: {
+        chatId: string,
+        messageId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_MESSAGE_TO_BOOKMARKS, {
+                id: msg.messageId,
+                chatId: msg.chatId
+            }, resolve, reject);
+        });
+    }
+
+    public removeMessageFromBookmarks(msg: {
+        chatId: string,
+        messageId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_MESSAGE_FROM_BOOKMARKS, {
+                chatId: msg.chatId,
+                id: msg.messageId
             }, resolve, reject);
         });
     }
