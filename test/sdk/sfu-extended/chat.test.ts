@@ -2,6 +2,8 @@ import {
     ATTACHMENTS,
     ATTACHMENTS_PAYLOAD,
     DOWNLOAD_PATH,
+    PDF_FILE_NAME,
+    PICTURE_FILE_NAME,
     TEST_BIG_PICTURE_ATTACHMENT,
     TEST_BIG_PICTURE_ATTACHMENT_DATA,
     TEST_PDF_ATTACHMENT,
@@ -22,6 +24,7 @@ import {
     ChannelType,
     ChatError,
     Message,
+    MessageAttachmentMediaType,
     MessageDeleted,
     MessageEdited,
     MessageState,
@@ -1235,6 +1238,64 @@ describe("chat", () => {
                 expect(allAttachments.attachmentsInfo[1].messageId).toEqual(searchResult.attachmentsInfo[0].messageId);
                 expect(allAttachments.attachmentsInfo[2].messageId).toEqual(searchResult.attachmentsInfo[1].messageId);
                 expect(allAttachments.attachmentsInfo[3].messageId).toEqual(searchResult.attachmentsInfo[2].messageId);
+
+                await bob.deleteChat(chat);
+            });
+            it("Should search message attachments in chat by file type", async () => {
+                const chat = await bob.createChat({});
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                    attachments: ATTACHMENTS
+                });
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+                expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                expect(status.attachments).toBeTruthy();
+
+                const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
+                await handler.sendAttachments();
+
+                const searchResult = await bob.searchMessageAttachments({
+                    chatId: chat.id,
+                    bookmarkedOnly: false,
+                    attachmentsType: MessageAttachmentMediaType.media,
+                    timeFrame: {
+                        start: 0,
+                        end: -1,
+                    },
+                    sortOrder: SortOrder.ASC
+                });
+                expect(searchResult.attachmentsInfo.length).toBe(1);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].mediaType).toEqual(MessageAttachmentMediaType.media);
+                expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
+                expect(searchResult.attachmentsInfo[0].date).toEqual(status.date);
+
+
+                await bob.deleteChat(chat);
+            });
+            it("Should send message with multiple attachments and should check attachments media type", async () => {
+                const chat = await bob.createChat({});
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                    attachments: ATTACHMENTS
+                });
+                expect(status.attachments[0].name).toEqual(PICTURE_FILE_NAME);
+                expect(status.attachments[0].mediaType).toEqual(MessageAttachmentMediaType.media);
+                expect(status.attachments[1].name).toEqual(PDF_FILE_NAME);
+                expect(status.attachments[1].mediaType).toEqual(MessageAttachmentMediaType.other);
+
+                const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
+                const messageStatus = await handler.sendAttachments();
+                expect(messageStatus.attachments[0].name).toEqual(PICTURE_FILE_NAME);
+                expect(messageStatus.attachments[0].mediaType).toEqual(MessageAttachmentMediaType.media);
+                expect(messageStatus.attachments[1].name).toEqual(PDF_FILE_NAME);
+                expect(messageStatus.attachments[1].mediaType).toEqual(MessageAttachmentMediaType.other);
 
                 await bob.deleteChat(chat);
             });

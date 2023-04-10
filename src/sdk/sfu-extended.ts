@@ -1233,7 +1233,7 @@ export class SfuExtended {
         return new Promise<MessageAttachmentsSearchResult>(function (resolve, reject) {
             self.#emmitAction(InternalApi.SEARCH_MESSAGE_ATTACHMENTS, {
                 chatId: params.chatId,
-                attachmentTypes: params.attachmentsType,
+                attachmentsType: params.attachmentsType,
                 bookmarkedOnly: params.bookmarkedOnly,
                 from: params.from,
                 timeFrame: params.timeFrame,

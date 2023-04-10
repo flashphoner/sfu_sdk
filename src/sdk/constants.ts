@@ -638,6 +638,7 @@ export enum MessageAttachmentType {
 
 export type MessageAttachment = {
     type: MessageAttachmentType;
+    mediaType?: MessageAttachmentMediaType;
     name: string;
     size: number;
     id: number;
