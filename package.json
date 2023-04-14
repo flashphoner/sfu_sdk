@@ -1,6 +1,6 @@
 {
   "name": "@flashphoner/sfusdk",
-  "version": "2.0.14",
+  "version": "2.0.17",
   "description": "Official Flashphoner WebCallServer SFU SDK package",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,9 @@
     "build": "tsc",
     "publish-lib": "npm run build && npm publish",
     "publish-beta": "npm run build && npm publish --tag beta",
-    "publish-dryrun": "npm run build && npm publish --dry-run"
+    "publish-dryrun": "npm run build && npm publish --dry-run",
+    "postinstall": "npm run get-wrtc",
+    "get-wrtc": "sh get-node-wrtc.sh $WRTC_URL $WRTC_USER $WRTC_PASSWD"
   },
   "keywords": [
     "Flashphoner",
