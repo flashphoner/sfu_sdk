@@ -594,9 +594,10 @@ describe("notifications", () => {
                 });
                 expect(bobRoom).toBeTruthy();
 
-                bobRoom.on(RoomEvent.JOINED, (msg) => {
+                bobRoom.on(RoomEvent.JOINED, async (msg) => {
                     const joinedEvent = msg as JoinedRoom;
                     if (joinedEvent.name === alice.user().nickname) {
+                        await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
                         done();
                     }
                 })
@@ -617,7 +618,6 @@ describe("notifications", () => {
             })
 
             await aliceRoom.join(new wrtc.RTCPeerConnection());
-            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
         })
         it("Should hold and then place participant into waiting room after owner enter the room", async (done) => {
             const bobPmiSettings = await bob.getUserPmiSettings();
