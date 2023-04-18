@@ -37,7 +37,8 @@ export enum SfuEvent {
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
-    MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT"
+    MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
+    LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT"
 }
 
 export enum RoomEvent {
@@ -183,7 +184,8 @@ export enum Operations {
     GET_CHAT_MESSAGES_COUNT = "GET_CHAT_MESSAGES_COUNT",
     SEARCH_MESSAGE_ATTACHMENTS = "SEARCH_MESSAGE_ATTACHMENTS",
     ADD_MESSAGE_TO_BOOKMARKS = "ADD_MESSAGE_TO_BOOKMARKS",
-    REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS"
+    REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS",
+    LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT"
 }
 
 export enum ParticipantRole {
@@ -308,7 +310,8 @@ export enum InternalApi {
     RESET_PASSWORD = "resetPassword",
     SEARCH_MESSAGE_ATTACHMENTS = "searchMessageAttachments",
     ADD_MESSAGE_TO_BOOKMARKS = "addMessageToBookmarks",
-    REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks"
+    REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks",
+    LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages"
 }
 
 export enum ContactError {
@@ -946,6 +949,26 @@ export type AttachmentInfo = {
 export type MessageAttachmentsSearchResult = InternalMessage & {
     attachmentsInfo: Array<AttachmentInfo>,
     totalSize: number
+}
+
+export type MessageInfo = {
+    id: string;
+    chatId: string;
+    parentMessage: MessageInfo;
+    date: number;
+    clientDate: number;
+    to: string;
+    body: string;
+    attachments: Array<MessageAttachment>;
+    privateMessage: boolean;
+    isEdited: boolean;
+    dateOfEdit: number;
+    bookmarked: boolean;
+}
+
+export type LoadBookmarkedMessagesResult = InternalMessage & {
+    messages: Array<MessageInfo>;
+    totalSize: number;
 }
 
 export enum SortOrder {

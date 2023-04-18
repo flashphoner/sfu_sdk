@@ -694,6 +694,82 @@ describe("chat", () => {
             expect(messages[0].bookmarked).toBe(false);
             await bob.deleteChat(chat);
         });
+        it("Should load bookmarked messages based on time frame", async () => {
+            const chats = await bob.getUserChats();
+            Object.keys(chats).map(async (id) => {
+                await bob.deleteChat({id: id});
+            });
+            const chat = await bob.createChat({});
+
+            for (let i = 0; i < 5; i++) {
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY + i
+                });
+                if (i !== 1 && i !== 3) {
+                    await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+                }
+            }
+
+            const result = await bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                },
+                sortOrder: SortOrder.ASC
+            });
+            expect(result.messages.length).toBe(3);
+            expect(result.totalSize).toBe(3);
+            expect(result.messages[0].body).toEqual(MESSAGE_BODY + 0);
+            expect(result.messages[1].body).toEqual(MESSAGE_BODY + 2);
+            expect(result.messages[2].body).toEqual(MESSAGE_BODY + 4);
+            await bob.deleteChat(chat);
+        });
+        it("Should load bookmarked messages based on boundaries", async () => {
+            const chats = await bob.getUserChats();
+            Object.keys(chats).map(async (id) => {
+                await bob.deleteChat({id: id});
+            });
+            const chat = await bob.createChat({});
+
+            for (let i = 0; i < 5; i++) {
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY + i
+                });
+                await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+            }
+
+            const allBookmarkedMessages = await bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                },
+                sortOrder: SortOrder.DESC
+            });
+
+            const bookmarkedMessagesBasedOnBoundaries = await bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                boundaries: {
+                    dateMark: allBookmarkedMessages.messages[2].date,
+                    lowerLimit: 2,
+                    upperLimit: 1
+                },
+                sortOrder: SortOrder.DESC
+            });
+
+            expect(allBookmarkedMessages.messages.length).toBe(5);
+            expect(allBookmarkedMessages.totalSize).toBe(5);
+            expect(bookmarkedMessagesBasedOnBoundaries.messages.length).toBe(3);
+            expect(bookmarkedMessagesBasedOnBoundaries.totalSize).toBe(5);
+            expect(allBookmarkedMessages.messages[1].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[0].id);
+            expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[1].id);
+            expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[2].id);
+
+            await bob.deleteChat(chat);
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});

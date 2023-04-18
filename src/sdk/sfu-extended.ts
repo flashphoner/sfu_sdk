@@ -64,7 +64,8 @@ import {
     ChatMessagesCount,
     MessageAttachmentsSearchResult,
     MessageAttachmentMediaType,
-    SortOrder
+    SortOrder,
+    LoadBookmarkedMessagesResult
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -419,6 +420,11 @@ export class SfuExtended {
                             const result = data[0] as MessageAttachmentsSearchResult;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT, result);
+                            }
+                        } else if (data[0].type === SfuEvent.LOAD_BOOKMARKED_MESSAGES_RESULT) {
+                            const result = data[0] as LoadBookmarkedMessagesResult;
+                            if (!promises.resolve(data[0].internalMessageId, result)) {
+                                this.#notifier.notify(SfuEvent.LOAD_BOOKMARKED_MESSAGES_RESULT, result);
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -1239,6 +1245,32 @@ export class SfuExtended {
                 timeFrame: params.timeFrame,
                 boundaries: params.boundaries,
                 searchString: params.searchString,
+                sortOrder: params.sortOrder,
+            }, resolve, reject);
+        });
+    };
+
+    public loadBookmarkedMessages(params: {
+        chatId?: string,
+        timeFrame?: {
+            start: number,
+            end: number,
+            limit?: number
+        },
+        boundaries?: {
+            dateMark: number,
+            lowerLimit: number,
+            upperLimit: number
+        }
+        sortOrder: SortOrder
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<LoadBookmarkedMessagesResult>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LOAD_BOOKMARKED_MESSAGES, {
+                chatId: params.chatId,
+                timeFrame: params.timeFrame,
+                boundaries: params.boundaries,
                 sortOrder: params.sortOrder,
             }, resolve, reject);
         });
