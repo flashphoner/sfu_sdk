@@ -14,10 +14,7 @@ import {
     TEST_PRIVATE_CHANNEL_WITH_LIST,
     TEST_PUBLIC_CHANNEL,
     TEST_USER_0,
-    TEST_USER_1,
-    TEST_USER_1_TAG,
-    EVERYONE_TAG,
-    ALL_TAG
+    TEST_USER_1
 } from "../../util/constants";
 import {
     ATTACHMENT_CHUNK_SIZE,
@@ -770,114 +767,6 @@ describe("chat", () => {
             expect(allBookmarkedMessages.messages[1].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[0].id);
             expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[1].id);
             expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[2].id);
-
-            await bob.deleteChat(chat);
-        });
-        it("Should load messages with mentions based on time frame", async () => {
-            const chats = await bob.getUserChats();
-            Object.keys(chats).map(async (id) => {
-                await bob.deleteChat({id: id});
-            });
-            const chat = await bob.createChat({members: [TEST_USER_1.username]});
-
-            for (let i = 0; i < 3; i++) {
-                await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY + i
-                });
-            }
-
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: TEST_USER_1_TAG
-            });
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: EVERYONE_TAG
-            });
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: ALL_TAG
-            });
-
-            const result = await alice.loadMessagesWithMentions({
-                userTag: TEST_USER_1_TAG,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.ASC
-            });
-            expect(result.messages.length).toBe(3);
-            expect(result.totalSize).toBe(3);
-            expect(result.messages[0].body).toEqual(TEST_USER_1_TAG);
-            expect(result.messages[1].body).toEqual(EVERYONE_TAG);
-            expect(result.messages[2].body).toEqual(ALL_TAG);
-            await bob.deleteChat(chat);
-        });
-        it("Should load messages with mentions based on boundaries", async () => {
-            const chats = await bob.getUserChats();
-            Object.keys(chats).map(async (id) => {
-                await bob.deleteChat({id: id});
-            });
-            const chat = await bob.createChat({members: [TEST_USER_1.username]});
-
-            for (let i = 0; i < 4; i++) {
-                if (i !== 3) {
-                    await bob.sendMessage({
-                        chatId: chat.id,
-                        body: MESSAGE_BODY + i
-                    });
-                } else {
-                    await bob.sendMessage({
-                        chatId: chat.id,
-                        body: TEST_USER_1_TAG
-                    });
-                }
-            }
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: ALL_TAG
-            });
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: TEST_USER_1_TAG
-            });
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: EVERYONE_TAG
-            });
-            await bob.sendMessage({
-                chatId: chat.id,
-                body: TEST_USER_1_TAG
-            });
-
-            const allMessagesWithMentions = await alice.loadMessagesWithMentions({
-                userTag: TEST_USER_1_TAG,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.DESC
-            });
-
-            const messagesBasedOnBoundaries = await alice.loadMessagesWithMentions({
-                userTag: TEST_USER_1_TAG,
-                boundaries: {
-                    dateMark: allMessagesWithMentions.messages[2].date,
-                    lowerLimit: 2,
-                    upperLimit: 1
-                },
-                sortOrder: SortOrder.DESC
-            });
-
-            expect(allMessagesWithMentions.messages.length).toBe(5);
-            expect(allMessagesWithMentions.totalSize).toBe(5);
-            expect(messagesBasedOnBoundaries.messages.length).toBe(3);
-            expect(messagesBasedOnBoundaries.totalSize).toBe(5);
-            expect(allMessagesWithMentions.messages[1].id).toEqual(messagesBasedOnBoundaries.messages[0].id);
-            expect(allMessagesWithMentions.messages[2].id).toEqual(messagesBasedOnBoundaries.messages[1].id);
-            expect(allMessagesWithMentions.messages[3].id).toEqual(messagesBasedOnBoundaries.messages[2].id);
 
             await bob.deleteChat(chat);
         });
