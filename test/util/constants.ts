@@ -13,6 +13,11 @@ export const TEST_USER_1 = {
     password: "123456",
     nickname: "alice"
 }
+export const ALL_TAG = "<@all>";
+export const EVERYONE_TAG = "<@everyone>";
+export const TEST_USER_0_TAG = `<@${TEST_USER_0.username}>`;
+export const TEST_USER_1_TAG = `<@${TEST_USER_1.username}>`;
+
 export const TEST_USER_2 = {
     username: "kiri@flashphoner.com",
     password: "123456",

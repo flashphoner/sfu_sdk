@@ -65,7 +65,8 @@ import {
     MessageAttachmentsSearchResult,
     MessageAttachmentMediaType,
     SortOrder,
-    LoadBookmarkedMessagesResult
+    LoadBookmarkedMessagesResult,
+    LoadMessagesWithMentionsResult
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -425,6 +426,11 @@ export class SfuExtended {
                             const result = data[0] as LoadBookmarkedMessagesResult;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.LOAD_BOOKMARKED_MESSAGES_RESULT, result);
+                            }
+                        } else if (data[0].type === SfuEvent.LOAD_MESSAGES_WITH_MENTIONS_RESULT) {
+                            const result = data[0] as LoadMessagesWithMentionsResult;
+                            if (!promises.resolve(data[0].internalMessageId, result)) {
+                                this.#notifier.notify(SfuEvent.LOAD_MESSAGES_WITH_MENTIONS_RESULT, result);
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -1269,6 +1275,34 @@ export class SfuExtended {
         return new Promise<LoadBookmarkedMessagesResult>(function (resolve, reject) {
             self.#emmitAction(InternalApi.LOAD_BOOKMARKED_MESSAGES, {
                 chatId: params.chatId,
+                timeFrame: params.timeFrame,
+                boundaries: params.boundaries,
+                sortOrder: params.sortOrder,
+            }, resolve, reject);
+        });
+    };
+
+    public loadMessagesWithMentions(params: {
+        chatId?: string,
+        userTag: string,
+        timeFrame?: {
+            start: number,
+            end: number,
+            limit?: number
+        },
+        boundaries?: {
+            dateMark: number,
+            lowerLimit: number,
+            upperLimit: number
+        }
+        sortOrder: SortOrder
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<LoadMessagesWithMentionsResult>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LOAD_MESSAGES_WITH_MENTIONS, {
+                chatId: params.chatId,
+                userTag: params.userTag,
                 timeFrame: params.timeFrame,
                 boundaries: params.boundaries,
                 sortOrder: params.sortOrder,
