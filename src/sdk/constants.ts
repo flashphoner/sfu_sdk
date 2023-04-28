@@ -38,7 +38,8 @@ export enum SfuEvent {
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
-    LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT"
+    LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT",
+    LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT"
 }
 
 export enum RoomEvent {
@@ -185,7 +186,8 @@ export enum Operations {
     SEARCH_MESSAGE_ATTACHMENTS = "SEARCH_MESSAGE_ATTACHMENTS",
     ADD_MESSAGE_TO_BOOKMARKS = "ADD_MESSAGE_TO_BOOKMARKS",
     REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS",
-    LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT"
+    LOAD_BOOKMARKED_MESSAGES = "LOAD_BOOKMARKED_MESSAGES",
+    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS"
 }
 
 export enum ParticipantRole {
@@ -311,7 +313,8 @@ export enum InternalApi {
     SEARCH_MESSAGE_ATTACHMENTS = "searchMessageAttachments",
     ADD_MESSAGE_TO_BOOKMARKS = "addMessageToBookmarks",
     REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks",
-    LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages"
+    LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages",
+    LOAD_MESSAGES_WITH_MENTIONS = "loadMessagesWithMentions"
 }
 
 export enum ContactError {
@@ -967,6 +970,11 @@ export type MessageInfo = {
 }
 
 export type LoadBookmarkedMessagesResult = InternalMessage & {
+    messages: Array<MessageInfo>;
+    totalSize: number;
+}
+
+export type LoadMessagesWithMentionsResult = InternalMessage & {
     messages: Array<MessageInfo>;
     totalSize: number;
 }
