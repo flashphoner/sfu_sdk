@@ -42,6 +42,7 @@ describe("room", () => {
         expect(room).toBeTruthy();
         expect(room.id()).toBeTruthy();
         expect(room.name()).toBeFalsy();
+        expect(room.waitingRoomEnabled()).toBeFalsy();
         await room.destroyRoom();
     });
     it("Should check room exists", async () => {
@@ -202,6 +203,19 @@ describe("room", () => {
         await room.join(bobPc);
         const state = await room.configureWaitingRoom(false);
         expect(state.enabled).toBeFalsy();
+    });
+    it("Should disable and enable waiting room", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
+        const room = await bob.createRoom({
+            ...TEST_ROOM
+        });
+        await room.join(bobPc);
+        const state = await room.configureWaitingRoom(false);
+        expect(state.enabled).toBeFalsy();
+        expect(room.waitingRoomEnabled()).toBeFalsy();
+        const enableState = await room.configureWaitingRoom(true);
+        expect(enableState.enabled).toBeTruthy();
+        expect(room.waitingRoomEnabled()).toBeTruthy();
     });
     it("sending control message to nonexistent participant should result in rejection", async () => {
         const bobPc = new wrtc.RTCPeerConnection();

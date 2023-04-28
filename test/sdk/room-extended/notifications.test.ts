@@ -33,9 +33,7 @@ describe("notifications", () => {
         it("Should authorize waiting participant", async (done) => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
@@ -53,22 +51,20 @@ describe("notifications", () => {
                 });
 
             const aliceRoom = await alice.roomAvailable({
-                ...TEST_ROOM,
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             await aliceRoom.join(alicePc)
         });
         it('Should authorize waiting participant after the second attempt', async (done) => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
 
             const aliceRoom = await alice.roomAvailable({
-                ...TEST_ROOM,
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             const waitingListHandlerReject = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandlerReject);
@@ -88,8 +84,8 @@ describe("notifications", () => {
                 await bobRoom.authorizeWaitingList(list.users[0].id, true);
             };
             const room2 = await alice.roomAvailable({
-                ...TEST_ROOM,
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             bobRoom
                 .on(RoomEvent.WAITING_LIST, waitingListHandlerAccept)
@@ -104,9 +100,7 @@ describe("notifications", () => {
         it("Should kick waiting participant", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
@@ -119,17 +113,15 @@ describe("notifications", () => {
             }
             bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
             const aliceRoom = await alice.roomAvailable({
-                ...TEST_ROOM,
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.AUTHORIZATION_FAILED);
         });
         it("Should move participant to waiting room", async (done) => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             
             await bobRoom.join(bobPc);
             const waitingListHandler0 = async (msg: InternalMessage) => {
@@ -153,17 +145,15 @@ describe("notifications", () => {
                     await bobRoom.moveToWaitingRoom(TEST_USER_1.nickname)
                 });
             const aliceRoom = await alice.roomAvailable({
-                ...TEST_ROOM,
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             aliceRoom.join(alicePc)
         });
         it("Should subscribe to waiting participant", async (done) => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
@@ -190,9 +180,7 @@ describe("notifications", () => {
         it("Should unsubscribe from waiting participant", async (done) => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
@@ -212,7 +200,8 @@ describe("notifications", () => {
             }
             bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
             const aliceRoom = await alice.roomAvailable({
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             const aSource = new RTCAudioSourceSineWave();
             const aTrack = aSource.createTrack();
@@ -222,9 +211,7 @@ describe("notifications", () => {
         it("Waiting participant should receive error at meeting end", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
-            const bobRoom = await bob.createRoom({
-                ...TEST_ROOM
-            });
+            const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
@@ -236,8 +223,8 @@ describe("notifications", () => {
             bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
 
             const aliceRoom = await alice.roomAvailable({
-                ...TEST_ROOM,
-                id: bobRoom.id()
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
             });
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
         });

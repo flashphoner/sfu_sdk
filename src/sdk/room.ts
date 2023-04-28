@@ -217,7 +217,7 @@ export class Room {
         } else if (e.type === RoomEvent.WAITING_ROOM_UPDATE) {
             const waitingRoomUpdate = e as WaitingRoomUpdate;
             if (promises.promised(e.internalMessageId)) {
-                promises.resolve(e.internalMessageId, waitingRoomUpdate.enabled);
+                promises.resolve(e.internalMessageId, waitingRoomUpdate);
             } else {
                 this.notifier.notify(RoomEvent.WAITING_ROOM_UPDATE, waitingRoomUpdate);
             }

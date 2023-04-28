@@ -20,7 +20,8 @@ export class RoomExtended extends Room {
 
     #config: RoomExtendedConfig;
     #owner: string;
-    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, loggerPrefix?: PrefixFunction) {
+    #waitingRoomEnabled: boolean;
+    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction) {
        super(connection, name, pin, nickname, creationTime);
        this._id = id;
        this.#owner = owner;
@@ -28,6 +29,7 @@ export class RoomExtended extends Room {
            config.participantsConfig = {};
        }
        this.#config = config;
+       this.#waitingRoomEnabled = waitingRoomEnabled;
        if (loggerPrefix) {
            this.logger.setPrefix(() => {
                return "[Room] " + loggerPrefix();
@@ -39,6 +41,10 @@ export class RoomExtended extends Room {
 
     public config() {
         return this.#config;
+    }
+
+    public waitingRoomEnabled() {
+        return this.#waitingRoomEnabled;
     }
 
     public createRoom() {
@@ -364,6 +370,14 @@ export class RoomExtended extends Room {
         } else if (e.type === RoomEvent.STOP_TRACK) {
             const event = e as StopTrackEvent;
             this.#resolveOrNotify(e, e.type, event);
+        } else if (e.type === RoomEvent.WAITING_ROOM_UPDATE) {
+            const waitingRoomUpdate = e as WaitingRoomUpdate;
+            this.#waitingRoomEnabled = waitingRoomUpdate.enabled;
+            if (promises.promised(e.internalMessageId)) {
+                promises.resolve(e.internalMessageId, waitingRoomUpdate);
+            } else {
+                this.notifier.notify(RoomEvent.WAITING_ROOM_UPDATE, waitingRoomUpdate);
+            }
         } else {
             super.processEvent(e);
         }

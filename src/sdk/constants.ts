@@ -439,6 +439,7 @@ export type CreatedRoom = InternalMessage & {
     chatId: string,
     //unix epoch in UTC
     creationTime: number,
+    waitingRoomEnabled: boolean,
     config?: RoomExtendedConfig
 }
 
@@ -448,6 +449,7 @@ export type RoomInfo = {
     name: string,
     pin: string,
     creationTime: number,
+    waitingRoomEnabled: boolean,
     config: RoomExtendedConfig
 }
 
@@ -460,6 +462,7 @@ export type RoomAvailable = InternalMessage & {
     owner: string,
     pin: string,
     creationTime: number,
+    waitingRoomEnabled: boolean,
     config: RoomExtendedConfig
 }
 

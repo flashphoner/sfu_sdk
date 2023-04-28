@@ -284,7 +284,7 @@ export class SfuExtended {
                             this.#notifier.notify(SfuEvent.CHAT_SEARCH_RESULT, messagesEvent);
                         } else if (data[0].type === RoomEvent.CREATED) {
                             const state = data[0] as CreatedRoom;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().nickname, state.creationTime, state.config, this.#loggerPrefix);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -313,7 +313,7 @@ export class SfuExtended {
                             promises.resolve(data[0].internalMessageId, room);
                         } else if (data[0].type === RoomEvent.AVAILABLE) {
                             const state = data[0] as RoomAvailable;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().nickname, state.creationTime, state.config, this.#loggerPrefix);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -343,7 +343,7 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.USER_ROOMS) {
                             const state = data[0] as UserRoomsEvent;
                             state.rooms.forEach((info) => {
-                                const room = new RoomExtended(this.#connection, info.id, info.owner, info.name, info.pin, this.user().nickname, info.creationTime, info.config, this.#loggerPrefix);
+                                const room = new RoomExtended(this.#connection, info.id, info.owner, info.name, info.pin, this.user().nickname, info.creationTime, info.config, info.waitingRoomEnabled, this.#loggerPrefix);
                                 this.#rooms[room.id()] = room;
                                 const self = this;
                                 const cleanup = () => {
