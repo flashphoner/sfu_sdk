@@ -109,9 +109,11 @@ export class Room {
                         case RemoteSdpType.OFFER:
                             if (this._crutch.settingRemoteAnswer) {
                                 this.logger.debug(new Error("Clashing with the answer!"));
+
                                 function sleep(millis: number) {
                                     return new Promise(resolve => setTimeout(resolve, millis));
                                 }
+
                                 while (this._crutch.settingRemoteAnswer) {
                                     await sleep(100);
                                     this.logger.debug("Waiting for answer " + this._crutch.settingRemoteAnswer);
@@ -139,7 +141,7 @@ export class Room {
                                     pin: this._pin,
                                     sdp: this.#_pc.localDescription.sdp,
                                     tid: this._crutch.tid,
-                                    sdpType:RemoteSdpType.ANSWER
+                                    sdpType: RemoteSdpType.ANSWER
                                 });
                             }
                             this._crutch.settingRemoteOffer = false;
@@ -169,8 +171,12 @@ export class Room {
         } else if (e.type === RoomEvent.OPERATION_FAILED) {
             const operationFailed = e as OperationFailed;
             if (promises.promised(operationFailed.internalMessageId)) {
+                if (operationFailed.operation === Operations.ROOM_JOIN) {
+                    this.#_state = RoomState.DISPOSED;
+                }
                 promises.reject(operationFailed.internalMessageId, operationFailed);
-            } else if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.ROOM_DESTROYED){
+            }
+            if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.ROOM_DESTROYED) {
                 this.notifier.notify(RoomEvent.ENDED);
             } else if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.AUTHORIZATION_FAILED) {
                 const evictedEvent: EvictedFromRoom = {
@@ -189,6 +195,7 @@ export class Room {
             }
         } else if (e.type === RoomEvent.JOINED) {
             const joinedRoom = e as JoinedRoom;
+            this.#_state = RoomState.JOINED;
             if (!promises.resolve(joinedRoom.internalMessageId, joinedRoom)) {
                 this.notifier.notify(RoomEvent.JOINED, joinedRoom);
             }
@@ -232,7 +239,7 @@ export class Room {
     }
 
     //TODO(naz): safe guard based on state
-    public join(pc: RTCPeerConnection, nickname?: UserNickname,  config?: {
+    public join(pc: RTCPeerConnection, nickname?: UserNickname, config?: {
         [key: string]: string
     }) {
         const self = this;
@@ -280,7 +287,6 @@ export class Room {
         }
         return new Promise<JoinedRoom>(async (resolve, reject) => {
             if (self.#_state === RoomState.NEW) {
-                self.#_state = RoomState.JOINED;
                 try {
                     const offer = await self.#_pc.createOffer();
                     if (config) {
@@ -296,7 +302,7 @@ export class Room {
                         sdp: offer.sdp,
                         nickname: nickname,
                         internalMessageId: id,
-                        sdpType:RemoteSdpType.OFFER
+                        sdpType: RemoteSdpType.OFFER
                     });
                 } catch (e) {
                     reject(e);
@@ -334,10 +340,10 @@ export class Room {
                     pin: self._pin,
                     sdp: offer.sdp,
                     internalMessageId: id,
-                    sdpType:RemoteSdpType.OFFER,
-                    tid:this._crutch.tid
+                    sdpType: RemoteSdpType.OFFER,
+                    tid: this._crutch.tid
                 });
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
@@ -415,7 +421,7 @@ export class Room {
             promises.add(id, resolve, reject);
             const chunkSize = 16384;
             if (msg.length > chunkSize) {
-                const chunks = msg.match(new RegExp("(.|[\r\n]){1,"+chunkSize+"}", "g"));
+                const chunks = msg.match(new RegExp("(.|[\r\n]){1," + chunkSize + "}", "g"));
                 for (let i = 0; i < chunks.length; i++) {
                     self.#dChannelSend(JSON.stringify({
                         id: id,

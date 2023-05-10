@@ -9,7 +9,6 @@ const PUBLISH = "publish";
 const PLAY = "play";
 const STOP = "stop";
 const PRELOADER_URL="../commons/media/silence.mp3";
-const MAX_AWAIT_MS=5000;
 
 
 /**
@@ -58,28 +57,18 @@ const CurrentState = function(prefix) {
         session: null,
         room: null,
         roomEnded: false,
-        timeout: null,
-        timer: null,
-        promise: null,
         starting: false,
         set: function(pc, session, room) {
             state.pc = pc;
             state.session = session;
             state.room = room;
             state.roomEnded = false;
-            state.timeout = null;
-            state.timer = null;
-            state.promise = null;
         },
         clear: function() {
-            state.stopWaiting();
             state.room = null;
             state.session = null;
             state.pc = null;
             state.roomEnded = false;
-            state.timeout = null;
-            state.timer = null;
-            state.promise = null;
         },
         setRoomEnded: function() {
             state.roomEnded = true;
@@ -109,47 +98,10 @@ const CurrentState = function(prefix) {
             return (state.room && !state.roomEnded && state.pc);
         },
         isConnected: function() {
-            return (state.session && state.session.state() == constants.SFU_STATE.CONNECTED);
+            return (state.session && state.session.state() === constants.SFU_STATE.CONNECTED);
         },
         isRoomEnded: function() {
             return state.roomEnded;
-        },
-        waitFor: async function(promise, ms) {
-            // Create a promise that rejects in <ms> milliseconds
-            state.promise = promise;
-            state.timeout = new Promise((resolve, reject) => {
-                state.resolve = resolve;
-                state.timer = setTimeout(() => {
-                    clearTimeout(state.timer);
-                    state.timer = null;
-                    state.promise = null;
-                    state.timeout = null;
-                    reject('Operation timed out in '+ ms + ' ms.')
-                }, ms)
-            });
-
-            // Returns a race between our timeout and the passed in promise
-            Promise.race([
-                    state.promise,
-                    state.timeout
-            ]).then(() => {
-                state.stopWaiting();
-            }).catch((e) => {
-                setStatus(state.errInfoId(), e, "red");
-            });
-        },
-        stopWaiting: function() {
-            if (state.timer) {
-                clearTimeout(state.timer);
-                state.timer = null;
-            }
-            if (state.timeout) {
-                state.resolve();
-                state.timeout = null;
-            }
-            if (state.promise) {
-                state.promise = null;
-            }
         },
         setStarting: function(value) {
             state.starting = value;
@@ -212,12 +164,10 @@ const connect = async function(state) {
         // Set up session ending events
         session.on(constants.SFU_EVENT.DISCONNECTED, function() {
             onStopClick(state);
-            state.clear();
             onDisconnected(state);
             setStatus(state.statusId(), "DISCONNECTED", "green");
         }).on(constants.SFU_EVENT.FAILED, function(e) {
             onStopClick(state);
-            state.clear();
             onDisconnected(state);
             setStatus(state.statusId(), "FAILED", "red");
             if (e.status && e.statusText) {
@@ -227,17 +177,16 @@ const connect = async function(state) {
             }
         });
         // Connected successfully
-        state.set(pc, session, session.room());
-        onConnected(state);
+        onConnected(state, pc, session);
         setStatus(state.statusId(), "ESTABLISHED", "green");
     } catch(e) {
-        state.clear();
         onDisconnected(state);
         setStatus(state.statusId(), "FAILED", "red");
         setStatus(state.errInfoId(), e, "red");
     }}
 
-const onConnected = function(state) {
+const onConnected = function(state, pc, session) {
+    state.set(pc, session, session.room());
     $("#" + state.buttonId()).text("Stop").off('click').click(function () {
         onStopClick(state);
     });
@@ -248,28 +197,23 @@ const onConnected = function(state) {
     state.room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
         setStatus(state.errInfoId(), e, "red");
         state.setRoomEnded();
-        state.stopWaiting();
         onStopClick(state);
     }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
-        setStatus(state.errInfoId(), e.operation + " failed: " + e.error, "red");
-        state.setRoomEnded();
-        state.stopWaiting();
-        onStopClick(state);
+        onOperationFailed(state, e);
     }).on(constants.SFU_ROOM_EVENT.ENDED, function () {
         setStatus(state.errInfoId(), "Room "+state.room.name()+" has ended", "red");
         state.setRoomEnded();
-        state.stopWaiting();
         onStopClick(state);
     }).on(constants.SFU_ROOM_EVENT.DROPPED, function () {
         setStatus(state.errInfoId(), "Dropped from the room "+state.room.name()+" due to network issues", "red");
         state.setRoomEnded();
-        state.stopWaiting();
         onStopClick(state);
     });
     startStreaming(state);
 }
 
 const onDisconnected = function(state) {
+    state.clear();
     $("#" + state.buttonId()).text(state.buttonText()).off('click').click(function () {
         onStartClick(state);
     }).prop('disabled', false);
@@ -305,10 +249,24 @@ const onStartClick = function(state) {
     }
 }
 
-const onStopClick = function(state) {
+const onOperationFailed = function(state, event) {
+    if (event.operation && event.error) {
+        setStatus(state.errInfoId(), event.operation + " failed: " + event.error, "red");
+    } else {
+        setStatus(state.errInfoId(), event, "red");
+    }
+    state.setRoomEnded();
+    onStopClick(state);
+}
+
+const onStopClick = async function(state) {
     state.setStarting(false);
-    $("#" + state.buttonId()).prop('disabled', true);
     stopStreaming(state);
+    if (state.isConnected()) {
+        $("#" + state.buttonId()).prop('disabled', true);
+        await state.session.disconnect();
+        onDisconnected(state);
+    }
 }
 
 const startStreaming = async function(state) {
@@ -326,14 +284,11 @@ const startStreaming = async function(state) {
     }
 }
 
-const stopStreaming = async function(state) {
+const stopStreaming = function(state) {
     if (state.is(PUBLISH)) {
         unPublishStreams(state);
     } else if (state.is(PLAY)) {
         stopStreams(state);
-    }
-    if (state.isConnected()) {
-        state.waitFor(state.session.disconnect(), MAX_AWAIT_MS);
     }
 }
 
@@ -362,12 +317,16 @@ const publishStreams = async function(state) {
                     });
                 });
                 //start WebRTC negotiation
-                state.waitFor(state.room.join(state.pc, null, config), MAX_AWAIT_MS);
+                await state.room.join(state.pc, null, config);
             }
         } catch(e) {
-            console.error("Failed to capture streams: " + e);
-            setStatus(state.errInfoId(), e.name, "red");
-            onStopClick(state);
+            if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
+                onOperationFailed(state, e);
+            } else {
+                console.error("Failed to capture streams: " + e);
+                setStatus(state.errInfoId(), e.name, "red");
+                onStopClick(state);
+            }
         }
     }
 }
@@ -388,11 +347,15 @@ const playStreams = async function(state) {
                 peerConnection: state.pc
             });
             //start WebRTC negotiation
-            state.waitFor(state.room.join(state.pc), MAX_AWAIT_MS);
+            await state.room.join(state.pc);
         } catch(e) {
-            console.error("Failed to play streams: " + e);
-            setStatus(state.errInfoId(), e.name, "red");
-            onStopClick(state);
+            if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
+                onOperationFailed(state, e);
+            } else {
+                console.error("Failed to play streams: " + e);
+                setStatus(state.errInfoId(), e.name, "red");
+                onStopClick(state);
+            }
         }
     }
 }
@@ -404,7 +367,7 @@ const stopStreams = function(state) {
 }
 
 const subscribeTrackToEndedEvent = function(room, track, pc) {
-    track.addEventListener("ended", function() {
+    track.addEventListener("ended", async function() {
         //track ended, see if we need to cleanup
         let negotiate = false;
         for (const sender of pc.getSenders()) {
@@ -417,7 +380,7 @@ const subscribeTrackToEndedEvent = function(room, track, pc) {
         }
         if (negotiate) {
             //kickoff renegotiation
-            room.updateState();
+            await room.updateState();
         }
     });
 };

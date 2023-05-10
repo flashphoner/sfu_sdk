@@ -128,20 +128,19 @@ export class Sfu {
     }
 
     public async disconnect() {
-        if (this.#_room) {
-            if (this.#_room.state() == RoomState.JOINED) {
-                await this.#_room.leaveRoom();
-            }
+        // Call leaveRoom on disconnect only if room is still active #WCS-3669
+        if (this.#_room && this.#_room.state() === RoomState.JOINED) {
+            await this.#_room.leaveRoom();
         }
         if (this.#connection) {
-            this.#connection.close();
+            await this.#connection.close();
         }
     }
-
+    
     public room() {
         return this.#_room;
     }
-
+    
     public nickname() {
         return this.#_nickname;
     }

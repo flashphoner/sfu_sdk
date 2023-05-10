@@ -1,4 +1,4 @@
-import {RoomEvent, Sfu} from "../../src";
+import {RoomEvent, RoomState, Sfu} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
 import {AddRemoveTracks, RoomMessage} from "../../src/sdk/constants";
 import {Verbosity} from "../../src/sdk/logger";
@@ -46,6 +46,25 @@ describe("room", () => {
         const state = await room.leaveRoom();
         expect(state.name).toEqual(TEST_GROUP_USER0.nickname);
         await sfu.disconnect();
+    });
+    it("should get an error if nickname already taken", async () => {
+        const sfu = await connect(TEST_GROUP_USER0);
+        const sfu1 = await connect(TEST_GROUP_USER0);
+
+        const room = sfu.createRoom({
+            ...TEST_ROOM
+        });
+
+        const room1 = sfu1.createRoom({
+            ...TEST_ROOM
+        });
+
+        await room.join(new wrtc.RTCPeerConnection());
+        await expect(room1.join(new wrtc.RTCPeerConnection())).rejects.toBeTruthy();
+        expect(room1.state()).toEqual(RoomState.DISPOSED);
+
+        await sfu.disconnect();
+        await sfu1.disconnect();
     });
     it("should destroy room", async () => {
         const sfu = await connect(TEST_GROUP_USER0);

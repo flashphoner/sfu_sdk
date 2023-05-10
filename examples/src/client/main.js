@@ -115,9 +115,28 @@ async function connect() {
     }
 }
 
+/**
+ * Display an error message on operation failure
+ *
+ * @param prefix
+ * @param event
+ */
+const onOperationFailed = function(prefix, event) {
+    let reason = "reason unknown";
+    if (event.operation && event.error) {
+        reason = event.operation + " failed: " + event.error;
+    } else if (event.text) {
+        reason = event.text;
+    } else {
+        reason = JSON.stringify(event);
+    }
+    console.error(prefix + ": " + reason);
+    displayError(reason);
+}
+
 
 /**
- * Publish streams after entyering room according to configuration file
+ * Publish streams after entering room according to configuration file
  * 
  * @param {*} room
  * @param {*} pc
@@ -146,8 +165,7 @@ const publishPreconfiguredStreams = async function(room, pc, streams) {
             $('#' + s.stream.id + "-button").prop('disabled', false);
         });
     } catch(e) {
-        console.error("Failed to publish a preconfigured streams: " + e);
-        displayError(e);
+        onOperationFailed("Failed to publish a preconfigured streams", e);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
             $('#' + s.stream.id + "-button").prop('disabled', false);
@@ -182,8 +200,7 @@ const publishNewTrack = async function(room, pc, media) {
         // Enable Delete button for a new stream #WCS-3689
         $('#' + media.stream.id + "-button").prop('disabled', false);
     } catch(e) {
-        console.error("Failed to publish a new track: " + e);
-        displayError(e);
+        onOperationFailed("Failed to publish a new track", e);
         // Enable Delete button for a new stream #WCS-3689
         $('#' + media.stream.id + "-button").prop('disabled', false);
     }
@@ -216,8 +233,7 @@ const subscribeTrackToEndedEvent = function(room, track, pc) {
                 await room.updateState();
             }
         } catch(e) {
-            displayError(e);
-            console.error("Failed to update room state: " + e);
+            onOperationFailed("Failed to update room state", e);
         }
     });
 }
