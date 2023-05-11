@@ -129,6 +129,7 @@ describe("chat", () => {
             await bob.deleteChat(chat);
         });
         it("Should reply to sent message", async () => {
+            const replyMessageBody = "test message reply";
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
                 chatId: chat.id,
@@ -137,7 +138,7 @@ describe("chat", () => {
             const replyStatus = await bob.sendMessage({
                 parentId: status.id,
                 chatId: chat.id,
-                body: "test message reply"
+                body: replyMessageBody
             });
             const allMessages = await bob.loadChatMessages({
                 chatId: chat.id,
@@ -149,7 +150,9 @@ describe("chat", () => {
             const reply = allMessages.find((m) => m.id === replyStatus.id);
             expect(reply).toBeTruthy();
             if (reply) {
-                expect(reply.parentId).toEqual(status.id);
+                expect(reply.parentMessage).toBeTruthy();
+                expect(reply.parentMessage.id).toEqual(status.id);
+                expect(reply.parentMessage.body).toEqual(MESSAGE_BODY);
             }
             await bob.deleteChat(chat);
         });

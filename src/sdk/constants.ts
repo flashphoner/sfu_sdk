@@ -619,6 +619,7 @@ export type MessageStatusUpdate = {
 export type MessageStatus = {
     id: string;
     chatId: string;
+    parentMessage: Message;
     delivered: boolean;
     state: MessageState;
     lastReadMessageId: string;
@@ -677,7 +678,7 @@ export type AttachmentRequestAck = InternalMessage & {
 
 export type Message = {
     id: string;
-    parentId?: string;
+    parentMessage?: Message;
     chatId: string;
     date: number;
     from: UserId;
