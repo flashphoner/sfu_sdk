@@ -6,7 +6,8 @@ import {
     State,
     RoomState,
     WS_PING_INTERVAL_MS,
-    WS_PINGS_MISSING_THRESHOLD
+    WS_PINGS_MISSING_THRESHOLD,
+    StatsType
 } from "./sdk/constants";
 
 export const sfu = new Sfu();
@@ -19,5 +20,6 @@ export {
     State,
     RoomState,
     WS_PING_INTERVAL_MS,
-    WS_PINGS_MISSING_THRESHOLD
+    WS_PINGS_MISSING_THRESHOLD,
+    StatsType
 };

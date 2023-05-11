@@ -191,6 +191,7 @@ const onOperationFailed = function(state, event) {
     state.setRoomEnded();
     onStopClick(state);
 }
+
 const playStreams = async function(state) {
     try {
         // Create remote display item to show remote streams
@@ -201,7 +202,10 @@ const playStreams = async function(state) {
             displayOptions: {
                 publisher: false,
                 quality: true,
-                type: false
+                type: false,
+                abr: true,
+                abrKeepOnGoodQuality: 20000,
+                abrTryForUpperQuality: 30000
             }
         }));
         // Start WebRTC negotiation

@@ -16,9 +16,10 @@ import {
     RemoteSdpType, RoleAssigned,
     RoomError,
     RoomEvent,
-    RoomState, WaitingRoomUpdate, UserNickname, RemoteSdpInfo
+    RoomState, WaitingRoomUpdate, UserNickname, RemoteSdpInfo, StatsType
 } from "./constants";
 import {Connection} from "./connection";
+import {WebRTCStats} from "./webrtc-stats";
 import Logger from "./logger";
 
 export class Room {
@@ -46,6 +47,7 @@ export class Room {
         settingRemoteAnswer: boolean,
         tid: string
     }
+    protected stats: WebRTCStats;
 
     public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number) {
         this.connection = connection;
@@ -64,14 +66,14 @@ export class Room {
         }
     }
 
-    #dChannelSend(msg: string) {
+    #dChannelSend(msg: string): void {
         this.logger.info("dchannel ", "==>", msg);
         this.#dChannel.send(msg);
     };
 
     #applyContentTypeConfig(sdp: string, config: {
         [key: string]: string
-    }) {
+    }): string {
         let ret = "";
         for (const str of sdp.split("\n")) {
             if (str && str.length > 0) {
@@ -87,7 +89,7 @@ export class Room {
         return ret;
     };
 
-    async #setRemoteDescription(remoteSdp: RemoteSdpInfo) {
+    async #setRemoteDescription(remoteSdp: RemoteSdpInfo): Promise<void> {
         try {
             await this.#_pc.setRemoteDescription(remoteSdp.info);
         } catch (e) {
@@ -99,7 +101,7 @@ export class Room {
     };
 
     //TODO refactor types
-    public async processEvent(e: InternalMessage) {
+    public async processEvent(e: InternalMessage): Promise<void> {
         this.logger.info("<==", e);
         if (e.type === RoomEvent.REMOTE_SDP) {
             if (this.#_state !== RoomState.FAILED && this.#_state !== RoomState.DISPOSED && this.#_pc.signalingState !== "closed") {
@@ -241,7 +243,7 @@ export class Room {
     //TODO(naz): safe guard based on state
     public join(pc: RTCPeerConnection, nickname?: UserNickname, config?: {
         [key: string]: string
-    }) {
+    }): Promise<JoinedRoom> {
         const self = this;
         this.#_pc = pc;
         this.#_pc.addEventListener("signalingstatechange", () => {
@@ -285,6 +287,7 @@ export class Room {
                 }
             }
         }
+        this.stats = new WebRTCStats(this.#_pc);
         return new Promise<JoinedRoom>(async (resolve, reject) => {
             if (self.#_state === RoomState.NEW) {
                 try {
@@ -315,7 +318,7 @@ export class Room {
 
     public updateState(config?: {
         [key: string]: string
-    }) {
+    }): Promise<void> {
         const self = this;
         return new Promise<void>(async (resolve, reject) => {
             if (self.#_pc.signalingState !== "stable") {
@@ -349,7 +352,7 @@ export class Room {
         });
     };
 
-    public destroyRoom() {
+    public destroyRoom(): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             self.#_state = RoomState.DISPOSED;
@@ -363,7 +366,7 @@ export class Room {
         });
     };
 
-    public leaveRoom() {
+    public leaveRoom(): Promise<LeftRoom> {
         const self = this;
         return new Promise<LeftRoom>((resolve, reject) => {
             self.#_state = RoomState.DISPOSED;
@@ -384,7 +387,7 @@ export class Room {
         });
     };
 
-    public evictParticipant(nickname: UserNickname) {
+    public evictParticipant(nickname: UserNickname): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
@@ -397,7 +400,7 @@ export class Room {
         })
     }
 
-    public renameParticipant(nickname: UserNickname, newNickname: UserNickname) {
+    public renameParticipant(nickname: UserNickname, newNickname: UserNickname): Promise<void> {
         const self = this;
         return new Promise<void>(((resolve, reject) => {
             const id = uuidv4();
@@ -411,7 +414,7 @@ export class Room {
         }));
     }
 
-    public sendMessage(msg: string) {
+    public sendMessage(msg: string): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
@@ -438,7 +441,7 @@ export class Room {
         });
     };
 
-    public changeQuality(trackId: string, quality: string, tid: number) {
+    public changeQuality(trackId: string, quality: string, tid: number): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
@@ -453,7 +456,7 @@ export class Room {
         });
     };
 
-    public muteTrack(trackId: string, mute: boolean) {
+    public muteTrack(trackId: string, mute: boolean): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
@@ -476,40 +479,44 @@ export class Room {
         return this;
     };
 
-    public id() {
+    public id(): string {
         return this._id;
     }
 
-    public name() {
+    public name(): string {
         return this._name;
     }
 
-    public pin() {
+    public pin(): string {
         return this._pin;
     }
 
-    public nickname() {
+    public nickname(): string {
         return this._nickname;
     }
 
-    public pc() {
+    public pc(): RTCPeerConnection {
         return this.#_pc;
     }
 
-    public role() {
+    public role(): ParticipantRole {
         return this.#_role;
     }
 
-    public invite() {
+    public invite(): string {
         return this.#inviteId;
     }
 
-    public state() {
+    public state(): RoomState {
         return this.#_state;
     }
 
-    public creationTime() {
+    public creationTime(): number {
         return this.#_creationTime;
+    }
+
+    public getStats(track: MediaStreamTrack, type: StatsType, callback: Function): void {
+        this.stats.getStats(track, type, callback);
     }
 
 }

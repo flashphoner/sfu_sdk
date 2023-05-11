@@ -1,3 +1,13 @@
+const ABR_QUALITY_CHECK_PERIOD = 1000;
+const ABR_KEEP_ON_QUALITY = 20000;
+const ABR_TRY_UPPER_QUALITY = 20000;
+const QUALITY_COLORS = {
+    NONE: "",
+    AVAILABLE: "gray",
+    UNAVAILABLE: "red",
+    SELECTED: "blue"
+};
+
 const initLocalDisplay = function(localDisplayElement){
     const localDisplayDiv = localDisplayElement;
     const localDisplays = {};
@@ -272,6 +282,23 @@ const initRemoteDisplay = function(options) {
         let publisherNameDisplay;
         let currentQualityDisplay;
         let videoTypeDisplay;
+        let abrQualityCheckPeriod = ABR_QUALITY_CHECK_PERIOD;
+        let abrKeepOnGoodQuality = ABR_KEEP_ON_QUALITY;
+        let abrTryForUpperQuality = ABR_TRY_UPPER_QUALITY;
+        if (displayOptions.abrQualityCheckPeriod !== undefined) {
+            abrQualityCheckPeriod = displayOptions.abrQualityCheckPeriod;
+        }
+        if (displayOptions.abrKeepOnGoodQuality !== undefined) {
+            abrKeepOnGoodQuality = displayOptions.abrKeepOnGoodQuality;
+        }
+        if (displayOptions.abrTryForUpperQuality !== undefined) {
+            abrTryForUpperQuality = displayOptions.abrTryForUpperQuality;
+        }
+        if (!displayOptions.abr) {
+            abrQualityCheckPeriod = 0;
+            abrKeepOnGoodQuality = 0;
+            abrTryForUpperQuality = 0;
+        }
         if (displayOptions.publisher) {
             publisherNameDisplay = createInfoDisplay(cell, "Published by: " + name);
         }
@@ -302,8 +329,16 @@ const initRemoteDisplay = function(options) {
 
         let audio = null;
         let video = null;
+
+        const abr = ABR(abrQualityCheckPeriod, [
+            {parameter: "nackCount", maxLeap: 10},
+            {parameter: "freezeCount", maxLeap: 10},
+            {parameter: "packetsLost", maxLeap: 10}
+        ], abrKeepOnGoodQuality, abrTryForUpperQuality);
+
         return {
             dispose: function() {
+                abr.stop();
                 cell.remove();
             },
             hide: function(value) {
@@ -380,31 +415,34 @@ const initRemoteDisplay = function(options) {
                 streamDisplay.appendChild(video);
                 video.srcObject = stream;
                 this.setResizeHandler(video);
+                abr.start();
             },
             setTrackInfo: function(trackInfo) {
                 if (trackInfo) { 
                     if (trackInfo.quality) {
                         showItem(qualitySwitchDisplay);
+                        if (abr.isEnabled()) {
+                            const autoDiv = createQualityButton("Auto", qualityDivs, qualitySwitchDisplay);
+                            autoDiv.style.color = QUALITY_COLORS.SELECTED;
+                            autoDiv.addEventListener('click', function() {
+                                setQualityButtonsColor(qualityDivs);
+                                autoDiv.style.color = QUALITY_COLORS.SELECTED;
+                                abr.setAuto();
+                            });
+                        }
                         for (let i = 0; i < trackInfo.quality.length; i++) {
-                            const qualityDiv = document.createElement("button");
-                            qualityDivs.push(qualityDiv);
-                            qualityDiv.innerText = trackInfo.quality[i];
-                            qualityDiv.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-                            qualityDiv.style.color = "red";
-                            qualityDiv.addEventListener('click', async function(){
+                            abr.addQuality(trackInfo.quality[i]);
+                            const qualityDiv = createQualityButton(trackInfo.quality[i], qualityDivs, qualitySwitchDisplay);
+                            qualityDiv.addEventListener('click', function() {
                                 console.log("Clicked on quality " + trackInfo.quality[i] + " trackId " + trackInfo.id);
-                                if (qualityDiv.style.color === "red") {
+                                if (qualityDiv.style.color === QUALITY_COLORS.UNAVAILABLE) {
                                     return;
                                 }
-                                for (let c = 0; c < qualityDivs.length; c++) {
-                                    if (qualityDivs[c].style.color !== "red") {
-                                        qualityDivs[c].style.color = "gray";
-                                    }
-                                }
-                                qualityDiv.style.color = "blue";
-                                await room.changeQuality(trackInfo.id, trackInfo.quality[i]);
+                                setQualityButtonsColor(qualityDivs);
+                                qualityDiv.style.color = QUALITY_COLORS.SELECTED;
+                                abr.setManual();
+                                abr.setQuality(trackInfo.quality[i]);
                             });
-                            qualitySwitchDisplay.appendChild(qualityDiv);
                         }
                     } else {
                         hideItem(qualitySwitchDisplay);
@@ -424,16 +462,17 @@ const initRemoteDisplay = function(options) {
             updateQualityInfo: function(videoQuality) {
                 showItem(qualitySwitchDisplay);
                 for (const qualityInfo of videoQuality) {
+                    let qualityColor = QUALITY_COLORS.UNAVAILABLE;
+                    if (qualityInfo.available === true) {
+                        qualityColor = QUALITY_COLORS.AVAILABLE;
+                    }
                     for (const qualityDiv of qualityDivs) {
                         if (qualityDiv.innerText === qualityInfo.quality){
-                            if (qualityInfo.available === true) {
-                                qualityDiv.style.color = "gray";
-                            } else {
-                                qualityDiv.style.color = "red";
-                            }
+                            qualityDiv.style.color = qualityColor;
                             break;
                         }
                     }
+                    abr.setQualityAvailable(qualityInfo.quality, qualityInfo.available);
                 }
             },
             hasVideo: function() {
@@ -450,6 +489,10 @@ const initRemoteDisplay = function(options) {
                         currentQualityDisplay.innerHTML = video.videoWidth + "x" + video.videoHeight;
                     }
                     resizeVideo(event.target);
+                    // Received a new quality, resume ABR is enabled
+                    if (abr.isAuto()) {
+                        abr.resume();
+                    }
                 });
             },
             setEventHandlers: function(video) {
@@ -481,6 +524,9 @@ const initRemoteDisplay = function(options) {
                     needRestart = true;
                     isFullscreen = false;
                 });
+            },
+            setVideoABRTrack: function(track) {
+                abr.setTrack(track);
             },
             audioMid: undefined,
             videoMid: undefined
@@ -517,6 +563,7 @@ const initRemoteDisplay = function(options) {
                     if (display.videoMid === transceiver.mid) {
                         let stream = new MediaStream();
                         stream.addTrack(transceiver.receiver.track);
+                        display.setVideoABRTrack(transceiver.receiver.track);
                         display.setVideo(stream);
                         break;
                     }
@@ -578,6 +625,202 @@ const initRemoteDisplay = function(options) {
             }
         };
         return button;
+    }
+
+    const ABR = function(interval, thresholds, keepGoodTimeout, tryUpperTimeout) {
+        let abr = {
+            track: null,
+            interval: interval,
+            thresholds: thresholds,
+            qualities: [],
+            currentQualityName: null,
+            statTimer: null,
+            paused: false,
+            manual: false,
+            keepGoodTimeout: keepGoodTimeout,
+            keepGoodTimer: null,
+            tryUpperTimeout: tryUpperTimeout,
+            tryUpperTimer: null,
+            start: function() {
+                if (abr.interval) {
+                    const thresholds = Thresholds();
+                    for (const threshold of abr.thresholds) {
+                        thresholds.add(threshold.parameter, threshold.maxLeap);
+                    }
+                    abr.statsTimer = setInterval(() => {
+                        if (abr.track) {
+                            room.getStats(abr.track, constants.SFU_RTC_STATS_TYPE.INBOUND, (stats) => {
+                                if (thresholds.isReached(stats)) {
+                                    abr.shiftDown();
+                                } else {
+                                    abr.useGoodQuality();
+                                }
+                            });
+                        }
+                    }, abr.interval);
+                }
+            },
+            stop: function() {
+                abr.stopKeeping();
+                abr.stopTrying();
+                if (abr.statsTimer) {
+                    clearInterval(abr.statsTimer);
+                    abr.statsTimer = null;
+                }
+            },
+            isEnabled: function () {
+                return (abr.interval > 0);
+            },
+            pause: function() {
+                abr.paused = true;
+            },
+            resume: function() {
+                abr.paused = false;
+            },
+            setAuto: function() {
+                abr.manual = false;
+                abr.resume();
+            },
+            setManual: function() {
+                abr.manual = true;
+                abr.pause();
+            },
+            isAuto: function() {
+                return !abr.manual;
+            },
+            setTrack: function(track) {
+                abr.track = track;
+            },
+            setQualitiesList: function(qualities) {
+                abr.qualities = qualities;
+            },
+            addQuality: function(name) {
+                abr.qualities.push({name: name, available: false, good: true});
+            },
+            setQualityAvailable: function(name, available) {
+                for (let i = 0; i < abr.qualities.length; i++) {
+                    if (name === abr.qualities[i].name) {
+                        abr.qualities[i].available = available;
+                    }
+                }
+            },
+            setQualityGood: function(name, good) {
+                if (name) {
+                    for (let i = 0; i < abr.qualities.length; i++) {
+                        if (name === abr.qualities[i].name) {
+                            abr.qualities[i].good = good;
+                        }
+                    }
+                }
+            },
+            getFirstAvailableQuality: function() {
+                for (let i = 0; i < abr.qualities.length; i++) {
+                    if (abr.qualities[i].available) {
+                        return abr.qualities[i];
+                    }
+                }
+                return null;
+            },
+            getLowerQuality: function(name) {
+                let quality = null;
+                if (!name) {
+                    // There were no switching yet, return a first available quality
+                    return abr.getFirstAvailableQuality();
+                }
+                let currentIndex = abr.qualities.map(item => item.name).indexOf(name);
+                for (let i = 0; i < currentIndex; i++) {
+                    if (abr.qualities[i].available) {
+                        quality = abr.qualities[i];
+                    }
+                }
+                return quality;
+            },
+            getUpperQuality: function(name) {
+                let quality = null;
+                if (!name) {
+                    // There were no switching yet, return a first available quality
+                    return abr.getFirstAvailableQuality();
+                }
+                let currentIndex = abr.qualities.map(item => item.name).indexOf(name);
+                for (let i = currentIndex + 1; i < abr.qualities.length; i++) {
+                    if (abr.qualities[i].available) {
+                        quality = abr.qualities[i];
+                        break;
+                    }
+                }
+                return quality;
+            },
+            shiftDown: function() {
+                if (!abr.manual && !abr.paused) {
+                    abr.stopKeeping();
+                    abr.setQualityGood(abr.currentQualityName, false);
+                    let quality = abr.getLowerQuality(abr.currentQualityName);
+                    if (quality) {
+                        console.log("Switching down to " + quality.name + " quality");
+                        abr.setQuality(quality.name);
+                    }
+                }
+            },
+            shiftUp: function() {
+                if (!abr.manual && !abr.paused) {
+                    let quality = abr.getUpperQuality(abr.currentQualityName);
+                    if (quality) {
+                        if (quality.good) {
+                            console.log("Switching up to " + quality.name + " quality");
+                            abr.setQuality(quality.name);
+                        } else {
+                            abr.tryUpper();
+                        }
+                    }
+                }
+            },
+            useGoodQuality: function() {
+                if (!abr.manual && !abr.paused) {
+                    if (!abr.currentQualityName) {
+                        let quality = abr.getFirstAvailableQuality();
+                        abr.currentQualityName = quality.name;
+                    }
+                    abr.setQualityGood(abr.currentQualityName, true);
+                    abr.keepGoodQuality();
+                }
+            },
+            keepGoodQuality: function() {
+                if (abr.keepGoodTimeout && !abr.keepGoodTimer && abr.getUpperQuality(abr.currentQualityName)) {
+                    abr.keepGoodTimer = setTimeout(() => {
+                        abr.shiftUp();
+                        abr.stopKeeping();
+                    }, abr.keepGoodTimeout);
+                }
+            },
+            stopKeeping: function() {
+                if (abr.keepGoodTimer) {
+                    clearTimeout(abr.keepGoodTimer);
+                    abr.keepGoodTimer = null;
+                }
+            },
+            tryUpper: function() {
+                let quality = abr.getUpperQuality(abr.currentQualityName);
+                if (abr.tryUpperTimeout && !abr.tryUpperTimer && quality) {
+                    abr.tryUpperTimer = setTimeout(() => {
+                        abr.setQualityGood(quality.name, true);
+                        abr.stopTrying();
+                    }, abr.tryUpperTimeout);
+                }
+            },
+            stopTrying: function() {
+                if (abr.tryUpperTimer) {
+                    clearTimeout(abr.tryUpperTimer);
+                    abr.tryUpperTimer = null;
+                }
+            },
+            setQuality: async function(name) {
+                // Pause switching until a new quality is received
+                abr.pause();
+                abr.currentQualityName = name;
+                await room.changeQuality(abr.track.id, abr.currentQualityName);
+            }
+        }
+        return abr;
     }
 
     return {
@@ -654,6 +897,28 @@ const createContainer = function(parent) {
         parent.appendChild(div);
     }
     return div;
+}
+
+const createQualityButton = function(qualityName, buttonsList, parent) {
+    const div = document.createElement("button");
+    div.innerText = qualityName;
+    div.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
+    div.style.color = QUALITY_COLORS.UNAVAILABLE;
+    if (buttonsList) {
+        buttonsList.push(div);
+    }
+    if (parent) {
+        parent.appendChild(div);
+    }
+    return div;
+}
+
+const setQualityButtonsColor = function(qualityDivs) {
+    for (let c = 0; c < qualityDivs.length; c++) {
+        if (qualityDivs[c].style.color !== QUALITY_COLORS.UNAVAILABLE) {
+            qualityDivs[c].style.color = QUALITY_COLORS.AVAILABLE;
+        }
+    }
 }
 
 // Helper functions to display/hide an element

@@ -1018,3 +1018,8 @@ export const WS_PING_INTERVAL_MS = 5000;
 
 // Set missing pings threshold as a half of WCS default setting
 export const WS_PINGS_MISSING_THRESHOLD = 5;
+
+export enum StatsType {
+    INBOUND = "inbound-rtp",
+    OUTBOUND = "outbound-rtp"
+}

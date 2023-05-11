@@ -1,4 +1,4 @@
-import {RoomEvent, RoomState, Sfu} from "../../src";
+import {RoomEvent, RoomState, Sfu, StatsType} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
 import {AddRemoveTracks, RoomMessage} from "../../src/sdk/constants";
 import {Verbosity} from "../../src/sdk/logger";
@@ -153,6 +153,42 @@ describe("room", () => {
         await sfu0.disconnect();
         await sfu1.disconnect();
     });
+    it("should get incoming track stats", async (done) => {
+        const sfu0 = await connect(TEST_GROUP_USER0);
+        const sfu1 = await connect(TEST_GROUP_USER1);
+        const room0 = sfu0.createRoom({
+            ...TEST_ROOM
+        });
+        const room1 = sfu1.createRoom({
+            ...TEST_ROOM
+        });
+
+        const rtcConnectionPublish = new wrtc.RTCPeerConnection();
+        const rtcConnectionPlay = new wrtc.RTCPeerConnection();
+
+        const vSource = new RTCVideoSourceWrapper();
+        const vTrack1 = vSource.createTrack();
+
+        rtcConnectionPublish.addTrack(vTrack1);
+
+        room0.on(RoomEvent.ADD_TRACKS, async (msg) => {
+            const message = msg as AddRemoveTracks;
+            expect(message).toBeTruthy();
+        });
+
+        rtcConnectionPlay.ontrack = ({transceiver}) => {
+            room0.getStats(transceiver.receiver.track, StatsType.INBOUND, async (stats) => {
+                expect(stats.type).toBe(StatsType.INBOUND);
+                expect(stats.mediaType).toBe("video");
+                await sfu1.disconnect();
+                await sfu0.disconnect();
+                done();
+            });
+        }
+
+        await room1.join(rtcConnectionPublish, null, {});
+        await room0.join(rtcConnectionPlay);
+    });
     //relates to zapp-64
     it.skip("should send message", async () => {
         const sfu = await connect(TEST_GROUP_USER0);
@@ -180,7 +216,7 @@ describe("room", () => {
                 const message = msg as RoomMessage;
                 expect(message).toBeTruthy();
                 expect(message.message.nickName).toEqual(TEST_GROUP_USER0.nickname);
-                expect(message.message.message).toEqual(TEST_MESSAGE_ROOM);
+                expect(JSON.parse(message.message.message).payload).toEqual(TEST_MESSAGE_ROOM);
                 await sfu0.disconnect();
                 await sfu1.disconnect();
                 done();

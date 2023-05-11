@@ -1,6 +1,6 @@
 {
   "name": "@flashphoner/sfusdk-examples",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "description": "Official Flashphoner WebCallServer SFU SDK usage examples",
   "main": "dist/sfu.js",
   "types": "src/sfu.ts",
@@ -27,6 +27,7 @@
     "webpack-cli": "^4.9.2"
   },
   "dependencies": {
-    "@flashphoner/sfusdk": "^2.0.193"
+    "@flashphoner/sfusdk": "^2.0.193",
+    "kalmanjs": "^1.1.0"
   }
 }

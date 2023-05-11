@@ -1,8 +1,10 @@
+import KalmanFilter from 'kalmanjs';
 import {
     Sfu,
     RoomEvent,
     SfuEvent,
-    State
+    State,
+    StatsType
 } from "@flashphoner/sfusdk";
 
 export async function createRoom(options: {
@@ -35,5 +37,10 @@ export async function createRoom(options: {
 export const constants = {
     SFU_EVENT: SfuEvent,
     SFU_ROOM_EVENT: RoomEvent,
-    SFU_STATE: State
+    SFU_STATE: State,
+    SFU_RTC_STATS_TYPE: StatsType
+}
+
+export function createFilter() : KalmanFilter {
+    return new KalmanFilter();
 }
