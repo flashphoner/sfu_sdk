@@ -1,5 +1,5 @@
 import {v4 as uuidv4} from 'uuid';
-import promises from "./promises";
+import promises, {reject} from "./promises";
 import {Notifier} from "./notifier";
 import {
     AddRemoveTracks,
@@ -21,6 +21,8 @@ import {
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
 import Logger from "./logger";
+import {Mutex} from 'async-mutex';
+
 
 export class Room {
     static readonly #CONTROL_CHANNEL = "control";
@@ -43,11 +45,11 @@ export class Room {
     protected logger: Logger;
     _uid: string;
     _crutch: {
-        settingRemoteOffer: boolean,
-        settingRemoteAnswer: boolean,
+        mutex: Mutex,
         tid: string
-    }
+    };
     protected stats: WebRTCStats;
+
 
     public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number) {
         this.connection = connection;
@@ -59,9 +61,9 @@ export class Room {
         this.#_creationTime = creationTime;
         this.logger = new Logger();
         this._uid = uuidv4();
+        // defines usage of the pc as a critical section, must be replaced
         this._crutch = {
-            settingRemoteOffer: false,
-            settingRemoteAnswer: false,
+            mutex: new Mutex(),
             tid: ""
         }
     }
@@ -105,57 +107,88 @@ export class Room {
         this.logger.info("<==", e);
         if (e.type === RoomEvent.REMOTE_SDP) {
             if (this.#_state !== RoomState.FAILED && this.#_state !== RoomState.DISPOSED && this.#_pc.signalingState !== "closed") {
-                try {
-                    const remoteSdp = e as RemoteSdp;
-                    switch (remoteSdp.info.type) {
-                        case RemoteSdpType.OFFER:
-                            if (this._crutch.settingRemoteAnswer) {
-                                this.logger.debug(new Error("Clashing with the answer!"));
-
-                                function sleep(millis: number) {
-                                    return new Promise(resolve => setTimeout(resolve, millis));
+                const remoteSdp = e as RemoteSdp;
+                const self = this;
+                switch (remoteSdp.info.type) {
+                    case RemoteSdpType.OFFER:
+                        this._crutch.mutex.runExclusive(async () => {
+                            self.logger.debug("Setting remote offer, tid " + remoteSdp.info.tid);
+                            try {
+                                if (!self._crutch.tid || self._crutch.tid != remoteSdp.info.tid) {
+                                    self.logger.debug("Tid mismatch, rollback. Remote tid " + remoteSdp.info.tid + ", local tid " + self._crutch.tid);
                                 }
 
-                                while (this._crutch.settingRemoteAnswer) {
-                                    await sleep(100);
-                                    this.logger.debug("Waiting for answer " + this._crutch.settingRemoteAnswer);
+                                let reOfferNeeded = false;
+                                if (self.#_pc.signalingState === "have-local-offer") {
+                                    self.logger.debug("Rollback, tid " + remoteSdp.info.tid);
+                                    reOfferNeeded = true;
+                                    await self.#setRemoteDescription({
+                                        info: {
+                                            sdp: "",
+                                            type: RemoteSdpType.ROLLBACK,
+                                            tid: ""
+                                        }
+                                    });
                                 }
-                            }
-                            this._crutch.tid = remoteSdp.info.tid;
-                            this.logger.debug("setTid " + this._crutch.tid);
-                            this._crutch.settingRemoteOffer = true;
-                            if (this.#_pc.signalingState === "have-local-offer") {
-                                await this.#setRemoteDescription({
-                                    info: {
-                                        sdp: "",
-                                        type: RemoteSdpType.ROLLBACK,
-                                        tid: ""
+                                await self.#setRemoteDescription(remoteSdp);
+                                const answer = await self.#_pc.createAnswer();
+                                answer.sdp = answer.sdp.replace(/a=sendrecv/g, "a=sendonly");
+                                await self.#_pc.setLocalDescription(answer);
+                                if (self.#_pc.connectionState !== "closed") {
+                                    const tid = self._crutch.tid;
+                                    self.logger.debug("Sent answer, remote tid " + remoteSdp.info.tid + ", local tid " + tid);
+                                    self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
+                                        id: self._id,
+                                        pin: self._pin,
+                                        sdp: self.#_pc.localDescription.sdp,
+                                        tid: tid,
+                                        sdpType: RemoteSdpType.ANSWER
+                                    });
+                                }
+                                if (reOfferNeeded) {
+                                    self.logger.debug("Setting local reoffer, tid " + remoteSdp.info.tid);
+                                    const offer = await self.#_pc.createOffer();
+                                    offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
+                                    await self.#_pc.setLocalDescription(offer);
+                                    if (self.#_pc.connectionState !== "closed") {
+                                        const tid = self._crutch.tid;
+                                        self.logger.debug("Sent reoffer,  remote tid " + remoteSdp.info.tid + ", local tid " + tid);
+                                        self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
+                                            id: self._id,
+                                            pin: self._pin,
+                                            sdp: offer.sdp,
+                                            internalMessageId: "",
+                                            sdpType: RemoteSdpType.OFFER,
+                                            tid: tid
+                                        });
                                     }
-                                });
+                                }
+                            } catch (error) {
+                                self.logger.error("Failed to process remote sdp, type " + remoteSdp.info.type + ", tid " + remoteSdp.info.tid, error);
                             }
-                            await this.#setRemoteDescription(remoteSdp);
-                            const answer = await this.#_pc.createAnswer();
-                            answer.sdp = answer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                            await this.#_pc.setLocalDescription(answer);
-                            if (this.#_pc.connectionState !== "closed") {
-                                this.connection.send(InternalApi.UPDATE_ROOM_STATE, {
-                                    id: this._id,
-                                    pin: this._pin,
-                                    sdp: this.#_pc.localDescription.sdp,
-                                    tid: this._crutch.tid,
-                                    sdpType: RemoteSdpType.ANSWER
-                                });
+                            self.logger.debug("Ended setting remote offer with tid " + remoteSdp.info.tid);
+                        });
+                        break;
+                    case RemoteSdpType.ANSWER:
+                        this._crutch.mutex.runExclusive(async () => {
+                            self.logger.debug("Setting remote answer, tid " + remoteSdp.info.tid);
+                            try {
+                                if (self.#_pc.signalingState !== "have-local-offer") {
+                                    self.logger.debug("Reject remote answer, bad state");
+                                    return
+                                }
+                                if (!self._crutch.tid || self._crutch.tid != remoteSdp.info.tid) {
+                                    self.logger.debug("Reject remote answer,bad tid " + remoteSdp.info.tid);
+                                    return;
+                                }
+                                self.logger.debug("Apply remote answer with tid " + remoteSdp.info.tid + ", local tid " + self._crutch.tid);
+                                await self.#setRemoteDescription(remoteSdp);
+                            } catch (error) {
+                                self.logger.error("Failed to process remote sdp, type " + remoteSdp.info.type + ", tid " + remoteSdp.info.tid, error);
                             }
-                            this._crutch.settingRemoteOffer = false;
-                            break;
-                        case RemoteSdpType.ANSWER:
-                            this._crutch.settingRemoteAnswer = true;
-                            await this.#setRemoteDescription(remoteSdp);
-                            this._crutch.settingRemoteAnswer = false;
-                            break;
-                    }
-                } catch (error) {
-                    this.logger.error("Failed to process remote sdp", error);
+                            self.logger.debug("Ended setting answer with tid " + remoteSdp.info.tid);
+                        });
+                        break;
                 }
             }
         } else if (e.type === RoomEvent.ROLE_ASSIGNED) {
@@ -299,13 +332,15 @@ export class Room {
                     await self.#_pc.setLocalDescription(offer);
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
+                    self._crutch.tid = uuidv4();
                     self.connection.send(InternalApi.JOIN_ROOM, {
                         id: self._id,
                         pin: self._pin,
                         sdp: offer.sdp,
                         nickname: nickname,
                         internalMessageId: id,
-                        sdpType: RemoteSdpType.OFFER
+                        sdpType: RemoteSdpType.OFFER,
+                        tid: self._crutch.tid
                     });
                 } catch (e) {
                     reject(e);
@@ -321,34 +356,39 @@ export class Room {
     }): Promise<void> {
         const self = this;
         return new Promise<void>(async (resolve, reject) => {
-            if (self.#_pc.signalingState !== "stable") {
-                reject("Peer connection signaling state is " + self.#_pc.signalingState + ". Can't update room while negotiation is in progress");
-                return;
-            }
-            try {
-                const offer = await self.#_pc.createOffer();
-                if (self._crutch.settingRemoteOffer) {
-                    reject("Setting remote offer");
-                    return;
+            self._crutch.mutex.runExclusive(async () => {
+                try {
+                    this.logger.debug("updateState " + this._nickname);
+                    if (self.#_pc.signalingState === "closed") {
+                        throw new Error("Bad state");
+                    }
+
+                    const offer = await self.#_pc.createOffer();
+                    if (config) {
+                        offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
+                    }
+                    offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
+                    await self.#_pc.setLocalDescription(offer);
+                    const id = uuidv4();
+                    promises.add(id, resolve, reject);
+                    const localTid = uuidv4();
+                    self._crutch.tid = localTid;
+                    self.logger.debug("Created tid " + localTid);
+
+                    self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
+                        id: self._id,
+                        pin: self._pin,
+                        sdp: offer.sdp,
+                        internalMessageId: id,
+                        sdpType: RemoteSdpType.OFFER,
+                        tid: localTid
+                    });
+                    self.logger.debug("Sent local offer with tid " + localTid);
+                } catch (e) {
+                    self.logger.error("Reject update state " + e);
+                    reject(e);
                 }
-                offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                await self.#_pc.setLocalDescription(offer);
-                if (config) {
-                    offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
-                }
-                const id = uuidv4();
-                promises.add(id, resolve, reject);
-                self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
-                    id: self._id,
-                    pin: self._pin,
-                    sdp: offer.sdp,
-                    internalMessageId: id,
-                    sdpType: RemoteSdpType.OFFER,
-                    tid: this._crutch.tid
-                });
-            } catch (e) {
-                reject(e);
-            }
+            });
         });
     };
 
