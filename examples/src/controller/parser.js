@@ -82,20 +82,20 @@ const statsToGraph = function(stats) {
                 eIndex++;
             }
         });
-        for (const [key, value] of Object.entries(participant.incomingTracks)) {
+        participant.incomingTracks.forEach(function(track) {
             g.edges.push({
                 id: 'e' + eIndex,
                 // Reference extremities:
                 source: wcsId,
                 target: participant.nickName,
-                label: value ? key + "-" + value : key,
+                label: track.quality ? track.id + "-" + track.quality : track.id,
                 count: count++,
                 size: edgeSize,
                 type: edgeType,
                 color: fromServerColour
             });
             eIndex++;
-        }
+        })
     });
     return g;
 }
@@ -155,14 +155,13 @@ const statsToTable = function(stats) {
     let bitrate_out = 0;
     let tracks_out = 0;
     stats.participants.forEach(function(participant){
-        for (const [key, value] of Object.entries(participant.incomingTracks)) {
-            const srcTrack = src[tKey(key, value)];
-            if (!srcTrack) {
-                continue;
+        participant.incomingTracks.forEach(function(track) {
+            const srcTrack = src[tKey(track.id, track.quality)];
+            if (srcTrack) {
+                bitrate_out += srcTrack.bitrate;
+                tracks_out++;
             }
-            bitrate_out += srcTrack.bitrate;
-            tracks_out++;
-        }
+        });
     });
     metrics.WCS.push(metricToTable("participants", stats.participants.length, NA));
     metrics.WCS.push(metricToTable("bitrate_in", bitrate_in, NA));
@@ -175,6 +174,10 @@ const statsToTable = function(stats) {
         let tracksOut = 0;
         let bitrateIn = 0;
         let bitrateOut = 0;
+        // Todo (Igor): this is shared counter across all outgoing tracks, there should be 'per-track' counters
+        let nackOut = 0;
+        let firOut = 0;
+        let pliOut = 0;
         participant.outgoingTracks.forEach(function(track){
             if (track.composite) {
                 for (const [key, value] of Object.entries(track.tracks)) {
@@ -186,21 +189,26 @@ const statsToTable = function(stats) {
                 pStats.push(trackToTable(track, participant.nickName, "NA"));
                 tracksOut++;
                 bitrateOut += track.bitrate;
+                firOut += track.feedbackStats.receivedFIR;
+                pliOut += track.feedbackStats.receivedPLI;
+                nackOut += track.feedbackStats.receivedNACK;
             }
         });
-        for (const [key, value] of Object.entries(participant.incomingTracks)) {
-            const srcTrack = src[tKey(key, value)];
-            if (!srcTrack) {
-                continue;
+        participant.incomingTracks.forEach(function(track) {
+            const srcTrack = src[tKey(track.id, track.quality)];
+            if (srcTrack) {
+                pStats.push(trackToTable(srcTrack, srcTrack.nickName, track.quality || "NA"));
+                tracksIn++;
+                bitrateIn += srcTrack.bitrate;
             }
-            pStats.push(trackToTable(srcTrack, srcTrack.nickName, value));
-            tracksIn++;
-            bitrateIn += srcTrack.bitrate;
-        }
+        })
         pStats.push(metricToTable("tracks_in", tracksIn, participant.nickName));
         pStats.push(metricToTable("bitrate_in", bitrateIn, participant.nickName));
         pStats.push(metricToTable("tracks_out", tracksOut, participant.nickName));
         pStats.push(metricToTable("bitrate_out", bitrateOut, participant.nickName));
+        pStats.push(metricToTable("nack_out", nackOut, participant.nickName));
+        pStats.push(metricToTable("pli_out", pliOut, participant.nickName));
+        pStats.push(metricToTable("fir_out", firOut, participant.nickName));
         metrics[participant.nickName] = pStats;
     });
     return metrics;
