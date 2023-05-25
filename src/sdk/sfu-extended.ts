@@ -98,11 +98,14 @@ export class SfuExtended {
     #signUpId: string = '';
     #resetPasswordId: string = '';
 
-    constructor(logLevel?: Verbosity, prefix?: PrefixFunction) {
+    constructor(logLevel?: Verbosity, prefix?: PrefixFunction, log?: any) {
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
         if (prefix) {
             this.#loggerPrefix = prefix;
             this.#logger.setPrefix(prefix);
+        }
+        if (log) {
+            this.#logger.setLogger(log);
         }
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
     }

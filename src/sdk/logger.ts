@@ -11,6 +11,7 @@ export enum Verbosity {
 class Logger {
     #prefix: PrefixFunction = () => "";
     #level: Verbosity = Verbosity.ERROR;
+    #_logger: any = console;
 
     setPrefix = (func:PrefixFunction) => {
         if (typeof func !== "function") {
@@ -25,29 +26,37 @@ class Logger {
 
     error = (...args) => {
         if (this.#level >= Verbosity.ERROR) {
-            console.error(this.#prefix(), ...args);
+            this.#_logger.error(this.#prefix(), ...args);
         }
     };
     warn = (...args) => {
         if (this.#level >= Verbosity.WARN) {
-            console.warn(this.#prefix(), ...args);
+            this.#_logger.warn(this.#prefix(), ...args);
         }
     };
     info = (...args) => {
         if (this.#level >= Verbosity.INFO) {
-            console.info(this.#prefix(), ...args);
+            this.#_logger.info(this.#prefix(), ...args);
         }
     };
     debug = (...args) => {
         if (this.#level >= Verbosity.DEBUG) {
-            console.debug(this.#prefix(), ...args);
+            this.#_logger.debug(this.#prefix(), ...args);
         }
     };
     trace = (...args) => {
         if (this.#level >= Verbosity.TRACE) {
-            console.trace(this.#prefix(), ...args);
+            this.#_logger.trace(this.#prefix(), ...args);
         }
     };
+
+    getLogger(): any {
+        return this.#_logger;
+    }
+
+    setLogger(value: any) {
+        this.#_logger = value;
+    }
 }
 
 export default Logger;
