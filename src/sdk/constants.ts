@@ -336,7 +336,8 @@ export enum ChatError {
     DELETE_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to delete message, message doesn't exist",
     CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT = "Adding a member to the private chat is not allowed",
     CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
-    CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed"
+    CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed",
+    CAN_NOT_ADD_DELETED_MESSAGE_TO_BOOKMARKS = "Can't add deleted message to bookmarks"
 }
 
 export enum RoomError {
@@ -967,6 +968,7 @@ export type MessageInfo = {
     parentMessage: MessageInfo;
     date: number;
     clientDate: number;
+    from: string;
     to: string;
     body: string;
     attachments: Array<MessageAttachment>;

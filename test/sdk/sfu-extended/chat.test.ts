@@ -674,6 +674,18 @@ describe("chat", () => {
             expect(messages[0].bookmarked).toBe(true);
             await bob.deleteChat(chat);
         });
+        it("Should reject adding deleted message to bookmarks", async () => {
+            const chat = await bob.createChat({});
+            const status = await bob.sendMessage({
+                chatId: chat.id,
+                body: MESSAGE_BODY
+            });
+            await bob.deleteChatMessage({chatId: chat.id, messageId: status.id});
+            await expect(
+                bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id})
+            ).rejects.toHaveProperty("error", ChatError.CAN_NOT_ADD_DELETED_MESSAGE_TO_BOOKMARKS)
+            await bob.deleteChat(chat);
+        });
         it("Should remove message from bookmarks", async () => {
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
@@ -730,6 +742,7 @@ describe("chat", () => {
             expect(result.messages.length).toBe(3);
             expect(result.totalSize).toBe(3);
             expect(result.messages[0].body).toEqual(MESSAGE_BODY + 0);
+            expect(result.messages[0].from).toEqual(TEST_USER_0.username);
             expect(result.messages[1].body).toEqual(MESSAGE_BODY + 2);
             expect(result.messages[2].body).toEqual(MESSAGE_BODY + 4);
             await bob.deleteChat(chat);
@@ -776,6 +789,55 @@ describe("chat", () => {
             expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[1].id);
             expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[2].id);
 
+            await bob.deleteChat(chat);
+        });
+        it("Should load messages that few users saved as bookmarks", async () => {
+            const chats = await bob.getUserChats();
+            Object.keys(chats).map(async (id) => {
+                await bob.deleteChat({id: id});
+            });
+            const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
+
+            for (let i = 0; i < 5; i++) {
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY + i
+                });
+                if (i !== 1 && i !== 3) {
+                    await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+                }
+                if (i !== 1) {
+                    await alice.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+                }
+            }
+
+            const bobBookmarks = await bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                },
+                sortOrder: SortOrder.ASC
+            });
+            expect(bobBookmarks.messages.length).toBe(3);
+            expect(bobBookmarks.totalSize).toBe(3);
+            expect(bobBookmarks.messages[0].body).toEqual(MESSAGE_BODY + 0);
+            expect(bobBookmarks.messages[1].body).toEqual(MESSAGE_BODY + 2);
+            expect(bobBookmarks.messages[2].body).toEqual(MESSAGE_BODY + 4);
+            const aliceBookmarks = await alice.loadBookmarkedMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                },
+                sortOrder: SortOrder.ASC
+            });
+            expect(aliceBookmarks.messages.length).toBe(4);
+            expect(aliceBookmarks.totalSize).toBe(4);
+            expect(aliceBookmarks.messages[0].body).toEqual(MESSAGE_BODY + 0);
+            expect(aliceBookmarks.messages[1].body).toEqual(MESSAGE_BODY + 2);
+            expect(aliceBookmarks.messages[2].body).toEqual(MESSAGE_BODY + 3);
+            expect(aliceBookmarks.messages[3].body).toEqual(MESSAGE_BODY + 4);
             await bob.deleteChat(chat);
         });
         it("Should load messages with mentions based on time frame", async () => {
