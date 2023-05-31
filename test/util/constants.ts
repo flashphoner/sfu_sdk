@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import {ChannelSendPolicy, ChannelType, MessageAttachmentType} from "../../src/sdk/constants";
+import {ChannelSendPolicy, ChatType, MessageAttachmentType} from "../../src/sdk/constants";
 export const url = "ws://127.0.0.1:8080/";
 export const wrongWsUrl = "ws://127.0.0.1:8081/";
 export const TEST_USER_0 = {
@@ -90,21 +90,21 @@ export const PDF_FILE_PATH = "../resources/" + PDF_FILE_NAME;
 export const TEST_PUBLIC_CHANNEL = {
     channel: true,
     name: "test_public_channel",
-    channelType: ChannelType.PUBLIC,
+    type: ChatType.PUBLIC,
     channelSendPolicy: ChannelSendPolicy.EVERYONE
 }
 
 export const TEST_PRIVATE_CHANNEL = {
     channel: true,
     name: "test_private_channel",
-    channelType: ChannelType.PRIVATE,
+    type: ChatType.PRIVATE,
     channelSendPolicy: ChannelSendPolicy.EVERYONE
 }
 
 export const TEST_PRIVATE_CHANNEL_WITH_LIST = {
     channel: true,
     name: "test_private_channel_with_list",
-    channelType: ChannelType.PRIVATE,
+    type: ChatType.PRIVATE,
     channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST
 }
 

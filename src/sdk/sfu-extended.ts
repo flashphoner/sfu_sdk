@@ -6,7 +6,7 @@ import {
     Calendar, CalendarEvent, CalendarEventEvent,
     AttachmentRequest, AttachmentRequestAck, Attachment,
     ChannelSendPolicy,
-    ChannelType,
+    ChatType,
     Chat,
     ChatLoadedEvent,
     ChatMap,
@@ -1319,7 +1319,7 @@ export class SfuExtended {
         members?: Array<UserId>,
         favourite?: boolean,
         channel?: boolean,
-        channelType?: ChannelType,
+        type?: ChatType,
         channelSendPolicy?: ChannelSendPolicy,
         sendPermissionList?: Array<string>,
         allowedToAddExternalUser?: boolean
@@ -1333,7 +1333,7 @@ export class SfuExtended {
                 members: chat.members,
                 favourite: chat.favourite,
                 channel: chat.channel,
-                channelType: chat.channelType,
+                type: chat.type,
                 channelSendPolicy: chat.channelSendPolicy,
                 sendPermissionList: chat.sendPermissionList,
                 allowedToAddExternalUser: chat.allowedToAddExternalUser
@@ -1560,7 +1560,7 @@ export class SfuExtended {
 
     public updateChatConfiguration(chat: {
         id: string,
-        channelType?: ChannelType,
+        type?: ChatType,
         channelSendPolicy?: ChannelSendPolicy,
         sendPermissionList?: Array<string>,
         allowedToAddExternalUser?: boolean

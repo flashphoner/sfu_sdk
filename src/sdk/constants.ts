@@ -333,7 +333,10 @@ export enum ChatError {
     EDIT_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to edit message, message doesn't exist",
     EDIT_MESSAGE_ERROR_MESSAGE_CAN_NOT_BE_WITHOUT_CONTENT = "Failed to edit message, message must have body or attachments",
     DELETE_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS = "Failed to delete message, chat doesn't exist",
-    DELETE_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to delete message, message doesn't exist"
+    DELETE_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to delete message, message doesn't exist",
+    CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT = "Adding a member to the private chat is not allowed",
+    CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
+    CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed"
 }
 
 export enum RoomError {
@@ -806,13 +809,13 @@ export type UserSpecificChatInfo = {
     lastReadMessageId: string;
     lastReadMessageDate: number;
     canSend: boolean;
-    channelType: ChannelType;
+    type: ChatType;
     channelSendPolicy: ChannelSendPolicy;
     chatReceivePolicy: ChatReceivePolicy;
     sendPermissionList: Array<string>;
     allowedToAddExternalUser: boolean;
 }
-export enum ChannelType {
+export enum ChatType {
     PUBLIC = "PUBLIC",
     PRIVATE = "PRIVATE"
 }
@@ -838,7 +841,7 @@ export type Chat = {
     members: Array<UserId>;
     messages: Array<Message>;
     channel: boolean;
-    channelType: ChannelType;
+    type: ChatType;
     channelSendPolicy: ChannelSendPolicy;
     chatReceivePolicy: ChatReceivePolicy;
     sendPermissionList: Array<string>;
