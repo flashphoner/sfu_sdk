@@ -1,11 +1,13 @@
 import {RoomEvent, SfuExtended} from "../../../src";
 import {TEST_MESSAGE_ROOM, TEST_ROOM, TEST_USER_0, TEST_USER_1} from "../../util/constants";
 import {
+    AddRemoveTracks,
     ControlMessageEvent,
-    EvictedFromRoom, PlacedInLobbyEvent,
+    EvictedFromRoom,
     InternalMessage,
     JoinedRoom,
     ParticipantRole,
+    PlacedInLobbyEvent,
     RoleAssigned,
     RolesListEvent,
     RoomError,
@@ -101,7 +103,6 @@ describe("notifications", () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
-            
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
@@ -122,7 +123,6 @@ describe("notifications", () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
-            
             await bobRoom.join(bobPc);
             const waitingListHandler0 = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler0);
@@ -154,7 +154,6 @@ describe("notifications", () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
-            
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
@@ -181,7 +180,6 @@ describe("notifications", () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
-            
             await bobRoom.join(bobPc);
             const waitingListHandler = async (msg: InternalMessage) => {
                 bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
@@ -243,7 +241,7 @@ describe("notifications", () => {
                 await bobRoom.assignRole(state.name, ParticipantRole.OWNER);
                 expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
             });
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
@@ -268,25 +266,25 @@ describe("notifications", () => {
             });
             await bobRoom.join(bobPc);
             await bobRoom.configureWaitingRoom(false);
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
             });
             await aliceRoom.join(alicePc);
-            
+
             await bobRoom.assignRole(TEST_USER_1.nickname, ParticipantRole.OWNER);
             expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
-            
+
             await waitForRoomEvent(
                 RoomEvent.ROLE_ASSIGNED,
                 aliceRoom,
                 (room) => room.role() === ParticipantRole.OWNER,
                 (room) => room.role());
-            
+
             await bobRoom.reclaimOwnerRights();
             expect(bobRoom.role()).toEqual(ParticipantRole.OWNER);
-            
+
             await waitForRoomEvent(
                 RoomEvent.ROLE_ASSIGNED,
                 aliceRoom,
@@ -331,7 +329,7 @@ describe("notifications", () => {
                 aliceRoom,
                 (room) => room.role() === ParticipantRole.OWNER,
                 (room) => room.role());
-            
+
             await bobRoom.leaveRoom();
             bobRoom = await bob.roomAvailable({
                 ...TEST_ROOM,
@@ -354,7 +352,7 @@ describe("notifications", () => {
                 }
             }
             bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
@@ -369,13 +367,13 @@ describe("notifications", () => {
 
             await bobRoom.assignRole(TEST_USER_1.nickname, ParticipantRole.OWNER);
             expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
-            
+
             await waitForRoomEvent(
                 RoomEvent.ROLE_ASSIGNED,
                 aliceRoom,
                 (room) => room.role() === ParticipantRole.OWNER,
                 (room) => room.role());
-            
+
             await bobRoom.leaveRoom();
             bobRoom = await bob.roomAvailable({
                 ...TEST_ROOM,
@@ -406,7 +404,7 @@ describe("notifications", () => {
                 }
             }
             bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
@@ -421,7 +419,7 @@ describe("notifications", () => {
 
             await bobRoom.assignRole(TEST_USER_1.nickname, ParticipantRole.OWNER);
             expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
-            
+
             await waitForRoomEvent(
                 RoomEvent.ROLE_ASSIGNED,
                 aliceRoom,
@@ -429,7 +427,7 @@ describe("notifications", () => {
                 (room) => room.role());
             await bobRoom.leaveRoom();
             await bob.disconnect();
-            
+
             bob = await connect(TEST_USER_0);
             const rooms = await bob.loadActiveRooms();
             expect(rooms.length).toBe(1);
@@ -490,13 +488,13 @@ describe("notifications", () => {
             });
             await bobRoom.join(bobPc);
             await bobRoom.configureWaitingRoom(false);
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
             });
             await aliceRoom.join(alicePc)
-            
+
             await bobRoom.setParticipantAudioMuted(TEST_USER_1.nickname, true);
             expect(bobRoom.config().participantsConfig[TEST_USER_1.nickname].audioMuted).toBeTruthy();
         });
@@ -508,13 +506,13 @@ describe("notifications", () => {
             });
             await bobRoom.join(bobPc);
             await bobRoom.configureWaitingRoom(false);
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
             });
             await aliceRoom.join(alicePc);
-            
+
             await bobRoom.setParticipantVideoMuted(TEST_USER_1.nickname, true);
             expect(bobRoom.config().participantsConfig[TEST_USER_1.nickname].videoMuted).toBeTruthy();
         });
@@ -526,16 +524,44 @@ describe("notifications", () => {
             });
             await bobRoom.join(bobPc);
             await bobRoom.configureWaitingRoom(false);
-            
+
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
             });
             await aliceRoom.join(alicePc);
-            
+
             await bobRoom.setParticipantScreenSharingMuted(TEST_USER_1.nickname, true);
             expect(bobRoom.config().participantsConfig[TEST_USER_1.nickname].screenSharingMuted).toBeTruthy();
         });
+        it("Should mute own audio track", async (done) => {
+            const bobPc = new wrtc.RTCPeerConnection();
+            const alicePc = new wrtc.RTCPeerConnection();
+            const bobRoom = await bob.createRoom({
+                ...TEST_ROOM
+            });
+            const aSource = new RTCAudioSourceSineWave();
+            const aTrack = aSource.createTrack();
+            const aSender = bobPc.addTrack(aTrack);
+            await bobRoom.join(bobPc);
+            await bobRoom.configureWaitingRoom(false);
+
+            const aliceRoom = await alice.roomAvailable({
+                ...TEST_ROOM,
+                id: bobRoom.id()
+            });
+
+            aliceRoom.on(RoomEvent.MUTE_TRACKS, (e) => {
+                const tracks = e as AddRemoveTracks;
+                expect(tracks.info.info).toBeTruthy();
+                const muteTrack = tracks.info.info[0];
+                expect(muteTrack.mute).toBeTruthy();
+                done();
+            })
+            await aliceRoom.join(alicePc);
+
+            await bobRoom.muteTrack(aTrack.id, true);
+        })
     })
     describe("hold", () => {
         it("Should hold participant if room doesn't allow to join at any time", async (done) => {
@@ -767,7 +793,7 @@ describe("notifications", () => {
         });
         await bobRoom.join(bobPc);
         await bobRoom.configureWaitingRoom(false);
-        
+
         const aliceRoom = await alice.roomAvailable({
             ...TEST_ROOM,
             id: bobRoom.id()
@@ -785,7 +811,7 @@ describe("notifications", () => {
         });
         await bobRoom.join(bobPc);
         await bobRoom.configureWaitingRoom(false);
-        
+
         const aliceRoom = await alice.roomAvailable({
             ...TEST_ROOM,
             id: bobRoom.id()

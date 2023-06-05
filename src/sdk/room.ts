@@ -504,7 +504,8 @@ export class Room {
             self.connection.send(InternalApi.MUTE_TRACK, {
                 roomId: self._id,
                 id: trackId,
-                mute: mute
+                mute: mute,
+                internalMessageId: id
             });
         });
     };
