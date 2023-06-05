@@ -251,9 +251,9 @@ describe("chat", () => {
             expect(center.length).toEqual(3);
             center.sort((a, b) => a.date - b.date);
 
-            expect(center[0].id).toEqual(allMessages[1].id);
-            expect(center[1].id).toEqual(allMessages[2].id);
-            expect(center[2].id).toEqual(allMessages[3].id);
+            expect(center[0].id).toEqual(allMessages[2].id);
+            expect(center[1].id).toEqual(allMessages[3].id);
+            expect(center[2].id).toEqual(allMessages[4].id);
             await bob.deleteChat(chat);
         });
         it("Should perform chat search", async () => {
