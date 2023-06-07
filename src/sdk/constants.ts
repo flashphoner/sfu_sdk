@@ -39,7 +39,10 @@ export enum SfuEvent {
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
     LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT",
-    LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT"
+    LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
+    BOOKMARK_DELETED = "BOOKMARK_DELETED",
+    BOOKMARK_EDITED = "BOOKMARK_EDITED",
+    CHAT_WITH_BOOKMARKS_DELETED = "CHAT_WITH_BOOKMARKS_DELETED"
 }
 
 export enum RoomEvent {
@@ -338,6 +341,10 @@ export enum ChatError {
     CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
     CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed",
     CAN_NOT_ADD_DELETED_MESSAGE_TO_BOOKMARKS = "Can't add deleted message to bookmarks"
+}
+
+export enum ChatSectionsError {
+    PAGE_NOT_FOUND = "Page not found"
 }
 
 export enum RoomError {
@@ -924,6 +931,20 @@ export type MessageDeleted = InternalMessage & {
     state: MessageState
 }
 
+export type BookmarkDeleted = InternalMessage & {
+    chatId: string,
+    id: string
+}
+
+export type ChatWithBookmarksDeleted = InternalMessage & {
+    chatId: string,
+    deletedBookmarksCount: number
+}
+
+export type BookmarkEdited = InternalMessage & {
+    bookmark: MessageInfo;
+}
+
 export type SignUpStatus = InternalMessage & {
     id: UserId,
     nickname: UserNickname,
@@ -973,7 +994,7 @@ export type MessageInfo = {
     body: string;
     attachments: Array<MessageAttachment>;
     privateMessage: boolean;
-    isEdited: boolean;
+    edited: boolean;
     dateOfEdit: number;
     bookmarked: boolean;
 }

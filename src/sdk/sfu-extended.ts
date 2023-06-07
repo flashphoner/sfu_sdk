@@ -66,7 +66,9 @@ import {
     MessageAttachmentMediaType,
     SortOrder,
     LoadBookmarkedMessagesResult,
-    LoadMessagesWithMentionsResult
+    LoadMessagesWithMentionsResult,
+    BookmarkDeleted,
+    ChatWithBookmarksDeleted, BookmarkEdited
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -434,6 +436,21 @@ export class SfuExtended {
                             const result = data[0] as LoadMessagesWithMentionsResult;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.LOAD_MESSAGES_WITH_MENTIONS_RESULT, result);
+                            }
+                        } else if (data[0].type === SfuEvent.BOOKMARK_DELETED) {
+                            const event = data[0] as BookmarkDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.BOOKMARK_DELETED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.BOOKMARK_EDITED) {
+                            const bookmarkEdited = data[0] as BookmarkEdited;
+                            if (!promises.resolve(data[0].internalMessageId, bookmarkEdited)) {
+                                this.#notifier.notify(SfuEvent.BOOKMARK_EDITED, bookmarkEdited);
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_WITH_BOOKMARKS_DELETED) {
+                            const event = data[0] as ChatWithBookmarksDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, event);
                             }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
@@ -1266,6 +1283,10 @@ export class SfuExtended {
             end: number,
             limit?: number
         },
+        pageRequest?: {
+            page: number,
+            pageSize: number
+        }
         boundaries?: {
             dateMark: number,
             lowerLimit: number,
@@ -1279,6 +1300,7 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.LOAD_BOOKMARKED_MESSAGES, {
                 chatId: params.chatId,
                 timeFrame: params.timeFrame,
+                pageRequest: params.pageRequest,
                 boundaries: params.boundaries,
                 sortOrder: params.sortOrder,
             }, resolve, reject);

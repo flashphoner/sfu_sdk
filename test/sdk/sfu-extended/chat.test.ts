@@ -35,7 +35,11 @@ import {
     MessageStatusBulkEvent,
     SfuEvent,
     SortOrder,
-    UserSpecificChatInfo
+    UserSpecificChatInfo,
+    BookmarkDeleted,
+    ChatWithBookmarksDeleted,
+    BookmarkEdited,
+    ChatSectionsError
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -576,6 +580,7 @@ describe("chat", () => {
                 body: '',
                 attachmentIdsToDelete: [attachmentId]
             })).rejects.toHaveProperty("error", ChatError.EDIT_MESSAGE_ERROR_MESSAGE_CAN_NOT_BE_WITHOUT_CONTENT);
+            await bob.deleteChat({id: chat.id});
         });
         it("Should delete and add a new attachment when editing", async () => {
             const editedBody = "edited message body";
@@ -789,6 +794,69 @@ describe("chat", () => {
             expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[1].id);
             expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[2].id);
 
+            await bob.deleteChat(chat);
+        });
+        it("Should load bookmarked messages based on pageRequest", async () => {
+            const chats = await bob.getUserChats();
+            Object.keys(chats).map(async (id) => {
+                await bob.deleteChat({id: id});
+            });
+            const chat = await bob.createChat({});
+
+            for (let i = 0; i < 5; i++) {
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY + i
+                });
+                await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+            }
+
+            const allBookmarkedMessages = await bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                timeFrame: {
+                    start: 0,
+                    end: -1
+                },
+                sortOrder: SortOrder.ASC
+            });
+
+            const bookmarkedMessagesBasedOnPageRequest = await bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                pageRequest: {
+                    page: 2,
+                    pageSize: 2
+                },
+                sortOrder: SortOrder.ASC
+            });
+
+            expect(allBookmarkedMessages.messages.length).toBe(5);
+            expect(allBookmarkedMessages.totalSize).toBe(5);
+            expect(bookmarkedMessagesBasedOnPageRequest.messages.length).toBe(2);
+            expect(bookmarkedMessagesBasedOnPageRequest.totalSize).toBe(5);
+            expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnPageRequest.messages[0].id);
+            expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnPageRequest.messages[1].id);
+
+            await bob.deleteChat(chat);
+        });
+        it('should reject loading bookmarked messages with incorrect page', async () => {
+            const chat = await bob.createChat({});
+
+            for (let i = 0; i < 3; i++) {
+                const status = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY + i
+                });
+                await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
+            }
+
+            await expect(bob.loadBookmarkedMessages({
+                chatId: chat.id,
+                pageRequest: {
+                    page: 2,
+                    pageSize: 5
+                },
+                sortOrder: SortOrder.ASC
+            })).rejects.toHaveProperty("error", ChatSectionsError.PAGE_NOT_FOUND);
             await bob.deleteChat(chat);
         });
         it("Should load messages that few users saved as bookmarks", async () => {
@@ -1761,6 +1829,155 @@ describe("chat", () => {
                 expect(deletedMessage).toBeTruthy();
                 await deletePromise;
 
+                await bob.deleteChat({id: chat.id});
+            });
+            it('should receive event about deleting bookmark', async () => {
+                const chat = await bob.createChat({type: ChatType.PUBLIC, channel: false});
+                const message = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                await bob.addMessageToBookmarks({
+                    chatId: chat.id,
+                    messageId: message.id
+                });
+                const waitEventPromise = async (): Promise<void> => {
+                    return new Promise((resolve) => {
+                        bob.on(SfuEvent.BOOKMARK_DELETED, async (msg) => {
+                            const event = msg as BookmarkDeleted;
+                            if (event.chatId === chat.id && event.id === message.id) {
+                                resolve();
+                            }
+                        })
+                    })
+                }
+                bob.removeMessageFromBookmarks({
+                    chatId: chat.id,
+                    messageId: message.id
+                });
+                await waitEventPromise();
+                await bob.deleteChat({id: chat.id});
+            });
+            it('should receive event about deleting bookmark when second user is deleting message', async () => {
+                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
+                const message = await alice.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                await bob.addMessageToBookmarks({
+                    chatId: chat.id,
+                    messageId: message.id
+                });
+                const waitEventPromise = async (): Promise<void> => {
+                    return new Promise((resolve) => {
+                        bob.on(SfuEvent.BOOKMARK_DELETED, async (msg) => {
+                            const event = msg as BookmarkDeleted;
+                            if (event.chatId === chat.id && event.id === message.id) {
+                                resolve();
+                            }
+                        })
+                    })
+                }
+                alice.deleteChatMessage({
+                    chatId: chat.id,
+                    messageId: message.id
+                });
+                await waitEventPromise();
+                await bob.deleteChat({id: chat.id});
+            });
+            it('should receive event about deleting chat with bookmarks when second user is deleting chat', async () => {
+                const chat = await alice.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
+                for (let i = 0; i < 3; i++) {
+                    const message = await alice.sendMessage({
+                        chatId: chat.id,
+                        body: MESSAGE_BODY
+                    });
+                    await bob.addMessageToBookmarks({
+                        chatId: chat.id,
+                        messageId: message.id
+                    });
+                }
+                const waitEventPromise = async (): Promise<void> => {
+                    return new Promise((resolve) => {
+                        bob.on(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, async (msg) => {
+                            const event = msg as ChatWithBookmarksDeleted;
+                            if (event.chatId === chat.id && event.deletedBookmarksCount === 3) {
+                                resolve();
+                            }
+                        })
+                    })
+                }
+                alice.deleteChat({id: chat.id});
+                await waitEventPromise();
+            });
+            it('should receive event about deleting chat with bookmarks when second user is removing first from chat', async () => {
+                const chat = await alice.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
+                for (let i = 0; i < 3; i++) {
+                    const message = await alice.sendMessage({
+                        chatId: chat.id,
+                        body: MESSAGE_BODY
+                    });
+                    await bob.addMessageToBookmarks({
+                        chatId: chat.id,
+                        messageId: message.id
+                    });
+                }
+                const waitEventPromise = async (): Promise<void> => {
+                    return new Promise((resolve) => {
+                        bob.on(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, async (msg) => {
+                            const event = msg as ChatWithBookmarksDeleted;
+                            if (event.chatId === chat.id && event.deletedBookmarksCount === 3) {
+                                resolve();
+                            }
+                        })
+                    })
+                }
+                alice.removeMemberFromChat({
+                    id: chat.id,
+                    member: TEST_USER_0.username
+                })
+                await waitEventPromise();
+                await alice.deleteChat({id: chat.id});
+            });
+            it('should receive event about editing bookmark when second user is editing message', async () => {
+                const editedBody = "EDITED BODY";
+                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
+                const message = await alice.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                    attachments: [
+                        TEST_PICTURE_ATTACHMENT
+                    ]
+                });
+
+                const attachmentsData = [];
+                attachmentsData.push({
+                    id: message.attachments[0].id,
+                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
+                })
+                const handler = alice.getSendingAttachmentsHandler(attachmentsData, message.id);
+                await handler.sendAttachments();
+
+                await bob.addMessageToBookmarks({
+                    chatId: chat.id,
+                    messageId: message.id
+                });
+
+                const waitEventPromise = async (): Promise<void> => {
+                    return new Promise((resolve) => {
+                        bob.on(SfuEvent.BOOKMARK_EDITED, async (msg) => {
+                            const event = msg as BookmarkEdited;
+                            if (event.bookmark.chatId === chat.id && event.bookmark.body === editedBody && event.bookmark.attachments.length === 0) {
+                                resolve();
+                            }
+                        })
+                    })
+                }
+
+                const attachmentId = message.attachments[0].id;
+                alice.editChatMessage({chatId: chat.id, messageId: message.id, body: editedBody, attachmentIdsToDelete: [attachmentId]});
+
+                await waitEventPromise();
                 await bob.deleteChat({id: chat.id});
             });
         });
