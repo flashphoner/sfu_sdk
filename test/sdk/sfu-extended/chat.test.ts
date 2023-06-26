@@ -1407,11 +1407,13 @@ describe("chat", () => {
                 expect(searchResult.attachmentsInfo.length).toBe(2);
                 expect(searchResult.attachmentsInfo[0].id).toEqual(0);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(status.date);
                 expect(searchResult.attachmentsInfo[1].id).toEqual(1);
                 expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PDF_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[1].type).toEqual(TEST_PDF_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[1].size).toEqual(TEST_PDF_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[1].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[1].date).toEqual(status.date);
@@ -1468,12 +1470,14 @@ describe("chat", () => {
                 expect(searchResult.attachmentsInfo[0].chatId).toEqual(secondChat.id);
                 expect(searchResult.attachmentsInfo[0].id).toEqual(1);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PDF_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PDF_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PDF_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(secondStatus.date);
                 expect(searchResult.attachmentsInfo[1].chatId).toEqual(firstChat.id);
                 expect(searchResult.attachmentsInfo[1].id).toEqual(0);
                 expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[1].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[1].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[1].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[1].date).toEqual(firstStatus.date);
@@ -1527,6 +1531,7 @@ describe("chat", () => {
                 expect(searchResult.attachmentsInfo[0].chatId).toEqual(firstChat.id);
                 expect(searchResult.attachmentsInfo[0].id).toEqual(0);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(firstStatus.date);
@@ -1610,6 +1615,7 @@ describe("chat", () => {
                 expect(searchResult.attachmentsInfo.length).toBe(1);
                 expect(searchResult.attachmentsInfo[0].id).toEqual(0);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
+                expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].mediaType).toEqual(MessageAttachmentMediaType.media);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
@@ -1633,8 +1639,10 @@ describe("chat", () => {
                 const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
                 const messageStatus = await handler.sendAttachments();
                 expect(messageStatus.attachments[0].name).toEqual(PICTURE_FILE_NAME);
+                expect(messageStatus.attachments[0].type).toEqual(ATTACHMENTS[0].type);
                 expect(messageStatus.attachments[0].mediaType).toEqual(MessageAttachmentMediaType.media);
                 expect(messageStatus.attachments[1].name).toEqual(PDF_FILE_NAME);
+                expect(messageStatus.attachments[1].type).toEqual(ATTACHMENTS[1].type);
                 expect(messageStatus.attachments[1].mediaType).toEqual(MessageAttachmentMediaType.other);
 
                 await bob.deleteChat(chat);
