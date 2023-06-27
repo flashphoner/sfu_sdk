@@ -68,7 +68,9 @@ import {
     LoadBookmarkedMessagesResult,
     LoadMessagesWithMentionsResult,
     BookmarkDeleted,
-    ChatWithBookmarksDeleted, BookmarkEdited
+    ChatWithBookmarksDeleted,
+    BookmarkEdited,
+    FirstAndLastChatMessage
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -421,6 +423,11 @@ export class SfuExtended {
                             const messagesCount = data[0] as ChatMessagesCount;
                             if (!promises.resolve(data[0].internalMessageId, messagesCount)) {
                                 this.#notifier.notify(SfuEvent.CHAT_MESSAGES_COUNT, messagesCount);
+                            }
+                        } else if (data[0].type === SfuEvent.FIRST_AND_LAST_CHAT_MESSAGE) {
+                            const info = data[0] as FirstAndLastChatMessage;
+                            if (!promises.resolve(data[0].internalMessageId, info)) {
+                                this.#notifier.notify(SfuEvent.FIRST_AND_LAST_CHAT_MESSAGE, info);
                             }
                         } else if (data[0].type === SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT) {
                             const result = data[0] as MessageAttachmentsSearchResult;
@@ -1237,6 +1244,18 @@ export class SfuExtended {
         const self = this;
         return new Promise<ChatMessagesCount>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_CHAT_MESSAGES_COUNT, {
+                chatId: chat.id
+            }, resolve, reject);
+        });
+    }
+
+    public getFirstAndLastMessage(chat: {
+        id: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<FirstAndLastChatMessage>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_CHAT_MESSAGE, {
                 chatId: chat.id
             }, resolve, reject);
         });

@@ -661,6 +661,21 @@ describe("chat", () => {
 
             await bob.deleteChat({id: chat.id});
         });
+        it('should send few messages and get first and last message', async () => {
+            let chat = await bob.createChat({});
+            const firstMessage = await bob.sendMessage({body: MESSAGE_BODY + "1", chatId: chat.id});
+            const secondMessage = await bob.sendMessage({body: MESSAGE_BODY + "2", chatId: chat.id});
+            const thirdMessage = await bob.sendMessage({body: MESSAGE_BODY + "3", chatId: chat.id});
+            const messagesCount = await bob.getChatMessagesCount({id: chat.id});
+            expect(messagesCount.messagesCount).toBe(3);
+            const result = await bob.getFirstAndLastMessage({id: chat.id});
+            expect(result.firstMessageId).toBe(firstMessage.id);
+            expect(result.firstMessageDate).toBe(firstMessage.date);
+            expect(result.lastMessageId).toBe(thirdMessage.id);
+            expect(result.lastMessageDate).toBe(thirdMessage.date);
+
+            await bob.deleteChat({id: chat.id});
+        });
         it("Should add message to bookmarks", async () => {
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({

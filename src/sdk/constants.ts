@@ -37,6 +37,7 @@ export enum SfuEvent {
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
+    FIRST_AND_LAST_CHAT_MESSAGE = "FIRST_AND_LAST_CHAT_MESSAGE",
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
     LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT",
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
@@ -266,6 +267,7 @@ export enum InternalApi {
     LOAD_CHAT_MESSAGES = "loadChatMessages",
     SEARCH_CHAT_MESSAGES = "searchChatMessages",
     GET_CHAT_MESSAGES_COUNT = "getChatMessagesCount",
+    GET_FIRST_AND_LAST_CHAT_MESSAGE = "getFirstAndLastChatMessage",
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
     RENAME_CHAT = "renameChat",
@@ -959,6 +961,14 @@ export type ResetPasswordRequestStatus = InternalMessage & {
 export type ChatMessagesCount = InternalMessage & {
     chatId: string,
     messagesCount: number
+}
+
+export type FirstAndLastChatMessage = InternalMessage & {
+    chatId: string,
+    firstMessageId: string,
+    firstMessageDate: number,
+    lastMessageId: string,
+    lastMessageDate: number
 }
 
 export enum MessageAttachmentMediaType {
