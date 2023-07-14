@@ -43,7 +43,7 @@ import {
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
-import {waitForUsers} from "../../util/utils";
+import {connect, waitForUsers} from "../../util/utils";
 
 const MESSAGE_BODY = "test message";
 
@@ -2002,6 +2002,110 @@ describe("chat", () => {
 
                 await waitEventPromise();
                 await bob.deleteChat({id: chat.id});
+            });
+        });
+        describe("multiple-clients", () => {
+            it('should create chat and two clients should receive event', async () => {
+                const aliceSecondClient = await connect(TEST_USER_1);
+
+                const waitNewChatEventOnTwoInstance = (): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        let eventsCount = 0;
+                        alice.on(SfuEvent.NEW_CHAT, (msg) => {
+                            eventsCount++;
+                            if (eventsCount === 2) {
+                                resolve();
+                            }
+                        });
+                        aliceSecondClient.on(SfuEvent.NEW_CHAT, (msg) => {
+                            eventsCount++;
+                            if (eventsCount === 2) {
+                                resolve();
+                            }
+                        });
+                    })
+                }
+
+                bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
+
+                await waitNewChatEventOnTwoInstance();
+
+                const chats = await bob.getUserChats();
+                await aliceSecondClient.disconnect();
+                Object.keys(chats).forEach((chat) => {
+                    bob.deleteChat({id: chat});
+                });
+            });
+            it('should create chat and second user client should receive event', async () => {
+                const bobSecondClient = await connect(TEST_USER_0);
+
+                const waitNewChatEventOnSecondClientInstance = (): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        bobSecondClient.on(SfuEvent.NEW_CHAT, (msg) => {
+                            resolve();
+                        });
+                    })
+                }
+
+                bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
+
+                await waitNewChatEventOnSecondClientInstance();
+
+                const chats = await bob.getUserChats();
+                Object.keys(chats).forEach((chat) => {
+                    bob.deleteChat({id: chat});
+                });
+                await bobSecondClient.disconnect();
+            });
+            it('should send message and two clients should receive message', async () => {
+                const aliceSecondClient = await connect(TEST_USER_1);
+
+                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
+
+                const onNewMessageHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
+                    sfu.on(SfuEvent.MESSAGE, (msg) => {
+                        eventsCount.num++;
+                        if (eventsCount.num === 2) {
+                            resolve();
+                        }
+                    });
+                }
+                const waitMessagesOnTwoInstance = (): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        let eventsCount = { num: 0 };
+                        onNewMessageHandler(alice, resolve, eventsCount);
+                        onNewMessageHandler(aliceSecondClient, resolve, eventsCount);
+                    })
+                }
+
+                bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                });
+                await waitMessagesOnTwoInstance();
+                await aliceSecondClient.disconnect();
+                await bob.deleteChat(chat);
+            });
+            it('should send message and second client should receive sync event', async () => {
+                const bobSecondClient = await connect(TEST_USER_0);
+
+                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
+
+                const waitSyncEvent = (): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        bobSecondClient.on(SfuEvent.SEND_MESSAGE_SYNC, (msg) => {
+                            resolve();
+                        })
+                    })
+                }
+
+                bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY,
+                });
+                await waitSyncEvent();
+                await bob.deleteChat(chat);
+                await bobSecondClient.disconnect();
             });
         });
     });

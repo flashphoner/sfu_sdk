@@ -704,9 +704,6 @@ describe("notifications", () => {
             });
             await expect(aliceRoom.join(alicePc, TEST_USER_0.nickname)).rejects.toHaveProperty("error", RoomError.NICKNAME_UNAVAILABLE);
         });
-        it('Should fail if user try to connect second time when he already connected', async () => {
-            await expect(connect(TEST_USER_0)).rejects.toBeTruthy();
-        });
         it("Should reject renaming participant if nickname is already taken", async (done) => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();

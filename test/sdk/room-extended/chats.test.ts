@@ -3,7 +3,6 @@ import {RoomEvent, SfuEvent, SfuExtended} from "../../../src";
 import {
     ChatReceivePolicy,
     InternalMessage,
-    LeftRoom,
     Message,
     UserSpecificChatInfo,
     WaitingListEvent
@@ -67,7 +66,7 @@ describe("chats", () => {
         await bobRoom.join(bobPc);
         await bobRoom.leaveRoom();
     })
-    it("Should remove participant from chat on exit from room", async (done) => {
+    it("Should remove participant from chat on exit from room", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
         const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
@@ -81,36 +80,41 @@ describe("chats", () => {
 
         await bobRoom.configureWaitingRoom(false);
 
-        const onJoinHandler = async (msg) => {
-            bobRoom.off(RoomEvent.JOINED, onJoinHandler);
-            const chats = await bob.getUserChats();
-            const meetingChat = chats[roomChatId];
-            expect(meetingChat.members.length).toBe(2);
-            await aliceRoom.leaveRoom();
+
+        const waitUpdateChatEventAfterJoin = async (): Promise<void> => {
+            return new Promise<void>((resolve) => {
+                const handler = (msg) => {
+                    bob.off(SfuEvent.CHAT_UPDATED, handler);
+                    const chat = msg as UserSpecificChatInfo;
+                    expect(chat.members.length).toBe(2);
+                    aliceRoom.leaveRoom();
+                    resolve();
+                }
+                bob.on(SfuEvent.CHAT_UPDATED, handler);
+            });
         }
 
-        const onLeftHandler = async (participant: LeftRoom) => {
-            if (participant.name === TEST_USER_1.nickname) {
-                bobRoom.off(RoomEvent.LEFT, onLeftHandler);
-                const chats = await bob.getUserChats();
-                const meetingChat = chats[roomChatId];
-                expect(meetingChat.members.length).toBe(1);
-                const room = bob.getRoom({id: meetingChat.id});
-                await room.destroyRoom();
-                done();
-            }
+        const waitUpdatedEventAfterLeave = async (): Promise<void> => {
+            return new Promise<void>((resolve) => {
+                const handler = async (msg) => {
+                    const chat = msg as UserSpecificChatInfo;
+                    expect(chat.members.length).toBe(1);
+                    const room = bob.getRoom({id: chat.id});
+                    await room.destroyRoom();
+                    resolve();
+                }
+                bob.on(SfuEvent.CHAT_UPDATED, handler);
+            })
         }
-
-        bobRoom
-            .on(RoomEvent.JOINED, onJoinHandler)
-            .on(RoomEvent.LEFT, onLeftHandler);
 
         const aliceRoom = await alice.roomAvailable({
             id: bobRoom.id(),
             pin: TEST_ROOM.pin
         });
-        await aliceRoom.join(alicePc);
-        await waitForPeerConnectionStableState(alicePc);
+        aliceRoom.join(alicePc);
+
+        await waitUpdateChatEventAfterJoin();
+        await waitUpdatedEventAfterLeave();
     });
     it("Should remove participant from chat on moving to waiting room", async (done) => {
         const bobPc = new wrtc.RTCPeerConnection();

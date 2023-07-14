@@ -30,8 +30,7 @@ export enum SfuEvent {
     SFU_USER_PMI_SETTINGS = "SFU_USER_PMI_SETTINGS",
     UPDATE_USER_PMI_SETTINGS = "UPDATE_USER_PMI_SETTINGS",
     USER_INFO = "USER_INFO",
-    USER_EMAIL_CHANGED = "USER_EMAIL_CHANGED",
-    USER_NICKNAME_CHANGED = "USER_NICKNAME_CHANGED",
+    USER_INFO_CHANGED = "USER_INFO_CHANGED",
     CHAT_MESSAGE_EDITED = "CHAT_MESSAGE_EDITED",
     CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
@@ -43,7 +42,8 @@ export enum SfuEvent {
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
     BOOKMARK_DELETED = "BOOKMARK_DELETED",
     BOOKMARK_EDITED = "BOOKMARK_EDITED",
-    CHAT_WITH_BOOKMARKS_DELETED = "CHAT_WITH_BOOKMARKS_DELETED"
+    CHAT_WITH_BOOKMARKS_DELETED = "CHAT_WITH_BOOKMARKS_DELETED",
+    SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC"
 }
 
 export enum RoomEvent {
@@ -912,14 +912,29 @@ export type UserInfoEvent = InternalMessage & {
     userInfo: UserInfo
 }
 
-export type UserEmailChangedEvent = InternalMessage & {
+export type UserInfoChangedEvent = InternalMessage & {
     userId: UserId,
-    email: UserEmail
+    info: UserInfo
 }
 
 export type UserNicknameChangedEvent = InternalMessage & {
     userId: UserId,
     nickname: UserNickname
+}
+
+export type UserHostKeyChangedEvent = InternalMessage & {
+    userId: UserId,
+    hostKey: UserHostKey
+}
+
+export type UserPhoneNumberChangedEvent = InternalMessage & {
+    userId: UserId,
+    phoneNumber: UserPhoneNumber
+}
+
+export type UserTimezoneChangedEvent = InternalMessage & {
+    userId: UserId,
+    timezone: UserTimezone
 }
 
 export type MessageEdited = InternalMessage & {

@@ -49,8 +49,6 @@ import {
     ChatReceivePolicy,
     ChatSearchResultEvent,
     MessageStatusBulkEvent,
-    UserEmailChangedEvent,
-    UserNicknameChangedEvent,
     UserInfo,
     UserInfoEvent,
     MessageEdited,
@@ -70,7 +68,8 @@ import {
     BookmarkDeleted,
     ChatWithBookmarksDeleted,
     BookmarkEdited,
-    FirstAndLastChatMessage
+    FirstAndLastChatMessage,
+    UserInfoChangedEvent
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -399,15 +398,14 @@ export class SfuExtended {
                             const event = data[0] as UserInfoEvent;
                             promises.resolve(event.internalMessageId, event.userInfo)
                             this.#notifier.notify(SfuEvent.USER_INFO, event.userInfo);
-                        } else if (data[0].type === SfuEvent.USER_EMAIL_CHANGED) {
-                            const event = data[0] as UserEmailChangedEvent;
-                            if (promises.resolve(event.internalMessageId)) {
-                                this.#_user.email = event.email;
+                        } else if (data[0].type === SfuEvent.USER_INFO_CHANGED) {
+                            const event = data[0] as UserInfoChangedEvent;
+                            if (this.#_user.username === event.userId) {
+                                this.#_user.email = event.info.email;
+                                this.#_user.nickname = event.info.nickname;
                             }
-                        } else if (data[0].type === SfuEvent.USER_NICKNAME_CHANGED) {
-                            const event = data[0] as UserNicknameChangedEvent;
-                            if (promises.resolve(event.internalMessageId)) {
-                                this.#_user.nickname = event.nickname;
+                            if (!promises.resolve(event.internalMessageId)) {
+                                this.#notifier.notify(SfuEvent.USER_INFO_CHANGED, event);
                             }
                         } else if (data[0].type === SfuEvent.CHAT_MESSAGE_EDITED) {
                             const message = data[0] as MessageEdited;
@@ -459,6 +457,9 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, event);
                             }
+                        } else if (data[0].type === SfuEvent.SEND_MESSAGE_SYNC) {
+                            const message = (data[0] as SfuMessageEvent).message;
+                            this.#notifier.notify(SfuEvent.SEND_MESSAGE_SYNC, message);
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
