@@ -647,7 +647,7 @@ export type MessageStatus = {
 export type AttachmentStatus = {
     chatId: string;
     messageId: string;
-    id: number;
+    id: string;
     name: string;
     state: AttachmentState;
     uploadedSize?: number;
@@ -664,20 +664,19 @@ export type MessageAttachment = {
     mediaType?: MessageAttachmentMediaType;
     name: string;
     size: number;
-    id: number;
+    id: string;
 }
 
 export type MessageAttachmentData = {
     payload: ArrayBuffer;
-    id: number;
+    id: string;
 }
 
 export type AttachmentRequest = {
     chatId: string;
     messageId: string;
-    attachmentId: number;
+    attachmentId: string;
     name: string;
-    tmpId?: number;
 }
 
 export type Attachment = AttachmentRequest & {
@@ -994,7 +993,7 @@ export enum MessageAttachmentMediaType {
 export type AttachmentInfo = {
     chatId: string;
     messageId: string;
-    id: number;
+    id: string;
     name: string;
     type: MessageAttachmentType,
     mediaType: MessageAttachmentMediaType;
@@ -1070,6 +1069,8 @@ export const WS_PING_INTERVAL_MS = 5000;
 
 // Set missing pings threshold as a half of WCS default setting
 export const WS_PINGS_MISSING_THRESHOLD = 5;
+
+export const ATTACHMENT_ID_LENGTH = 36;
 
 export enum StatsType {
     INBOUND = "inbound-rtp",

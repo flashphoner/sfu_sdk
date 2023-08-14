@@ -3,8 +3,13 @@ import promises from "./promises";
 import {Connection} from "./connection";
 import {
     ATTACHMENT_CHUNK_SIZE,
-    Calendar, CalendarEvent, CalendarEventEvent,
-    AttachmentRequest, AttachmentRequestAck, Attachment,
+    ATTACHMENT_ID_LENGTH,
+    Calendar,
+    CalendarEvent,
+    CalendarEventEvent,
+    AttachmentRequest,
+    AttachmentRequestAck,
+    Attachment,
     ChannelSendPolicy,
     ChatType,
     Chat,
@@ -472,18 +477,19 @@ export class SfuExtended {
             (name: string, data: ArrayBuffer) => {
                 switch (name) {
                     case InternalApi.BINARY_DATA:
+                        const headerSize = 38;
                         const buffer = new Uint8Array(data);
-                        const id = buffer[1];
-                        const eof = buffer[2];
-                        const attachment = this.#attachmentState.find(attachment => attachment.tmpId === id);
+                        const id = SfuExtended.fromUTF8ArrayToStr(buffer.slice(1, ATTACHMENT_ID_LENGTH + 1));
+                        const eof = buffer[headerSize - 1];
+                        const attachment = this.#attachmentState.find((attachment) => attachment.attachmentId === id);
                         if (attachment) {
                             if (!attachment.payload) {
-                                attachment.payload = data.slice(3, data.byteLength);
+                                attachment.payload = data.slice(headerSize, data.byteLength);
                             } else {
                                 //ToDo (igor): optimize ArrayBuffer merging
-                                const newData = new Uint8Array(attachment.payload.byteLength + (data.byteLength - 3));
+                                const newData = new Uint8Array(attachment.payload.byteLength + (data.byteLength - headerSize));
                                 newData.set(new Uint8Array(attachment.payload), 0);
-                                newData.set(new Uint8Array(data.slice(3, data.byteLength)), attachment.payload.byteLength);
+                                newData.set(new Uint8Array(data.slice(headerSize, data.byteLength)), attachment.payload.byteLength);
                                 attachment.payload = newData.buffer;
                             }
                             if (eof === 1) {
@@ -802,6 +808,15 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * This method is recommended for using to generate attachment id before sending.
+     * Sending and downloading attachments may not work with other generating options.
+     * @return string of 36 ASCII characters
+     **/
+    public static generateAttachmentId(): string {
+        return uuidv4();
+    }
+
     public getSendingAttachmentsHandler(attachments: Array<MessageAttachmentData>, messageId: string) {
         const self = this;
         const cancelledAttachments: {[key: number]: {status: AttachmentStatus}} = {};
@@ -818,24 +833,28 @@ export class SfuExtended {
             })
         }
 
-        function cancelSendAttachment(attachmentId: number) {
+        function cancelSendAttachment(attachmentId: string) {
             return new Promise<AttachmentStatus>(function (resolve, reject) {
                 self.#emmitAction(InternalApi.CANCEL_SENDING_ATTACHMENT, {
                     id: attachmentId}, resolve, reject);
             })
         }
 
-        function sendAttachmentChunk(data: Blob, id: number, end: number, index: number) {
+        function sendAttachmentChunk(data: Blob, id: string, end: number, index: number) {
             return new Promise<AttachmentStatus>(function (resolve, reject) {
                 promises.add(id.toString(), resolve, reject);
                 /**
-                 * 3-bytes header:
-                 * 1st byte - command (10 - sendMessageAttachment)
-                 * 2nd byte - attachment id
-                 * 3rd byte - end of attachment
+                 * 38-bytes header:
+                 * 1st byte - command (10 - uploadAttachment)
+                 * 2nd-37th bytes - attachment id
+                 * 38th byte - end of file (0 - false, 1 - true)
                  * @type {Uint8Array}
                  */
-                const header = new Uint8Array([10, id, end]);
+
+                const header = new Uint8Array(38);
+                header[0] = 10;
+                header.set(SfuExtended.strToUTF8Array(id), 1);
+                header[37] = end;
                 const start = index * self.#binaryChunkSize;
                 const chunk = new Blob([header, data.slice(start, start + self.#binaryChunkSize)]);
                 self.#emmitBinaryAction(chunk);
@@ -1409,7 +1428,7 @@ export class SfuExtended {
         messageId: string,
         body: string,
         attachmentsToSend?: Array<MessageAttachment>,
-        attachmentIdsToDelete?: number[]
+        attachmentIdsToDelete?: string[]
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1754,6 +1773,52 @@ export class SfuExtended {
         this.#notifier.remove(event, callback);
         return this;
     };
+
+    public static strToUTF8Array(str: string): Array<number> {
+        let utf8Arr: Array<number> = [];
+        for (let i = 0; i < str.length; i++) {
+            let charCode = str.charCodeAt(i);
+            if (charCode < 0x80) utf8Arr.push(charCode);
+            else if (charCode < 0x800) {
+                utf8Arr.push(0xc0 | (charCode >> 6),
+                    0x80 | (charCode & 0x3f));
+            } else if (charCode < 0xd800 || charCode >= 0xe000) {
+                utf8Arr.push(0xe0 | (charCode >> 12),
+                    0x80 | ((charCode >> 6) & 0x3f),
+                    0x80 | (charCode & 0x3f));
+            } else {
+                i++;
+                charCode = ((charCode & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff)
+                utf8Arr.push(0xf0 | (charCode >> 18),
+                    0x80 | ((charCode >> 12) & 0x3f),
+                    0x80 | ((charCode >> 6) & 0x3f),
+                    0x80 | (charCode & 0x3f));
+            }
+        }
+        return utf8Arr;
+    }
+
+    public static fromUTF8ArrayToStr(data: Uint8Array): string {
+        let str = '';
+        for (let i = 0; i < data.byteLength; i++) {
+            let value = data[i];
+
+            if (value < 0x80) {
+                str += String.fromCharCode(value);
+            } else if (value > 0xBF && value < 0xE0) {
+                str += String.fromCharCode((value & 0x1F) << 6 | data[i + 1] & 0x3F);
+                i += 1;
+            } else if (value > 0xDF && value < 0xF0) {
+                str += String.fromCharCode((value & 0x0F) << 12 | (data[i + 1] & 0x3F) << 6 | data[i + 2] & 0x3F);
+                i += 2;
+            } else {
+                let charCode = ((value & 0x07) << 18 | (data[i + 1] & 0x3F) << 12 | (data[i + 2] & 0x3F) << 6 | data[i + 3] & 0x3F) - 0x010000;
+                str += String.fromCharCode(charCode >> 10 | 0xD800, charCode & 0x03FF | 0xDC00);
+                i += 3;
+            }
+        }
+        return str;
+    }
 
     private closePcAndFireEvent(room: RoomExtended) {
         if (this.#rooms[room.id()].pc()) {

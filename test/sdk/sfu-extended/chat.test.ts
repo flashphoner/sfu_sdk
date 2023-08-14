@@ -301,7 +301,7 @@ describe("chat", () => {
             expect(searchResults.length).toEqual(0);
             await bob.deleteChat(chat);
         });
-        
+
         it("Should reject sending message if user is not chat member", async () => {
             const chat = await bob.createChat({});
             await expect(alice.sendMessage({
@@ -310,7 +310,7 @@ describe("chat", () => {
             })).rejects.toHaveProperty("error", ChatError.USER_MUST_BE_A_CHAT_MEMBER_TO_SEND_MESSAGES);
             await bob.deleteChat(chat);
         });
-        
+
 
 
 
@@ -604,7 +604,7 @@ describe("chat", () => {
                 chatId: chat.id,
                 messageId: message.id,
                 body: editedBody,
-                attachmentIdsToDelete: [0],
+                attachmentIdsToDelete: [TEST_PICTURE_ATTACHMENT.id],
                 attachmentsToSend: [TEST_PDF_ATTACHMENT]
             });
 
@@ -1420,13 +1420,13 @@ describe("chat", () => {
                     sortOrder: SortOrder.ASC
                 });
                 expect(searchResult.attachmentsInfo.length).toBe(2);
-                expect(searchResult.attachmentsInfo[0].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(status.date);
-                expect(searchResult.attachmentsInfo[1].id).toEqual(1);
+                expect(searchResult.attachmentsInfo[1].id).toEqual(TEST_PDF_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PDF_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[1].type).toEqual(TEST_PDF_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[1].size).toEqual(TEST_PDF_ATTACHMENT.size);
@@ -1483,14 +1483,14 @@ describe("chat", () => {
                 });
                 expect(searchResult.attachmentsInfo.length).toBe(2);
                 expect(searchResult.attachmentsInfo[0].chatId).toEqual(secondChat.id);
-                expect(searchResult.attachmentsInfo[0].id).toEqual(1);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PDF_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PDF_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PDF_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PDF_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(secondStatus.date);
                 expect(searchResult.attachmentsInfo[1].chatId).toEqual(firstChat.id);
-                expect(searchResult.attachmentsInfo[1].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[1].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[1].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[1].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
@@ -1544,7 +1544,7 @@ describe("chat", () => {
                 });
                 expect(searchResult.attachmentsInfo.length).toBe(1);
                 expect(searchResult.attachmentsInfo[0].chatId).toEqual(firstChat.id);
-                expect(searchResult.attachmentsInfo[0].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
@@ -1564,7 +1564,7 @@ describe("chat", () => {
 
                     const attachmentData = [];
                     attachmentData.push({
-                        id: 0,
+                        id: status.attachments[0].id,
                         payload: TEST_PICTURE_ATTACHMENT_DATA
                     });
                     const handler = bob.getSendingAttachmentsHandler(attachmentData, status.id);
@@ -1628,7 +1628,7 @@ describe("chat", () => {
                     sortOrder: SortOrder.ASC
                 });
                 expect(searchResult.attachmentsInfo.length).toBe(1);
-                expect(searchResult.attachmentsInfo[0].id).toEqual(0);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].mediaType).toEqual(MessageAttachmentMediaType.media);
@@ -1711,7 +1711,7 @@ describe("chat", () => {
                 let chat0 = await bob.createChat({
                     members: [TEST_USER_1.username]
                 });
-                
+
                 await bob.sendMessage({
                     chatId: chat0.id,
                     body: MESSAGE_BODY
@@ -1748,7 +1748,7 @@ describe("chat", () => {
 
                 alice.on(SfuEvent.MESSAGE, onMessageHandler);
 
-                
+
                 const status = await bob.sendMessage({
                     chatId: chat0.id,
                     body: MESSAGE_BODY,
@@ -1782,7 +1782,7 @@ describe("chat", () => {
                 let chat0 = await bob.createChat({
                     members: [TEST_USER_1.username]
                 });
-                
+
                 await bob.sendMessage({
                     chatId: chat0.id,
                     body: MESSAGE_BODY
@@ -2378,7 +2378,7 @@ describe("chat", () => {
                     ...TEST_PUBLIC_CHANNEL,
                     members: [TEST_USER_1.username]
                 });
-                
+
                 await bob.sendMessage({
                     chatId: channel0.id,
                     body: MESSAGE_BODY

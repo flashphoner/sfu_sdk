@@ -114,21 +114,21 @@ export const TEST_PICTURE_ATTACHMENT = {
     type: MessageAttachmentType.picture,
     name: PICTURE_FILE_NAME,
     size: fs.readFileSync(path.resolve(__dirname, PICTURE_FILE_PATH)).length,
-    id: 0
+    id: "94b8526d-3972-420b-ba42-35ec484a928d"
 }
 
 export const TEST_BIG_PICTURE_ATTACHMENT = {
     type: MessageAttachmentType.picture,
     name: PICTURE_2M_FILE_NAME,
     size: fs.readFileSync(path.resolve(__dirname, PICTURE_2M_FILE_PATH)).length,
-    id: 2
+    id: "fe6269ce-5401-48c7-ac1e-b03c9af19cfe"
 }
 
 export const TEST_PDF_ATTACHMENT = {
     type: MessageAttachmentType.file,
     name: PDF_FILE_NAME,
     size: fs.readFileSync(path.resolve(__dirname, PDF_FILE_PATH)).length,
-    id: 1
+    id: "5c0c1aec-e7dc-41bd-bc29-92f5f21ba612"
 }
 
 export const TEST_PICTURE_ATTACHMENT_DATA = {
