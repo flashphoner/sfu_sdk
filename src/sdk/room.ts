@@ -16,7 +16,12 @@ import {
     RemoteSdpType, RoleAssigned,
     RoomError,
     RoomEvent,
-    RoomState, WaitingRoomUpdate, UserNickname, RemoteSdpInfo, StatsType
+    RoomState,
+    WaitingRoomUpdate,
+    UserId,
+    UserNickname,
+    RemoteSdpInfo,
+    StatsType
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
@@ -35,6 +40,7 @@ export class Room {
     #_pc: RTCPeerConnection;
     _id: string;
     _name: string;
+    _userId: string;
     _pin: string;
     _nickname: string;
     #incomingMessageQueue: {
@@ -51,13 +57,13 @@ export class Room {
     protected stats: WebRTCStats;
 
 
-    public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number) {
+    public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number, userId?: UserId) {
         this.connection = connection;
         this._id = name;
         this._name = name;
         this._nickname = nickname;
         this._pin = pin;
-        this._nickname = nickname;
+        this._userId = userId;
         this.#_creationTime = creationTime;
         this.logger = new Logger();
         this._uid = uuidv4();
@@ -193,7 +199,7 @@ export class Room {
             }
         } else if (e.type === RoomEvent.ROLE_ASSIGNED) {
             const roleAssigned = e as RoleAssigned;
-            if (this._nickname === roleAssigned.name) {
+            if (this._userId === roleAssigned.userId) {
                 this.#_role = roleAssigned.role;
             }
             this.notifier.notify(RoomEvent.ROLE_ASSIGNED, roleAssigned);
@@ -216,12 +222,14 @@ export class Room {
             } else if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.AUTHORIZATION_FAILED) {
                 const evictedEvent: EvictedFromRoom = {
                     ...operationFailed,
+                    userId: this._userId,
                     name: this._nickname
                 }
                 this.notifier.notify(RoomEvent.EVICTED, evictedEvent);
             } else if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.CANCEL_JOIN_ROOM) {
                 const leftRoomEvent: LeftRoom = {
                     ...operationFailed,
+                    userId: this._userId,
                     name: this._nickname
                 }
                 this.notifier.notify(RoomEvent.LEFT, leftRoomEvent);
@@ -231,7 +239,10 @@ export class Room {
         } else if (e.type === RoomEvent.JOINED) {
             const joinedRoom = e as JoinedRoom;
             this.#_state = RoomState.JOINED;
-            if (!promises.resolve(joinedRoom.internalMessageId, joinedRoom)) {
+            if (promises.promised(joinedRoom.internalMessageId)) {
+                this._userId = joinedRoom.userId;
+                promises.resolve(joinedRoom.internalMessageId, joinedRoom);
+            } else {
                 this.notifier.notify(RoomEvent.JOINED, joinedRoom);
             }
         } else if (e.type === RoomEvent.LEFT) {
@@ -240,10 +251,10 @@ export class Room {
             this.notifier.notify(RoomEvent.LEFT, leftRoom);
         } else if (e.type === RoomEvent.PARTICIPANT_RENAMED) {
             const participantRenamed = e as ParticipantRenamed;
-            if (this._nickname === participantRenamed.previousName) {
+            if (this._userId === participantRenamed.userId) {
                 this._nickname = participantRenamed.updatedName;
             }
-            if (!promises.promised(participantRenamed.internalMessageId)) {
+            if (!promises.resolve(participantRenamed.internalMessageId, participantRenamed)) {
                 this.notifier.notify(RoomEvent.PARTICIPANT_RENAMED, participantRenamed);
             }
         } else if (e.type === RoomEvent.ADD_TRACKS) {
@@ -427,27 +438,27 @@ export class Room {
         });
     };
 
-    public evictParticipant(nickname: UserNickname): Promise<void> {
+    public evictParticipant(userId: UserId): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.EVICT_PARTICIPANT, {
                 id: self._id,
-                nickname: nickname,
+                userId: userId,
                 internalMessageId: id
             });
         })
     }
 
-    public renameParticipant(nickname: UserNickname, newNickname: UserNickname): Promise<void> {
+    public renameParticipant(userId: UserId, newNickname: UserNickname): Promise<ParticipantRenamed> {
         const self = this;
-        return new Promise<void>(((resolve, reject) => {
+        return new Promise<ParticipantRenamed>(((resolve, reject) => {
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.RENAME_PARTICIPANT, {
                 roomId: self._id,
-                nickname: nickname,
+                userId: userId,
                 newNickname: newNickname,
                 internalMessageId: id
             });
@@ -526,6 +537,10 @@ export class Room {
 
     public name(): string {
         return this._name;
+    }
+
+    public userId(): string {
+        return this._userId;
     }
 
     public pin(): string {

@@ -155,8 +155,9 @@ describe("room", () => {
             ...TEST_ROOM
         });
         await room.join(bobPc);
+        const userId = room.userId();
         const state = await room.leaveRoom();
-        expect(state.name).toEqual(TEST_USER_0.nickname);
+        expect(state.userId).toEqual(userId);
     });
     it("Should destroy room", async () => {
         const room = await bob.createRoom({
@@ -249,6 +250,6 @@ describe("room", () => {
             ...TEST_ROOM
         });
         await room.join(bobPc);
-        await waitForRoomEvent(RoomEvent.PARTICIPANT_CONFIG, room, (r) => r.config().participantsConfig[TEST_USER_0.nickname] !== undefined, () => {});
+        await waitForRoomEvent(RoomEvent.PARTICIPANT_CONFIG, room, (r) => r.config().participantsConfig[room.userId()] !== undefined, () => {});
     });
 });

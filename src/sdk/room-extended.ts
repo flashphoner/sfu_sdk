@@ -21,8 +21,8 @@ export class RoomExtended extends Room {
     #config: RoomExtendedConfig;
     #owner: string;
     #waitingRoomEnabled: boolean;
-    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction) {
-       super(connection, name, pin, nickname, creationTime);
+    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, userId: UserId, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction) {
+       super(connection, name, pin, nickname, creationTime, userId);
        this._id = id;
        this.#owner = owner;
        if (!config.participantsConfig) {
@@ -60,7 +60,7 @@ export class RoomExtended extends Room {
         });
     };
 
-    public sendControlMessage(msg: string, broadcast: boolean, to?: UserNickname) {
+    public sendControlMessage(msg: string, broadcast: boolean, to?: UserId) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
@@ -90,14 +90,14 @@ export class RoomExtended extends Room {
         });
     };
 
-    public moveToWaitingRoom(nickname: UserNickname) {
+    public moveToWaitingRoom(userId: UserId) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.MOVE_TO_WAITING_ROOM, {
                 roomId: self._id,
-                nickname: nickname,
+                userId: userId,
                 internalMessageId: id
             });
         });
@@ -116,14 +116,14 @@ export class RoomExtended extends Room {
         });
     };
 
-    public assignRole(nickname: UserNickname, role: ParticipantRole) {
+    public assignRole(userId: UserId, role: ParticipantRole) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.ASSIGN_ROLE, {
                 roomId: self._id,
-                nickname: nickname,
+                userId: userId,
                 role: role,
                 internalMessageId: id
             });
@@ -142,27 +142,27 @@ export class RoomExtended extends Room {
         });
     };
 
-    public subscribeToWaitingParticipant(nickname: UserNickname) {
+    public subscribeToWaitingParticipant(userId: UserId) {
         const self = this;
         return new Promise<AddRemoveTracks>((resolve, reject) => {
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.SUBSCRIBE_TO_WAITING_PARTICIPANT, {
                 roomId: self._id,
-                nickname: nickname,
+                userId: userId,
                 internalMessageId: id
             });
         });
     };
 
-    public unsubscribeFromWaitingParticipant(nickname: UserNickname) {
+    public unsubscribeFromWaitingParticipant(userId: UserId) {
         const self = this;
         return new Promise<AddRemoveTracks>((resolve, reject) => {
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.UNSUBSCRIBE_FROM_WAITING_PARTICIPANT, {
                 roomId: self._id,
-                nickname: nickname,
+                userId: userId,
                 internalMessageId: id
             });
         });
@@ -252,31 +252,31 @@ export class RoomExtended extends Room {
         });
     };
 
-    public setParticipantAudioMuted(nickname: UserNickname, muted: boolean) {
+    public setParticipantAudioMuted(userId: UserId, muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
-            self.#emmitAction(InternalApi.SET_PARTICIPANT_AUDIO_MUTED, {id: self._id, value: muted, nickname: nickname}, resolve, reject);
+            self.#emmitAction(InternalApi.SET_PARTICIPANT_AUDIO_MUTED, {id: self._id, value: muted, userId: userId}, resolve, reject);
         });
     };
 
-    public setParticipantVideoMuted(nickname: UserNickname, muted: boolean) {
+    public setParticipantVideoMuted(userId: UserId, muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
-            self.#emmitAction(InternalApi.SET_PARTICIPANT_VIDEO_MUTED, {id: self._id, value: muted, nickname: nickname}, resolve, reject);
+            self.#emmitAction(InternalApi.SET_PARTICIPANT_VIDEO_MUTED, {id: self._id, value: muted, userId: userId}, resolve, reject);
         });
     };
 
-    public setParticipantScreenSharingMuted(nickname: UserNickname, muted: boolean) {
+    public setParticipantScreenSharingMuted(userId: UserId, muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
-            self.#emmitAction(InternalApi.SET_PARTICIPANT_SCREEN_SHARING_MUTED, {id: self._id, value: muted, nickname: nickname}, resolve, reject);
+            self.#emmitAction(InternalApi.SET_PARTICIPANT_SCREEN_SHARING_MUTED, {id: self._id, value: muted, userId: userId}, resolve, reject);
         });
     };
 
-    public turnOffParticipantScreenSharing(nickname?: string, reason?: string) {
+    public turnOffParticipantScreenSharing(userId?: UserId, reason?: string) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
-            self.#emmitAction(InternalApi.TURN_OFF_PARTICIPANT_SCREEN_SHARING, {id: self._id, nickname: nickname, reason: reason}, resolve, reject);
+            self.#emmitAction(InternalApi.TURN_OFF_PARTICIPANT_SCREEN_SHARING, {id: self._id, userId: userId, reason: reason}, resolve, reject);
         });
     }
 
@@ -347,7 +347,7 @@ export class RoomExtended extends Room {
             this.#resolveOrNotify(e, e.type, value);
         } else if (e.type === RoomEvent.PARTICIPANT_CONFIG) {
             const pConfig = e as ParticipantConfigEvent;
-            this.#config.participantsConfig[pConfig.nickname] = pConfig.config;
+            this.#config.participantsConfig[pConfig.userId] = pConfig.config;
             this.#resolveOrNotify(e, e.type, e);
         } else if (e.type === RoomEvent.SCREEN_SHARING_CONFIG) {
             const screenSharingConfigEvent = e as RoomScreenSharingConfigEvent;
@@ -357,15 +357,15 @@ export class RoomExtended extends Room {
             this.#resolveOrNotify(e, e.type, screenSharingConfigEvent);
         } else if (e.type === RoomEvent.PARTICIPANT_AUDIO_MUTED) {
             const mutedEvent = e as ParticipantAVSMutedEvent;
-            this.#config.participantsConfig[mutedEvent.nickname].audioMuted = mutedEvent.value;
+            this.#config.participantsConfig[mutedEvent.userId].audioMuted = mutedEvent.value;
             this.#resolveOrNotify(e, e.type, mutedEvent.value);
         } else if (e.type === RoomEvent.PARTICIPANT_VIDEO_MUTED) {
             const mutedEvent = e as ParticipantAVSMutedEvent;
-            this.#config.participantsConfig[mutedEvent.nickname].videoMuted = mutedEvent.value;
+            this.#config.participantsConfig[mutedEvent.userId].videoMuted = mutedEvent.value;
             this.#resolveOrNotify(e, e.type, mutedEvent.value);
         } else if (e.type === RoomEvent.PARTICIPANT_SCREEN_SHARING_MUTED) {
             const mutedEvent = e as ParticipantAVSMutedEvent;
-            this.#config.participantsConfig[mutedEvent.nickname].screenSharingMuted = mutedEvent.value;
+            this.#config.participantsConfig[mutedEvent.userId].screenSharingMuted = mutedEvent.value;
             this.#resolveOrNotify(e, e.type, mutedEvent.value);
         } else if (e.type === RoomEvent.STOP_TRACK) {
             const event = e as StopTrackEvent;

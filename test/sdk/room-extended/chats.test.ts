@@ -135,7 +135,7 @@ describe("chats", () => {
             const list = msg as WaitingListEvent;
             expect(list.users).toBeTruthy();
             expect(list.users.length).toEqual(1);
-            await bobRoom.authorizeWaitingList(list.users[0].id, true);
+            await bobRoom.authorizeWaitingList(list.users[0].userId, true);
         }
         bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
 
@@ -147,7 +147,7 @@ describe("chats", () => {
             .on(SfuEvent.NEW_CHAT, async (msg) => {
                 const newChat = msg as UserSpecificChatInfo;
                 expect(newChat.members.length).toBe(2);
-                await bobRoom.moveToWaitingRoom(TEST_USER_1.nickname);
+                await bobRoom.moveToWaitingRoom(aliceRoom.userId());
             })
             .on(SfuEvent.CHAT_DELETED, async (msg) => {
                 expect(msg).toBeTruthy();

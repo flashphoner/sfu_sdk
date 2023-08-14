@@ -433,13 +433,14 @@ export type RemoteSdpInfo = {
 }
 
 export type RoleAssigned = InternalMessage & {
+    userId: UserId,
     name: UserNickname,
     role: ParticipantRole
 }
 
 export type RolesListEvent = InternalMessage & {
     roles: Array<{
-        name: UserNickname,
+        userId: UserId,
         role: ParticipantRole
     }>
 }
@@ -486,7 +487,7 @@ export type RoomExtendedParticipantConfig = {
 }
 
 export type RoomExtendedParticipantsConfig = {
-    [key: UserNickname]: RoomExtendedParticipantConfig
+    [key: UserId]: RoomExtendedParticipantConfig
 }
 
 export type RoomExtendedScreenSharingConfig = {
@@ -510,38 +511,57 @@ export type RoomExtendedConfig = {
 }
 
 export type PlacedInWaitingRoomEvent = InternalMessage & {
+    userId: UserId,
     name: UserNickname
 }
 
 export type PlacedInLobbyEvent = InternalMessage & {
+    userId: UserId,
     name: UserNickname
 }
 
 export type JoinedRoom = InternalMessage & {
+    userId: UserId,
     name: UserNickname,
     chatId: string,
     owner: boolean
 }
 
 export type LeftRoom = InternalMessage & {
+    userId: UserId,
     name: UserNickname
 }
 
 export type EvictedFromRoom = InternalMessage & {
+    userId: UserId,
     name: UserNickname
 }
 
 export type ParticipantRenamed = InternalMessage & {
+    userId: UserId,
     previousName: UserNickname,
     updatedName: UserNickname
 }
 
+export type WaitingParticipant = InternalMessage & {
+    userId: UserId,
+    name: string,
+    isAudioEnabled: boolean,
+    isVideoEnabled: boolean,
+    isScreenSharingEnabled: boolean
+}
+
+export type Participant = InternalMessage & {
+    userId: UserId,
+    name: string
+}
+
 export type ParticipantsListEvent = InternalMessage & {
-    participants: Array<UserNickname>
+    participants: Array<Participant>
 }
 
 export type WaitingListEvent = InternalMessage & {
-    users: Array<User>
+    users: Array<WaitingParticipant>
 }
 
 export type RoomConfigEvent = InternalMessage & {
@@ -549,7 +569,7 @@ export type RoomConfigEvent = InternalMessage & {
 }
 
 export type ParticipantConfigEvent = InternalMessage & {
-    nickname: UserNickname,
+    userId: UserId,
     config: RoomExtendedParticipantConfig
 }
 
@@ -558,23 +578,24 @@ export type RoomScreenSharingConfigEvent = InternalMessage & {
 }
 
 export type ParticipantAVSMutedEvent = InternalMessage & {
-    nickname: UserNickname,
+    userId: UserId,
     value: boolean
 }
 
 export type StopScreenSharingEvent = InternalMessage & {
-    nickname: UserNickname,
+    userId: UserId,
     reason: string
 }
 
 export type StopTrackEvent = InternalMessage & {
-    nickname: UserNickname,
+    userId: UserId,
     id: string,
     tracksMid: Array<string>
 }
 
 export type AddRemoveTracks = InternalMessage & {
     info: {
+        userId: UserId,
         nickName: UserNickname,
         waitingRoom: boolean,
         info: Array<{

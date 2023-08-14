@@ -43,11 +43,12 @@ describe("room", () => {
             ...TEST_ROOM
         });
         await room.join(new wrtc.RTCPeerConnection());
+        const userId = room.userId();
         const state = await room.leaveRoom();
-        expect(state.name).toEqual(TEST_GROUP_USER0.nickname);
+        expect(state.userId).toEqual(userId);
         await sfu.disconnect();
     });
-    it("should get an error if nickname already taken", async () => {
+    it("should join room with same nicknames", async () => {
         const sfu = await connect(TEST_GROUP_USER0);
         const sfu1 = await connect(TEST_GROUP_USER0);
 
@@ -60,8 +61,9 @@ describe("room", () => {
         });
 
         await room.join(new wrtc.RTCPeerConnection());
-        await expect(room1.join(new wrtc.RTCPeerConnection())).rejects.toBeTruthy();
-        expect(room1.state()).toEqual(RoomState.DISPOSED);
+        await room1.join(new wrtc.RTCPeerConnection())
+        expect(room1.state()).toEqual(RoomState.JOINED);
+        expect(room.state()).toEqual(RoomState.JOINED);
 
         await sfu.disconnect();
         await sfu1.disconnect();
@@ -129,6 +131,7 @@ describe("room", () => {
         room0.on(RoomEvent.ADD_TRACKS, async (msg) => {
             const message = msg as AddRemoveTracks;
             expect(message).toBeTruthy();
+            expect(message.info.userId).toBeTruthy();
             message.info.info.forEach((info) => {
                 const index = contentTypes.indexOf(info.contentType);
                 expect(index).toBeGreaterThan(-1);
@@ -174,6 +177,7 @@ describe("room", () => {
         room0.on(RoomEvent.ADD_TRACKS, async (msg) => {
             const message = msg as AddRemoveTracks;
             expect(message).toBeTruthy();
+            expect(message.info.userId).toBeTruthy();
         });
 
         rtcConnectionPlay.ontrack = ({transceiver}) => {
