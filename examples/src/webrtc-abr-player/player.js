@@ -13,7 +13,7 @@ const CurrentState = function() {
         pc: null,
         session: null,
         room: null,
-        remoteDisplay: null,
+        display: null,
         roomEnded: false,
         set: function(pc, session, room) {
             state.pc = pc;
@@ -39,13 +39,13 @@ const CurrentState = function() {
         isActive: function() {
             return (state.room && !state.roomEnded && state.pc);
         },
-        setDisplay: function(display) {
-            state.remoteDisplay = display;
+        setDisplay: function (display) {
+            state.display = display;
         },
-        disposeDisplay: function() {
-            if (state.remoteDisplay) {
-                state.remoteDisplay.stop();
-                state.remoteDisplay = null;
+        disposeDisplay: function () {
+            if (state.display) {
+                state.display.stop();
+                state.display = null;
             }
         }
     };
@@ -192,24 +192,17 @@ const onOperationFailed = function(state, event) {
     onStopClick(state);
 }
 
-const playStreams = async function(state) {
+const playStreams = async function (state) {
     try {
         // Create remote display item to show remote streams
-        state.setDisplay(initRemoteDisplay({
-            div: document.getElementById("remoteVideo"),
-            room: state.room,
-            peerConnection: state.pc,
-            displayOptions: {
-                publisher: false,
-                quality: true,
-                type: false,
-                abr: true,
-                abrKeepOnGoodQuality: 20000,
-                abrTryForUpperQuality: 30000
-            }
-        }));
+        const display = initRemoteDisplay(state.room, document.getElementById("remoteVideo"), {quality:true, autoAbr: true}, {thresholds: [
+            {parameter: "nackCount", maxLeap: 10},
+        {parameter: "freezeCount", maxLeap: 10},
+        {parameter: "packetsLost", maxLeap: 10}
+    ], abrKeepOnGoodQuality: ABR_KEEP_ON_QUALITY, abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY, interval: ABR_QUALITY_CHECK_PERIOD},createDefaultMeetingController, createDefaultMeetingModel, createDefaultMeetingView, oneToOneParticipantFactory(remoteTrackProvider(state.room)));
+        state.setDisplay(display);
         // Start WebRTC negotiation
-        await state.room.join(state.pc);
+        await state.room.join(state.pc, null, null, 1);
     } catch(e) {
         if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
             onOperationFailed(state, e);
@@ -222,7 +215,7 @@ const playStreams = async function(state) {
 
 }
 
-const stopStreams = function(state) {
+const stopStreams = function (state) {
     state.disposeDisplay();
 }
 

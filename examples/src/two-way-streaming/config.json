@@ -26,12 +26,12 @@
             "frameRate": 25
           },
           "encodings": [
-            { "rid": "720p", "active": true, "maxBitrate": 900000 },
+            { "rid": "180p", "active": true, "maxBitrate": 200000, "scaleResolutionDownBy": 4 },
             { "rid": "360p", "active": true, "maxBitrate": 500000, "scaleResolutionDownBy": 2 },
-            { "rid": "180p", "active": true, "maxBitrate": 200000, "scaleResolutionDownBy": 4 }
+            { "rid": "720p", "active": true, "maxBitrate": 900000 }
           ],
           "type": "cam1"
-        }        
+        }
       ]
     }
   }

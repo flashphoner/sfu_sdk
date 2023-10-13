@@ -7,16 +7,19 @@ const createChat = function(room, messages, input, sendButton) {
 
     room.on(constants.SFU_ROOM_EVENT.MESSAGE, function(e) {
         appendMessage({
+            userId: getUserId(e.message),
             nickName: getNickName(e.message),
             message: getMessage(e.message)
         }, chatOtherColour, chatTextColour);
     }).on(constants.SFU_ROOM_EVENT.JOINED, function(e) {
         appendMessage({
+            userId: getShortUserId(e.userId),
             nickName: e.name,
             message: e.type
         }, chatOtherColour, chatEventColour);
     }).on(constants.SFU_ROOM_EVENT.LEFT, function(e) {
         appendMessage({
+            userId: getShortUserId(e.userId),
             nickName: e.name,
             message: e.type
         }, chatOtherColour, chatEventColour);
@@ -27,6 +30,7 @@ const createChat = function(room, messages, input, sendButton) {
         input.value = "";
         await room.sendMessage(message);
         appendMessage({
+            userId: getShortUserId(room.userId()),
             nickName: nickName.value,
             message: message
         }, chatSelfColour, chatTextColour);
@@ -50,7 +54,7 @@ const createChat = function(room, messages, input, sendButton) {
         messages.appendChild(message);
         let nickDiv = document.createElement('div');
         nickDiv.style.color = nickColour;
-        nickDiv.innerText = getChatTimestamp() + " " + msg.nickName + ":";
+        nickDiv.innerText = getChatTimestamp() + " " + msg.nickName + "#" + msg.userId + ":";
         message.appendChild(nickDiv);
         let msgDiv = document.createElement('div');
         msgDiv.style.color = msgColour;
@@ -66,6 +70,16 @@ const createChat = function(room, messages, input, sendButton) {
     const getChatTimestamp = function() {
         let currentdate = new Date();
         return currentdate.getHours() + ":" + currentdate.getMinutes() + ":" + currentdate.getSeconds();
+    }
+
+    const getUserId = function(msgData) {
+        let userId = "unknown";
+        if (msgData.userId) {
+            userId = msgData.userId;
+        } else if (msgData.message.userId) {
+            userId = msgData.message.userId;
+        }
+        return getShortUserId(userId);
     }
 
     const getNickName = function(msgData) {

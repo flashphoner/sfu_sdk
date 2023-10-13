@@ -1,16 +1,18 @@
 const constants = SFU.constants;
 const sfu = SFU;
 let mainConfig;
-let localDisplay;
-let remoteDisplay;
 let publishState;
-let playState;
+let test1State;
+let test2State;
+let test3State;
+
 const PUBLISH = "publish";
-const PLAY = "play";
-const STOP = "stop";
+const TEST1 = "test1";
+const TEST2 = "test2";
+const TEST3 = "test3";
 const PRELOADER_URL = "../commons/media/silence.mp3";
 
-
+const trackCount = 30;
 /**
  * Default publishing config
  */
@@ -24,16 +26,8 @@ const defaultConfig = {
         pingInterval: 5000
     },
     media: {
-        audio: {
-            tracks: [
-                {
-                    source: "mic",
-                    channels: 1
-                }
-            ]
-        },
         video: {
-            tracks: Array(1).fill({
+            tracks: Array(trackCount).fill({
                 source: "camera",
                 width: 1280,
                 height: 720,
@@ -42,9 +36,7 @@ const defaultConfig = {
                     frameRate: 25
                 },
                 encodings: [
-                    {rid: "180p", active: true, maxBitrate: 200000, scaleResolutionDownBy: 4},
-                    {rid: "360p", active: true, maxBitrate: 500000, scaleResolutionDownBy: 2},
-                    {rid: "720p", active: true, maxBitrate: 900000}
+                    {rid: "180p", active: true, maxBitrate: 2000000, scaleResolutionDownBy: 4}
                 ],
                 type: "cam1"
             })
@@ -132,31 +124,25 @@ const CurrentState = function (prefix) {
  * load config and set default values
  */
 const init = function () {
-    let configName = getUrlParam("config") || "./config.json";
     $("#publishBtn").prop('disabled', true);
-    $("#playBtn").prop('disabled', true);
+    $("#test1Btn").prop('disabled', true);
+    $("#test2Btn").prop('disabled', true);
+    $("#test3Btn").prop('disabled', true);
     $("#url").prop('disabled', true);
     $("#roomName").prop('disabled', true);
     $("#publishName").prop('disabled', true);
-    $("#playName").prop('disabled', true);
     publishState = CurrentState(PUBLISH);
-    playState = CurrentState(PLAY);
-    $.getJSON(configName, function (cfg) {
-        mainConfig = cfg;
-        onDisconnected(publishState);
-        onDisconnected(playState);
-    }).fail(function (e) {
-        //use default config
-        console.error("Error reading configuration file " + configName + ": " + e.status + " " + e.statusText)
-        console.log("Default config will be used");
-        mainConfig = defaultConfig;
-        onDisconnected(publishState);
-        onDisconnected(playState);
-    });
+    test1State = CurrentState(TEST1);
+    test2State = CurrentState(TEST2);
+    test3State = CurrentState(TEST3);
+    mainConfig = defaultConfig;
+    onDisconnected(publishState);
+    onDisconnected(test1State);
+    onDisconnected(test2State);
+    onDisconnected(test3State);
     $("#url").val(setURL());
     $("#roomName").val("ROOM1-" + createUUID(4));
     $("#publishName").val("Publisher1-" + createUUID(4));
-    $("#playName").val("Player1-" + createUUID(4));
 }
 
 /**
@@ -169,7 +155,7 @@ const connect = async function (state) {
     const roomConfig = getRoomConfig(mainConfig);
     roomConfig.url = $("#url").val();
     roomConfig.roomName = $("#roomName").val();
-    roomConfig.nickname = $("#" + state.inputId()).val();
+    roomConfig.nickname = createUUID(5);
     // clean state display items
     setStatus(state.statusId(), "");
     setStatus(state.errInfoId(), "");
@@ -233,29 +219,13 @@ const onDisconnected = function (state) {
     $("#" + state.buttonId()).text(state.buttonText()).off('click').click(function () {
         onStartClick(state);
     }).prop('disabled', false);
-    $("#" + state.inputId()).prop('disabled', false);
-    // Enable other session buttons
-    let otherState = getOtherState(state);
-    if (!otherState.session) {
-        $("#" + otherState.buttonId()).prop('disabled', false);
-        $("#" + otherState.inputId()).prop('disabled', false);
-        $('#url').prop('disabled', false);
-        $("#roomName").prop('disabled', false);
-    }
 }
 
 const onStartClick = function (state) {
     if (validateForm("connectionForm", state.errInfoId())
-        && validateForm(state.formId(), state.errInfoId())
-        && validateName(state, state.errInfoId())) {
+        && validateForm(state.formId(), state.errInfoId())) {
         state.setStarting(true);
-        let otherState = getOtherState(state);
-        $("#" + state.buttonId()).prop('disabled', true);
-        // Disable other session button to prevent a simultaneous connections
-        if (!otherState.isStarting()) {
-            $("#" + otherState.buttonId()).prop('disabled', true);
-        }
-        if (state.is(PLAY) && Browser().isSafariWebRTC()) {
+        if (!state.is(PUBLISH) && Browser().isSafariWebRTC()) {
             playFirstSound(document.getElementById("main"), PRELOADER_URL).then(function () {
                 connect(state);
             });
@@ -284,30 +254,21 @@ const onStopClick = async function (state) {
         onDisconnected(state);
     }
 }
-const disposeStateDisplay = function (state) {
-    state.disposeDisplay();
-}
 
 const startStreaming = async function (state) {
     if (state.is(PUBLISH)) {
         await publishStreams(state);
-    } else if (state.is(PLAY)) {
+    } else {
         await playStreams(state);
     }
     state.setStarting(false);
-    // Enable session buttons
-    let otherState = getOtherState(state);
-    $("#" + state.buttonId()).prop('disabled', false);
-    if (!otherState.isStarting()) {
-        $("#" + otherState.buttonId()).prop('disabled', false);
-    }
 }
 
 const publishStreams = async function (state) {
     if (state.isConnected()) {
         //create local display item to show local streams
-        const display = initLocalDisplay(document.getElementById("localVideo"));
-        state.setDisplay(display);
+        const localDisplay = initLocalDisplay(document.getElementById("localVideo"));
+        state.setDisplay(localDisplay);
         try {
             //get configured local video streams
             let streams = await getVideoStreams(mainConfig);
@@ -320,7 +281,7 @@ const publishStreams = async function (state) {
                 streams.forEach(function (s) {
                     let contentType = s.type || s.source;
                     //add local stream to local display
-                    display.add(s.stream.id, $("#" + state.inputId()).val(), s.stream, contentType);
+                    localDisplay.add(s.stream.id, $("#" + state.inputId()).val(), s.stream, contentType);
                     //add each track to PeerConnection
                     s.stream.getTracks().forEach((track) => {
                         config[track.id] = contentType;
@@ -346,11 +307,30 @@ const publishStreams = async function (state) {
 const playStreams = async function (state) {
     if (state.isConnected() && state.isActive()) {
         try {
-            //create remote display item to show remote streams
-            const display = initDefaultRemoteDisplay(state.room, document.getElementById("remoteVideo"), null, null);
-            state.setDisplay(display);
+            if (state.is(TEST1)) {
+                const display = initRemoteDisplay(state.room, document.getElementById("remoteVideo"), null, null,
+                    createDefaultMeetingController,
+                    createDelayedMeetingModel,
+                    createDefaultMeetingView,
+                    oneToOneParticipantFactory(remoteTrackProvider(state.room)));
+                state.setDisplay(display);
+            } else if (state.is(TEST2)) {
+                const display = initRemoteDisplay(state.room, document.getElementById("remoteVideo"), null, null,
+                    createDefaultMeetingController,
+                    createDefaultMeetingModel,
+                    createDefaultMeetingView,
+                    createParticipantFactory(remoteTrackProvider(state.room), createAutoMuteParticipantView, createOneToManyParticipantModel));
+                state.setDisplay(display);
+            } else if (state.is(TEST3)) {
+                const display = initRemoteDisplay(state.room, document.getElementById("remoteVideo"), null, null,
+                    createDefaultMeetingController,
+                    createTest3MeetingModel,
+                    createDefaultMeetingView,
+                    oneToOneParticipantFactory(remoteTrackProvider(state.room)));
+                state.setDisplay(display);
+            }
             //start WebRTC negotiation
-            await state.room.join(state.pc, null, null, 1);
+            await state.room.join(state.pc, null, null, 10);
         } catch (e) {
             if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
                 onOperationFailed(state, e);
@@ -361,6 +341,11 @@ const playStreams = async function (state) {
             }
         }
     }
+}
+
+
+const disposeStateDisplay = function (state) {
+    state.disposeDisplay();
 }
 
 const subscribeTrackToEndedEvent = function (room, track, pc) {
@@ -422,29 +407,240 @@ const validateForm = function (formId, errorInfoId) {
     }
 }
 
-const validateName = function (state) {
-    let valid = true;
-    // Validate other nickname
-    let nameToCheck = $("#" + state.inputId()).val();
-    let otherState = getOtherState(state);
+function timeout(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-    if (nameToCheck === $("#" + otherState.inputId()).val()) {
-        if (otherState.isActive() || otherState.isConnected()) {
-            valid = false;
-            setStatus(state.errInfoId(), "Cannot connect with the same name", "red");
+const createDelayedMeetingModel = function (meetingView, participantFactory, displayOptions, abrFactory) {
+    return {
+        participants: new Map(),
+        meetingName: null,
+        ended: false,
+        addParticipant: function (userId, participantName) {
+            if (this.participants.get(userId)) {
+                return;
+            }
+            const [participantModel, participantView, participant] = participantFactory.createParticipant(userId, participantName, displayOptions, abrFactory);
+            this.participants.set(userId, participant);
+            meetingView.addParticipant(userId, participantName, participantView.rootDiv);
+        },
+        removeParticipant: function (userId) {
+            const participant = this.participants.get(userId);
+            if (participant) {
+                this.participants.delete(userId);
+                meetingView.removeParticipant(userId);
+                participant.dispose();
+            }
+        },
+        addTracks: async function (userId, tracks) {
+            const participant = this.participants.get(userId);
+            if (!participant) {
+                return;
+            }
+
+            for (let i = 0; i < 10 && i < tracks.length; i++) {
+                if (this.ended) {
+                    return;
+                }
+                if (tracks[i].type === "VIDEO") {
+                    participant.addVideoTrack(tracks[i]);
+                    await timeout(1000);
+                }
+            }
+        },
+        removeTracks: function (userId, tracks) {
+            const participant = this.participants.get(userId);
+            if (!participant) {
+                return;
+            }
+            for (const track of tracks) {
+                if (track.type === "VIDEO") {
+                    participant.removeVideoTrack(track);
+                } else if (track.type === "AUDIO") {
+                    participant.removeAudioTrack(track);
+                }
+            }
+        },
+        updateQualityInfo: function (userId, tracksInfo) {
+            const participant = this.participants.get(userId);
+            if (!participant) {
+                return;
+            }
+            participant.updateQualityInfo(tracksInfo);
+        },
+        end: function () {
+            console.log("Meeting " + this.meetingName + " ended")
+            meetingView.end();
+            this.participants.forEach((participant, id) => {
+                participant.dispose();
+            });
+            this.participants.clear();
+        },
+        setMeetingName: function (id) {
+            this.meetingName = id;
+            meetingView.setMeetingName(id);
         }
     }
-    return valid;
 }
 
-const buttonText = function (string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
+const createAutoMuteParticipantView = function () {
+
+    const participantDiv = createContainer(null);
+
+    const participantNicknameDisplay = createInfoDisplay(participantDiv, "Name: ");
+    const muteStatus = createInfoDisplay(participantDiv, "unMuted");
+
+
+    const player = createVideoPlayer(participantDiv);
+    const timer = setInterval(() => {
+        if (player.muteButton) {
+            player.muteButton.click();
+        }
+    }, 10000);
+
+    return {
+        rootDiv: participantDiv,
+        dispose: function () {
+            player.dispose();
+            if (timer) {
+                clearInterval(timer);
+            }
+        },
+        addVideoTrack: function (track, requestVideoTrack) {
+
+        },
+        removeVideoTrack: function (track) {
+
+        },
+        addVideoSource: function (remoteVideoTrack, track, onResize, muteHandler) {
+            player.setVideoSource(remoteVideoTrack, onResize, async (mute) => {
+                const startDate = Date.now();
+                if (mute) {
+                    muteStatus.innerText = "muting";
+                    return muteHandler(mute).then(() => {
+                        const delay = Date.now() - startDate;
+                        muteStatus.innerText = "muted";
+                        muteStatus.innerHTML = muteStatus.innerHTML + " in " + delay + "ms";
+
+                    });
+                } else {
+                    muteStatus.innerText = "unMuting";
+                    return muteHandler(mute).then(() => {
+                        const delay = Date.now() - startDate;
+                        muteStatus.innerText = "unMuted";
+                        muteStatus.innerHTML = muteStatus.innerHTML + " in " + delay + "ms";
+
+                    });
+                }});
+            if (player.muteButton) {
+                hideItem(player.muteButton);
+            }
+        },
+        removeVideoSource: function (track) {
+            player.removeVideoSource(track);
+        },
+        showVideoTrack: function (track) {
+            player.showVideoTrack(track);
+        },
+        addAudioTrack: function (track, audioTrack, show) {
+
+        },
+        removeAudioTrack: function (track) {
+
+        },
+        setNickname: function (nickname) {
+            participantNicknameDisplay.innerText = "Name: " + nickname;
+        },
+        updateQuality: function (track, qualityName, available) {
+            player.updateQuality(qualityName, available);
+        },
+        addQuality: function (track, qualityName, available, onQualityPick) {
+            player.addQuality(qualityName, available, onQualityPick);
+        },
+        clearQualityState: function (track) {
+            player.clearQualityState();
+        },
+        pickQuality: function (track, qualityName) {
+            player.pickQuality(qualityName);
+        }
+    }
 }
 
-const getOtherState = function (state) {
-    if (state.is(PUBLISH)) {
-        return playState;
-    } else if (state.is(PLAY)) {
-        return publishState;
+const createTest3MeetingModel = function (meetingView, participantFactory, displayOptions, abrFactory) {
+    return {
+        participants: new Map(),
+        meetingName: null,
+        ended: false,
+        addParticipant: function (userId, participantName) {
+            if (this.participants.get(userId)) {
+                return;
+            }
+            const [participantModel, participantView, participant] = participantFactory.createParticipant(userId, participantName, displayOptions, abrFactory);
+            this.participants.set(userId, participant);
+            meetingView.addParticipant(userId, participantName, participantView.rootDiv);
+        },
+        removeParticipant: function (userId) {
+            const participant = this.participants.get(userId);
+            if (participant) {
+                this.participants.delete(userId);
+                meetingView.removeParticipant(userId);
+                participant.dispose();
+            }
+        },
+        addTracks: async function (userId, tracks) {
+            const participant = this.participants.get(userId);
+            if (!participant) {
+                return;
+            }
+            const videoTracks = tracks.filter((t) => t.type === "VIDEO");
+            for (let i = 0; i < videoTracks.length;i+=5) {
+                console.log("add 5 tracks");
+                for(let j = i; j< i+5; j++) {
+                    participant.addVideoTrack(videoTracks[j]);
+                }
+                await timeout(5000);
+                if (this.ended) {
+                    return;
+                }
+                const tracksToRemove = []
+                console.log("remove 5 tracks");
+                for(let j = i; j< i+5; j++) {
+                    tracksToRemove.push(videoTracks[j]);
+                }
+                this.removeTracks(userId, tracksToRemove);
+            }
+        },
+        removeTracks: function (userId, tracks) {
+            const participant = this.participants.get(userId);
+            if (!participant) {
+                return;
+            }
+            for (const track of tracks) {
+                if (track.type === "VIDEO") {
+                    participant.removeVideoTrack(track);
+                } else if (track.type === "AUDIO") {
+                    participant.removeAudioTrack(track);
+                }
+            }
+        },
+        updateQualityInfo: function (userId, tracksInfo) {
+            const participant = this.participants.get(userId);
+            if (!participant) {
+                return;
+            }
+            participant.updateQualityInfo(tracksInfo);
+        },
+        end: function () {
+            console.log("Meeting " + this.meetingName + " ended")
+            meetingView.end();
+            this.participants.forEach((participant, id) => {
+                participant.dispose();
+            });
+            this.participants.clear();
+        },
+        setMeetingName: function (id) {
+            this.meetingName = id;
+            meetingView.setMeetingName(id);
+        }
     }
 }

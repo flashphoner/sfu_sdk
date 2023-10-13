@@ -21,12 +21,14 @@ import {
     UserId,
     UserNickname,
     RemoteSdpInfo,
-    StatsType
+    StatsType,
+    TrackType
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
 import Logger from "./logger";
 import {Mutex} from 'async-mutex';
+import {Queue} from 'queue-typescript';
 
 
 export class Room {
@@ -56,6 +58,8 @@ export class Room {
     };
     protected stats: WebRTCStats;
 
+    #vacantTransceivers: { video: Queue<RTCRtpTransceiver>, audio: Queue<RTCRtpTransceiver> };
+
 
     public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number, userId?: UserId) {
         this.connection = connection;
@@ -72,6 +76,7 @@ export class Room {
             mutex: new Mutex(),
             tid: ""
         }
+        this.#vacantTransceivers = {audio: new Queue<RTCRtpTransceiver>(), video: new Queue<RTCRtpTransceiver>()};
     }
 
     #dChannelSend(msg: string): void {
@@ -139,8 +144,8 @@ export class Room {
                                 await self.#setRemoteDescription(remoteSdp);
                                 const answer = await self.#_pc.createAnswer();
                                 answer.sdp = answer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                                await self.#_pc.setLocalDescription(answer);
                                 if (self.#_pc.connectionState !== "closed") {
+                                    await self.#_pc.setLocalDescription(answer);
                                     const tid = self._crutch.tid;
                                     self.logger.debug("Sent answer, remote tid " + remoteSdp.info.tid + ", local tid " + tid);
                                     self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
@@ -155,8 +160,8 @@ export class Room {
                                     self.logger.debug("Setting local reoffer, tid " + remoteSdp.info.tid);
                                     const offer = await self.#_pc.createOffer();
                                     offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                                    await self.#_pc.setLocalDescription(offer);
                                     if (self.#_pc.connectionState !== "closed") {
+                                        await self.#_pc.setLocalDescription(offer);
                                         const tid = self._crutch.tid;
                                         self.logger.debug("Sent reoffer,  remote tid " + remoteSdp.info.tid + ", local tid " + tid);
                                         self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
@@ -287,7 +292,7 @@ export class Room {
     //TODO(naz): safe guard based on state
     public join(pc: RTCPeerConnection, nickname?: UserNickname, config?: {
         [key: string]: string
-    }): Promise<JoinedRoom> {
+    }, predefinedTracksCount?: number): Promise<JoinedRoom> {
         const self = this;
         this.#_pc = pc;
         this.#_pc.addEventListener("signalingstatechange", () => {
@@ -295,6 +300,12 @@ export class Room {
         })
         if (nickname) {
             this._nickname = nickname;
+        }
+        if (predefinedTracksCount > 0) {
+            for (let i = 0; i < predefinedTracksCount; i++) {
+                let transceiver = pc.addTransceiver("video", {direction: "recvonly"});
+                this.#vacantTransceivers.video.enqueue(transceiver);
+            }
         }
         this.#dChannel = this.#_pc.createDataChannel(Room.#CONTROL_CHANNEL);
         this.#dChannel.onmessage = (msg) => {
@@ -521,6 +532,20 @@ export class Room {
         });
     };
 
+    private muteRemoteTrack(mid: string, mute: boolean): Promise<void> {
+        const self = this;
+        return new Promise<void>((resolve, reject) => {
+            const id = uuidv4();
+            promises.add(id, resolve, reject);
+            self.connection.send(InternalApi.MUTE_REMOTE_TRACK, {
+                roomId: self._id,
+                id: mid,
+                mute: mute,
+                internalMessageId: id
+            });
+        });
+    };
+
     public on(event: RoomEvent, callback: (arg0: InternalMessage) => void): Room {
         this.notifier.add(event, callback);
         return this;
@@ -575,4 +600,105 @@ export class Room {
         this.stats.getStats(track, type, callback);
     }
 
+    public async getRemoteTrack(kind: TrackType, force: boolean): Promise<RemoteTrack | undefined> {
+        let transceiver = this.#vacantTransceivers[kind.toLowerCase()].dequeue();
+        if (!transceiver) {
+            if (force) {
+                transceiver = this.pc().addTransceiver(kind.toLowerCase(), {direction: "recvonly"});
+                await this.updateState();
+            } else {
+                return undefined;
+            }
+        }
+        const room = this;
+        return {
+            track: transceiver.receiver.track,
+            preferredQuality: undefined,
+            tid: undefined,
+            disposed: false,
+            demandTrack(remoteTrackId?: string): Promise<void> {
+                if (this.disposed) {
+                    return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
+                }
+                const self = this;
+                return new Promise<void>((resolve, reject) => {
+                    const id = uuidv4();
+                    promises.add(id, resolve, reject);
+                    room.connection.send(InternalApi.LEASE_TRACK, {
+                        roomId: room._id,
+                        remoteTrackId: remoteTrackId,
+                        localMid: transceiver.mid,
+                        internalMessageId: id
+                    });
+                }).catch(function (error) {
+                    // If the track was deleted before the promise was resolved, need to release the transceiver
+                    if (!self.disposed) {
+                        self.disposed = true;
+                        room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                    }
+                    throw error;
+                });
+            }, mute(): Promise<void> {
+                if (this.disposed) {
+                    return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
+                }
+                return room.muteRemoteTrack(transceiver.mid, true).then(() => {
+                    transceiver.receiver.track.enabled = false
+                });
+            }, unmute(): Promise<void> {
+                if (this.disposed) {
+                    return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
+                }
+                transceiver.receiver.track.enabled = true;
+                return room.muteRemoteTrack(transceiver.mid, false);
+            }, setPreferredQuality(quality?: string, tid?: string): Promise<void> {
+                if (this.disposed) {
+                    return new Promise<void>(((resolve, reject) => reject()));
+                }
+                const self = this;
+                return new Promise<void>((resolve, reject) => {
+                    if (quality !== undefined) {
+                        self.preferredQuality = quality;
+                    }
+                    if (tid !== undefined) {
+                        self.tid = tid;
+                    }
+                    const id = uuidv4();
+                    promises.add(id, resolve, reject);
+                    room.connection.send(InternalApi.CHANGE_QUALITY, {
+                        roomId: room._id,
+                        id: transceiver.mid,
+                        quality: self.preferredQuality,
+                        tid: self.tid,
+                        internalMessageId: id
+                    });
+                });
+            }, async dispose() {
+                if (this.disposed) {
+                    return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
+                }
+                this.disposed = true;
+                try {
+                    await this.demandTrack(null);
+                } catch (e) {
+
+                } finally {
+                    room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                }
+            }
+        };
+    }
+}
+
+export interface RemoteTrack {
+    readonly track: MediaStreamTrack;
+    readonly preferredQuality?: string;
+    readonly tid?: string;
+    readonly disposed: boolean;
+
+    demandTrack(remoteMid?: string): Promise<void>;
+    mute(): void;
+    unmute(): void;
+    setPreferredQuality(quality?: string, tid?: string): Promise<void>;
+    dispose(): Promise<void>;
 }

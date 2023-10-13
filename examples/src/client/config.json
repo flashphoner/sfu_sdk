@@ -17,8 +17,8 @@
         "height": 720,
         "codec": "H264",
         "encodings": [
-          { "rid": "h", "active": true, "maxBitrate": 900000 },
-          { "rid": "m", "active": true, "maxBitrate": 300000, "scaleResolutionDownBy": 2 }
+          { "rid": "m", "active": true, "maxBitrate": 300000, "scaleResolutionDownBy": 2 },
+          { "rid": "h", "active": true, "maxBitrate": 900000 }
         ]
       }]
     }

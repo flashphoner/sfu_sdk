@@ -27,8 +27,8 @@ const defaultConfig = {
                     height: 720,
                     codec: "H264",
                     encodings: [
-                        { rid: "h", active: true, maxBitrate: 900000 },
-                        { rid: "m", active: true, maxBitrate: 300000, scaleResolutionDownBy: 2 }
+                        {rid: "m", active: true, maxBitrate: 300000, scaleResolutionDownBy: 2},
+                        {rid: "h", active: true, maxBitrate: 900000}
                     ]
                 }
             ]
@@ -39,11 +39,11 @@ const defaultConfig = {
 /**
  * Load track configuration and show entrance modal
  */
-const init = function() {
+const init = function () {
     //read config
-    $.getJSON("config.json", function(config){
+    $.getJSON("config.json", function (config) {
         cControls = createControls(config);
-    }).fail(function(){
+    }).fail(function () {
         //use default config
         cControls = createControls(defaultConfig);
     });
@@ -67,7 +67,7 @@ async function connect() {
     try {
         const session = await sfu.createRoom(roomConfig);
         // Now we connected to the server (if no exception was thrown)
-        session.on(constants.SFU_EVENT.FAILED, function(e) {
+        session.on(constants.SFU_EVENT.FAILED, function (e) {
             if (e.status && e.statusText) {
                 displayError("CONNECTION FAILED: " + e.status + " " + e.statusText);
             } else if (e.type && e.info) {
@@ -75,11 +75,11 @@ async function connect() {
             } else {
                 displayError("CONNECTION FAILED: " + e);
             }
-        }).on(constants.SFU_EVENT.DISCONNECTED, function(e) {
+        }).on(constants.SFU_EVENT.DISCONNECTED, function (e) {
             displayError("DISCONNECTED. Refresh the page to enter the room again");
         });
         const room = session.room();
-        room.on(constants.SFU_ROOM_EVENT.FAILED, function(e) {
+        room.on(constants.SFU_ROOM_EVENT.FAILED, function (e) {
             displayError(e);
         }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
             displayError(e.operation + " failed: " + e.error);
@@ -100,7 +100,11 @@ async function connect() {
 
         //setup remote display for showing remote audio/video tracks
         const remoteDisplay = document.getElementById("display");
-        initRemoteDisplay(room, remoteDisplay, pc);
+        initDefaultRemoteDisplay(room, remoteDisplay, {quality: true},{thresholds: [
+                {parameter: "nackCount", maxLeap: 10},
+                {parameter: "freezeCount", maxLeap: 10},
+                {parameter: "packetsLost", maxLeap: 10}
+            ], abrKeepOnGoodQuality: ABR_KEEP_ON_QUALITY, abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY, interval: ABR_QUALITY_CHECK_PERIOD});
 
         //get configured local video streams
         let streams = cControls.getVideoStreams();
@@ -109,7 +113,7 @@ async function connect() {
 
         // Publish preconfigured streams
         publishPreconfiguredStreams(room, pc, streams);
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         displayError(e);
     }
@@ -121,7 +125,7 @@ async function connect() {
  * @param prefix
  * @param event
  */
-const onOperationFailed = function(prefix, event) {
+const onOperationFailed = function (prefix, event) {
     let reason = "reason unknown";
     if (event.operation && event.error) {
         reason = event.operation + " failed: " + event.error;
@@ -137,34 +141,32 @@ const onOperationFailed = function(prefix, event) {
 
 /**
  * Publish streams after entering room according to configuration file
- * 
+ *
  * @param {*} room
  * @param {*} pc
- * @param {*} streams 
+ * @param {*} streams
  */
-const publishPreconfiguredStreams = async function(room, pc, streams) {
+const publishPreconfiguredStreams = async function (room, pc, streams) {
     try {
-        let config = {};
+        const config = {};
         //add our local streams to the room (to PeerConnection)
         streams.forEach(function (s) {
-            //add local stream to local display
-            localDisplay.add(s.stream.id, "local", s.stream);
+            let contentType = s.type || s.source;
             //add each track to PeerConnection
             s.stream.getTracks().forEach((track) => {
-                if (s.source === "screen") {
-                    config[track.id] = s.source;
-                }
+                config[track.id] = contentType;
                 addTrackToPeerConnection(pc, s.stream, track, s.encodings);
                 subscribeTrackToEndedEvent(room, track, pc);
             });
+            localDisplay.add(s.stream.id, "local", s.stream, contentType);
         });
         //join room
-        await room.join(pc, null, config);
+        await room.join(pc, null, config, 10);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
             $('#' + s.stream.id + "-button").prop('disabled', false);
         });
-    } catch(e) {
+    } catch (e) {
         onOperationFailed("Failed to publish a preconfigured streams", e);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
@@ -175,21 +177,21 @@ const publishPreconfiguredStreams = async function(room, pc, streams) {
 
 /**
  * Publish a new media track to the room
- * 
+ *
  * @param {*} room
  * @param {*} pc
- * @param {*} media 
+ * @param {*} media
  */
-const publishNewTrack = async function(room, pc, media) {
+const publishNewTrack = async function (room, pc, media) {
     try {
         let config = {};
         //add local stream to local display
-        localDisplay.add(media.stream.id, "local", media.stream);
+        let contentType = media.type || media.source;
+
+        localDisplay.add(media.stream.id, "local", media.stream, contentType);
         //add each track to PeerConnection
         media.stream.getTracks().forEach((track) => {
-            if (media.source === "screen") {
-                config[track.id] = media.source;
-            }
+            config[track.id] = contentType;
             addTrackToPeerConnection(pc, media.stream, track, media.encodings);
             subscribeTrackToEndedEvent(room, track, pc);
         });
@@ -199,7 +201,7 @@ const publishNewTrack = async function(room, pc, media) {
         await room.updateState(config);
         // Enable Delete button for a new stream #WCS-3689
         $('#' + media.stream.id + "-button").prop('disabled', false);
-    } catch(e) {
+    } catch (e) {
         onOperationFailed("Failed to publish a new track", e);
         // Enable Delete button for a new stream #WCS-3689
         $('#' + media.stream.id + "-button").prop('disabled', false);
@@ -208,13 +210,13 @@ const publishNewTrack = async function(room, pc, media) {
 
 /**
  * Subscribe to track ended event to renegotiate WebRTC connection
- * 
- * @param {*} room 
- * @param {*} track 
- * @param {*} pc 
+ *
+ * @param {*} room
+ * @param {*} track
+ * @param {*} pc
  */
-const subscribeTrackToEndedEvent = function(room, track, pc) {
-    track.addEventListener("ended", async function() {
+const subscribeTrackToEndedEvent = function (room, track, pc) {
+    track.addEventListener("ended", async function () {
         try {
             //track ended, see if we need to cleanup
             let negotiate = false;
@@ -232,7 +234,7 @@ const subscribeTrackToEndedEvent = function(room, track, pc) {
                 //kickoff renegotiation
                 await room.updateState();
             }
-        } catch(e) {
+        } catch (e) {
             onOperationFailed("Failed to update room state", e);
         }
     });
@@ -240,13 +242,13 @@ const subscribeTrackToEndedEvent = function(room, track, pc) {
 
 /**
  * Add track to WebRTC PeerConnection
- * 
- * @param {*} pc 
- * @param {*} stream 
- * @param {*} track 
- * @param {*} encodings 
+ *
+ * @param {*} pc
+ * @param {*} stream
+ * @param {*} track
+ * @param {*} encodings
  */
-const addTrackToPeerConnection = function(pc, stream, track, encodings) {
+const addTrackToPeerConnection = function (pc, stream, track, encodings) {
     pc.addTransceiver(track, {
         direction: "sendonly",
         streams: [stream],
@@ -256,10 +258,10 @@ const addTrackToPeerConnection = function(pc, stream, track, encodings) {
 
 /**
  * Display error message
- * 
- * @param {*} text 
+ *
+ * @param {*} text
  */
-const displayError = function(text) {
+const displayError = function (text) {
     const errField = document.getElementById("errorMsg");
     errField.style.color = "red";
     errField.innerText = text;
@@ -268,7 +270,7 @@ const displayError = function(text) {
 /**
  * Entrance modal cancelled, we do not enter to a room
  */
-const cancel = function() {
+const cancel = function () {
     //hide modal
     $('#entranceModal').modal('hide');
     //disable controls

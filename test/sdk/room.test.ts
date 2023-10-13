@@ -1,6 +1,6 @@
 import {RoomEvent, RoomState, Sfu, StatsType} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
-import {AddRemoveTracks, RoomMessage} from "../../src/sdk/constants";
+import {AddRemoveTracks, RoomMessage, TrackType} from "../../src/sdk/constants";
 import {Verbosity} from "../../src/sdk/logger";
 
 const wrtc = require("wrtc");
@@ -178,20 +178,19 @@ describe("room", () => {
             const message = msg as AddRemoveTracks;
             expect(message).toBeTruthy();
             expect(message.info.userId).toBeTruthy();
-        });
-
-        rtcConnectionPlay.ontrack = ({transceiver}) => {
-            room0.getStats(transceiver.receiver.track, StatsType.INBOUND, async (stats) => {
+            const t = await room0.getRemoteTrack(TrackType.VIDEO, true);
+            await t.demandTrack(message.info.info[0].id);
+            room0.getStats(t.track, StatsType.INBOUND, async (stats) => {
                 expect(stats.type).toBe(StatsType.INBOUND);
                 expect(stats.mediaType).toBe("video");
                 await sfu1.disconnect();
                 await sfu0.disconnect();
                 done();
             });
-        }
+        });
 
         await room1.join(rtcConnectionPublish, null, {});
-        await room0.join(rtcConnectionPlay);
+        await room0.join(rtcConnectionPlay, null, {}, 1);
     });
     //relates to zapp-64
     it.skip("should send message", async () => {

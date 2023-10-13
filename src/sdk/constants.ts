@@ -191,7 +191,8 @@ export enum Operations {
     ADD_MESSAGE_TO_BOOKMARKS = "ADD_MESSAGE_TO_BOOKMARKS",
     REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS",
     LOAD_BOOKMARKED_MESSAGES = "LOAD_BOOKMARKED_MESSAGES",
-    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS"
+    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS",
+    LEASE_TRACK = "LEASE_TRACK"
 }
 
 export enum ParticipantRole {
@@ -247,6 +248,7 @@ export enum InternalApi {
     UPDATE_CALENDAR_EVENT = "updateCalendarEvent",
     CREATE_ROOM_FROM_EVENT = "createRoomFromEvent",
     MUTE_TRACK = "muteTrack",
+    MUTE_REMOTE_TRACK = "muteRemoteTrack",
     SEND_MESSAGE = "sendMessage",
     GET_ATTACHMENT = "downloadAttachment",
     SEND_CONTROL_MESSAGE = "sendControlMessage",
@@ -319,7 +321,8 @@ export enum InternalApi {
     ADD_MESSAGE_TO_BOOKMARKS = "addMessageToBookmarks",
     REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks",
     LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages",
-    LOAD_MESSAGES_WITH_MENTIONS = "loadMessagesWithMentions"
+    LOAD_MESSAGES_WITH_MENTIONS = "loadMessagesWithMentions",
+    LEASE_TRACK = "leaseTrack"
 }
 
 export enum ContactError {
@@ -361,7 +364,8 @@ export enum RoomError {
     USER_ALREADY_JOINED = "User already joined",
     CANCEL_JOIN_ROOM = "Joining to room canceled by user",
     ROOM_IS_LOCKED = "Room is locked",
-    RENAMING_PROHIBITED = "Renaming prohibited by the owner"
+    RENAMING_PROHIBITED = "Renaming prohibited by the owner",
+    TRACK_ALREADY_DISPOSED = "Track already disposed"
 }
 
 export enum UserInfoError {
@@ -606,6 +610,19 @@ export type AddRemoveTracks = InternalMessage & {
             quality: Array<string>,
             mute: boolean,
             creationTime: number
+        }>
+    }
+}
+
+export type QualityState = InternalMessage & {
+    info: {
+        nickName: UserNickname,
+        tracks: Array<{
+            mid: string,
+            quality: Array<{
+                quality:string,
+                available:boolean
+            }>,
         }>
     }
 }

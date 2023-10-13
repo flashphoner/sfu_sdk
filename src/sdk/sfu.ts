@@ -106,7 +106,7 @@ export class Sfu {
 
     public createRoom(options: {
         name: string,
-        pin: string
+        pin: string,
     }) {
         if (this.#_room) {
             switch (this.#_room.state()) {
@@ -129,7 +129,7 @@ export class Sfu {
 
     public async disconnect() {
         // Call leaveRoom on disconnect only if room is still active #WCS-3669
-        if (this.#_room && this.#_room.state() === RoomState.JOINED) {
+        if (this.#_room  && this.#_room.state() === RoomState.JOINED) {
             await this.#_room.leaveRoom();
         }
         if (this.#connection) {

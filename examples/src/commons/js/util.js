@@ -201,3 +201,7 @@ const playFirstSound = function (parent, preloader) {
         resolve();
     });
 }
+
+const getShortUserId = function (userId) {
+    return userId.substring(0, 4);
+}

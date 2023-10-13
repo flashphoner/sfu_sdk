@@ -94,7 +94,8 @@ const createControls = function(config) {
         trackCallback({
             stream: stream,
             encodings: track.encodings,
-            source: track.source
+            source: track.source,
+            type: track.type
         });
     }
 
@@ -185,7 +186,8 @@ const createControls = function(config) {
             streams.push({
                 stream: data.stream,
                 encodings: data.encodings,
-                source: data.source
+                source: data.source,
+                type: data.type
             });
         });
         return streams;

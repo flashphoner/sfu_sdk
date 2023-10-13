@@ -109,7 +109,7 @@ const init = function() {
  */
 const connect = async function(state) {
     //create peer connection
-    pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = getRoomConfig(mainConfig);
     roomConfig.url = $("#url").val();
@@ -220,13 +220,9 @@ const onOperationFailed = function(state, event) {
 const playStreams = async function(state) {
     //create remote display item to show remote streams
     try {
-        remoteDisplay = initRemoteDisplay({
-            div: document.getElementById("remoteVideo"),
-            room: state.room,
-            peerConnection: state.pc
-        });
+        remoteDisplay = initDefaultRemoteDisplay(state.room, document.getElementById("remoteVideo"), {quality: true});
         // Start WebRTC negotiation
-        await state.room.join(state.pc);
+        await state.room.join(state.pc, null, null, 1);
     } catch(e) {
         if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
             onOperationFailed(state, e);
