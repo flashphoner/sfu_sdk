@@ -13,6 +13,7 @@ type InitialUserData = {
     sipLogin: string,
     email: string,
     sipVisibleName: string,
+    authToken: string,
     pmi: string
 }
 
@@ -102,13 +103,14 @@ export class Connection {
         }
         this.pingChecker = null;
     }
-    
+
     public connect(options: {
         url: string,
         appName: string,
         timeout?: number,
         failedProbesThreshold?: number,
         pingInterval?: number,
+        authToken?: string,
         custom: object | null
     }): Promise<InitialUserData> {
         const timeout = options.timeout !== undefined ? options.timeout : WS_CONNECTION_TIMEOUT;
@@ -150,11 +152,11 @@ export class Connection {
                     appKey: options.appName,
                     mediaProviders: ["WebRTC"],
                     keepAlive: true,
-                    authToken: null,
+                    authToken: options.authToken ?? null,
                     clientVersion: "0.5.28",
                     clientOSVersion: window.navigator.appVersion,
                     clientBrowserVersion: window.navigator.userAgent,
-                    custom: options.custom
+                    custom: options.authToken ? null : options.custom
                 };
                 // Enable intervalic ping checking if ping options are set
                 if (failedProbesThreshold > 0 && pingInterval > 0) {

@@ -92,6 +92,7 @@ export class SfuExtended {
         username: UserId,
         email: UserEmail,
         nickname: UserNickname,
+        authToken: string,
         pmi: string
     }
     #_server: string;
@@ -126,6 +127,7 @@ export class SfuExtended {
         timeout?: number,
         binaryChunkSize?: number
         failedProbesThreshold?: number,
+        authToken?: string,
         pingInterval?: number
     }) {
         if (!options) {
@@ -137,6 +139,7 @@ export class SfuExtended {
             timeout: options.timeout ? options.timeout : 10000,
             failedProbesThreshold: options.failedProbesThreshold,
             pingInterval: options.pingInterval,
+            authToken: options.authToken,
             custom: {
                 username: options.username,
                 password: options.password,
@@ -152,6 +155,7 @@ export class SfuExtended {
             email: UserEmail,
             nickname: UserNickname,
             pmi: string
+            authToken: string,
         }>(async (resolve, reject) => {
             try {
                 const userCredentials = await this.#connection.connect(connectionConfig);
@@ -159,6 +163,7 @@ export class SfuExtended {
                     username: userCredentials.sipLogin,
                     email: userCredentials.email,
                     nickname: userCredentials.sipVisibleName,
+                    authToken: userCredentials.authToken,
                     pmi: userCredentials.pmi
                 }
                 self.#_state = State.AUTHENTICATED;
