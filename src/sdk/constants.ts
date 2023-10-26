@@ -14,7 +14,8 @@ export enum SfuEvent {
     CHAT_UPDATED = "CHAT_UPDATED",
     MESSAGE_STATE = "MESSAGE_STATE",
     MESSAGE_ATTACHMENT_STATE = "MESSAGE_ATTACHMENT_STATE",
-    MESSAGE_STATE_BULK = "MESSAGE_STATE_BULK",
+    LAST_READ_MESSAGE_UPDATED = "LAST_READ_MESSAGE_UPDATED",
+    USER_READ_MESSAGE = "USER_READ_MESSAGE",
     CONTACT_UPDATE = "CONTACT_UPDATE",
     CONTACT_REMOVED = "CONTACT_REMOVED",
     CONTACT_INVITE = "CONTACT_INVITE",
@@ -226,7 +227,6 @@ export enum InternalApi {
     MESSAGE = "SFU_MESSAGE",
     MESSAGE_STATE = "SFU_MESSAGE_STATE",
     MESSAGE_ATTACHMENT_STATE = "SFU_MESSAGE_ATTACHMENT_STATE",
-    MESSAGE_STATE_BULK = "SFU_MESSAGE_STATE_BULK",
     SFU_ATTACHMENT_REQUEST_ACK = "SFU_ATTACHMENT_REQUEST_ACK",
     USER_LIST = "SFU_USER_LIST",
     USER_CALENDAR = "SFU_USER_CALENDAR",
@@ -646,8 +646,7 @@ export enum MessageState {
 export enum DeliveryStatus {
     PENDING = "PENDING",
     DELIVERED = "DELIVERED",
-    READ = "READ",
-    UNREAD = "UNREAD"
+    READ = "READ"
 }
 
 export enum AttachmentState {
@@ -755,9 +754,22 @@ export type AttachmentStatusEvent = InternalMessage & {
     status: AttachmentStatus
 }
 
-export type MessageStatusBulkEvent = InternalMessage & {
+export type UserReadMessageEvent = InternalMessage & {
     chatId: string,
-    update: Array<MessageStatusUpdate>
+    userId: string,
+    oldLastReadMessageDate: number,
+    lastReadMessageDate: number
+}
+
+export type LastReadMessageUpdated = InternalMessage & {
+    chatId: string,
+    updateInfo: LastReadMessageUpdate
+}
+
+export type LastReadMessageUpdate = {
+    oldLastReadMessageDate: number,
+    lastReadMessageDate: number,
+    lastReadMessageId: string
 }
 
 export type ControlMessage = {

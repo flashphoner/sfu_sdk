@@ -11,15 +11,14 @@ import {
     CalendarEvent,
     ChannelSendPolicy,
     ChatType,
-    DeliveryStatus,
     Invite,
     MessageEdited,
-    MessageState,
-    MessageStatusBulkEvent,
     User,
     UserInfoChangedEvent,
     UserPmiSettings,
     UserSpecificChatInfo,
+    LastReadMessageUpdated,
+    UserReadMessageEvent
 } from "../../../src/sdk/constants";
 
 const MESSAGE_BODY = "test message";
@@ -982,15 +981,14 @@ describe("multiple-sync", () => {
                 channel: false
             });
 
-            const waitEvents = (chatId: string, messageId: string): Promise<void> => {
+            const waitEvents = (chatId: string, messageId: string, messageDate: number): Promise<void> => {
                 const onMessageStatusBulkEventHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
-                    sfu.on(SfuEvent.MESSAGE_STATE_BULK, (msg) => {
-                        const state = msg as MessageStatusBulkEvent;
-                        expect(state.chatId).toEqual(chatId);
-                        expect(state.update.length).toBe(1);
-                        expect(state.update[0].id).toEqual(messageId);
-                        expect(state.update[0].state).toEqual(MessageState.FULL_DELIVERY_FULL_READ);
-                        expect(state.update[0].deliveryStatus[TEST_USER_1.username]).toEqual(DeliveryStatus.READ);
+                    sfu.on(SfuEvent.USER_READ_MESSAGE, (msg) => {
+                        const updateEvent = msg as UserReadMessageEvent;
+                        expect(chatId).toEqual(updateEvent.chatId);
+                        expect(updateEvent.oldLastReadMessageDate).toBe(0);
+                        expect(updateEvent.lastReadMessageDate).toBe(messageDate);
+                        expect(updateEvent.userId).toEqual(aliceFirstInstance.user().username);
                         eventsCount.num++;
                         if (eventsCount.num === 3) {
                             resolve();
@@ -999,10 +997,11 @@ describe("multiple-sync", () => {
                 }
                 return new Promise<void>((resolve) => {
                     let eventsCount = { num: 0 };
-                    aliceSecondInstance.on(SfuEvent.CHAT_UPDATED, (msg) => {
-                        const info = msg as UserSpecificChatInfo;
-                        expect(info.id).toEqual(chatId);
-                        expect(info.lastReadMessageId).toEqual(messageId);
+                    aliceSecondInstance.on(SfuEvent.LAST_READ_MESSAGE_UPDATED, (msg) => {
+                        const updateEvent = msg as LastReadMessageUpdated;
+                        expect(updateEvent.chatId).toEqual(chatId);
+                        expect(updateEvent.updateInfo.lastReadMessageId).toEqual(messageId);
+                        expect(updateEvent.updateInfo.lastReadMessageDate).toEqual(messageDate);
                         eventsCount.num++;
                         if (eventsCount.num === 3) {
                             resolve();
@@ -1018,7 +1017,7 @@ describe("multiple-sync", () => {
                 body: MESSAGE_BODY,
             });
             aliceFirstInstance.markMessageRead({id: message.id, chatId: chat.id});
-            await waitEvents(chat.id, message.id);
+            await waitEvents(chat.id, message.id, message.date);
             await bobFirstInstance.deleteChat(chat);
         });
         it('should mark message unread', async () => {
@@ -1028,32 +1027,19 @@ describe("multiple-sync", () => {
                 channel: false
             });
 
-            const waitEvents = (chatId: string, messageId: string): Promise<void> => {
-                const onMessageStatusBulkEventHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
-                    sfu.on(SfuEvent.MESSAGE_STATE_BULK, (msg) => {
-                        const state = msg as MessageStatusBulkEvent;
-                        expect(state.chatId).toEqual(chatId);
-                        expect(state.update.length).toBe(1);
-                        expect(state.update[0].id).toEqual(messageId);
-                        eventsCount.num++;
-                        if (eventsCount.num === 3 && state.update[0].state === MessageState.FULL_DELIVERY_NO_READ
-                            && state.update[0].deliveryStatus[TEST_USER_1.username] === DeliveryStatus.UNREAD) {
-                            resolve();
-                        }
-                    });
-                }
+            const waitEvents = (chatId: string, messageDate: number): Promise<void> => {
                 return new Promise<void>((resolve) => {
-                    let eventsCount = { num: 0 };
-                    aliceSecondInstance.on(SfuEvent.CHAT_UPDATED, (msg) => {
-                        const info = msg as UserSpecificChatInfo;
-                        expect(info.id).toEqual(chatId);
-                        eventsCount.num++;
-                        if (eventsCount.num === 3 && info.lastReadMessageId === "") {
+                    aliceSecondInstance.on(SfuEvent.LAST_READ_MESSAGE_UPDATED, (msg) => {
+                        const updateEvent = msg as LastReadMessageUpdated;
+                        expect(updateEvent.chatId).toEqual(chatId);
+                        if (
+                            updateEvent.updateInfo.oldLastReadMessageDate === messageDate
+                            && updateEvent.updateInfo.lastReadMessageDate === 0
+                            && updateEvent.updateInfo.lastReadMessageId === ''
+                        ) {
                             resolve();
                         }
                     });
-                    onMessageStatusBulkEventHandler(bobFirstInstance, resolve, eventsCount);
-                    onMessageStatusBulkEventHandler(bobSecondInstance, resolve, eventsCount);
                 })
             }
 
@@ -1063,7 +1049,7 @@ describe("multiple-sync", () => {
             });
             await aliceFirstInstance.markMessageRead({id: message.id, chatId: chat.id});
             aliceFirstInstance.markMessageUnread({id: message.id, chatId: chat.id});
-            await waitEvents(chat.id, message.id);
+            await waitEvents(chat.id, message.date);
             await bobFirstInstance.deleteChat(chat);
         });
     });

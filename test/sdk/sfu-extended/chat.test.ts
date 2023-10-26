@@ -32,14 +32,14 @@ import {
     MessageDeleted,
     MessageEdited,
     MessageState,
-    MessageStatusBulkEvent,
     SfuEvent,
     SortOrder,
     UserSpecificChatInfo,
     BookmarkDeleted,
     ChatWithBookmarksDeleted,
     BookmarkEdited,
-    ChatSectionsError
+    ChatSectionsError,
+    UserReadMessageEvent
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -1766,27 +1766,31 @@ describe("chat", () => {
                 const handler = await bob.getSendingAttachmentsHandler(attachmentsData, status.id);
                 await handler.sendAttachments();
             });
-            it("user should be notified with message IM state", async (done) => {
-                bob.on(SfuEvent.MESSAGE_STATE_BULK, async (msg) => {
-                    const state = msg as MessageStatusBulkEvent;
-                    expect(state).toBeTruthy();
-                    expect(state.update[0].state).toEqual(MessageState.FULL_DELIVERY_FULL_READ);
-                    await bob.deleteChat(chat0);
-                    done();
-                });
-                alice.on(SfuEvent.MESSAGE, async (msg) => {
-                    const message1 = msg as Message;
-                    expect(message1.body).toEqual(MESSAGE_BODY);
-                    await alice.markMessageRead(message1);
-                });
-                let chat0 = await bob.createChat({
+            it("user should be notified about reading message by user", async () => {
+                const waitUserReadMessageEvent = (chatId: string, messageDate: number): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        bob.on(SfuEvent.USER_READ_MESSAGE, async (msg) => {
+                            const state = msg as UserReadMessageEvent;
+                            expect(state).toBeTruthy();
+                            expect(state.chatId).toEqual(chatId);
+                            expect(state.oldLastReadMessageDate).toBe(0);
+                            expect(state.lastReadMessageDate).toBe(messageDate);
+                            await bob.deleteChat({id: chatId});
+                            resolve();
+                        });
+                    });
+                }
+
+                const chat = await bob.createChat({
                     members: [TEST_USER_1.username]
                 });
 
-                await bob.sendMessage({
-                    chatId: chat0.id,
+                const message = await bob.sendMessage({
+                    chatId: chat.id,
                     body: MESSAGE_BODY
                 });
+                alice.markMessageRead({id: message.id, chatId: chat.id});
+                await waitUserReadMessageEvent(chat.id, message.date);
             });
             it("Chat member should be notified about editing message", async () => {
                 const editedBody = "edited message body";
@@ -2433,28 +2437,32 @@ describe("chat", () => {
                 const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
                 handler.sendAttachments();
             });
-            it("user should be notified with message IM state", async (done) => {
-                bob.on(SfuEvent.MESSAGE_STATE_BULK, async (msg) => {
-                    const state = msg as MessageStatusBulkEvent;
-                    expect(state).toBeTruthy();
-                    expect(state.update[0].state).toEqual(MessageState.FULL_DELIVERY_FULL_READ);
-                    await bob.deleteChat(channel0);
-                    done();
-                });
-                alice.on(SfuEvent.MESSAGE, async (msg) => {
-                    const message1 = msg as Message;
-                    expect(message1.body).toEqual(MESSAGE_BODY);
-                    await alice.markMessageRead(message1);
-                });
-                let channel0 = await bob.createChat({
+            it("user should be notified about reading message by user", async () => {
+                const waitUserReadMessageEvent = (channelId: string, messageDate: number): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        bob.on(SfuEvent.USER_READ_MESSAGE, async (msg) => {
+                            const state = msg as UserReadMessageEvent;
+                            expect(state).toBeTruthy();
+                            expect(state.chatId).toEqual(channelId);
+                            expect(state.oldLastReadMessageDate).toBe(0);
+                            expect(state.lastReadMessageDate).toBe(messageDate);
+                            await bob.deleteChat({id: channelId});
+                            resolve();
+                        });
+                    });
+                }
+
+                const channel = await bob.createChat({
                     ...TEST_PUBLIC_CHANNEL,
                     members: [TEST_USER_1.username]
                 });
 
-                await bob.sendMessage({
-                    chatId: channel0.id,
+                const message = await bob.sendMessage({
+                    chatId: channel.id,
                     body: MESSAGE_BODY
                 });
+                alice.markMessageRead({id: message.id, chatId: channel.id});
+                await waitUserReadMessageEvent(channel.id, message.date);
             });
             it("member's state should update after it was added to send permission list", async (done) => {
                 alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {

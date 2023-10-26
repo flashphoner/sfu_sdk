@@ -53,7 +53,6 @@ import {
     ChatError,
     ChatReceivePolicy,
     ChatSearchResultEvent,
-    MessageStatusBulkEvent,
     UserInfo,
     UserInfoEvent,
     MessageEdited,
@@ -74,7 +73,9 @@ import {
     ChatWithBookmarksDeleted,
     BookmarkEdited,
     FirstAndLastChatMessage,
-    UserInfoChangedEvent
+    UserInfoChangedEvent,
+    LastReadMessageUpdated,
+    UserReadMessageEvent
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -198,10 +199,15 @@ export class SfuExtended {
                             const attachmentState = data[0] as AttachmentStatusEvent;
                             promises.resolve(data[0].internalMessageId, attachmentState.status);
                             this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENT_STATE, attachmentState.status);
-                        } else if (data[0].type === InternalApi.MESSAGE_STATE_BULK) {
-                            const messageState = data[0] as MessageStatusBulkEvent;
-                            if (!promises.resolve(data[0].internalMessageId, messageState)) {
-                                this.#notifier.notify(SfuEvent.MESSAGE_STATE_BULK, messageState);
+                        } else if (data[0].type === SfuEvent.LAST_READ_MESSAGE_UPDATED) {
+                            const updateEvent = data[0] as LastReadMessageUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, updateEvent)) {
+                                this.#notifier.notify(SfuEvent.LAST_READ_MESSAGE_UPDATED, updateEvent);
+                            }
+                        } else if (data[0].type === SfuEvent.USER_READ_MESSAGE) {
+                            const updateEvent = data[0] as UserReadMessageEvent;
+                            if (!promises.resolve(data[0].internalMessageId, updateEvent)) {
+                                this.#notifier.notify(SfuEvent.USER_READ_MESSAGE, updateEvent);
                             }
                         } else if (data[0].type === InternalApi.SFU_ATTACHMENT_REQUEST_ACK) {
                             const ack = data[0] as AttachmentRequestAck;
@@ -990,7 +996,7 @@ export class SfuExtended {
     }) {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<UserSpecificChatInfo>(function(resolve, reject) {
+        return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
             if (!msg) {
                 reject(new Error("Can't mark null message"));
             } else if (!msg.chatId || msg.chatId === "") {
@@ -1012,7 +1018,7 @@ export class SfuExtended {
     }) {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<UserSpecificChatInfo>(function(resolve, reject) {
+        return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
             if (!msg) {
                 reject(new Error("Can't mark null message"));
             } else if (!msg.chatId || msg.chatId === "") {
