@@ -322,7 +322,8 @@ export enum InternalApi {
     REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks",
     LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages",
     LOAD_MESSAGES_WITH_MENTIONS = "loadMessagesWithMentions",
-    LEASE_TRACK = "leaseTrack"
+    LEASE_TRACK = "leaseTrack",
+    LOGOUT = "logout"
 }
 
 export enum ContactError {
@@ -1096,6 +1097,18 @@ export type OperationFailedEvent = InternalMessage & {
 
 export type ConnectionFailedEvent = InternalMessage & {
     info: string
+}
+
+export enum ConnectionType {
+    MAIN = "MAIN",
+    MEETING = "MEETING",
+    CHAT = "CHAT",
+    MEETING_CHAT = "MEETING_CHAT"
+}
+
+export type ConnectionDetails = {
+    id: string,
+    type: ConnectionType
 }
 
 export type UserId = string;

@@ -75,7 +75,8 @@ import {
     FirstAndLastChatMessage,
     UserInfoChangedEvent,
     LastReadMessageUpdated,
-    UserReadMessageEvent
+    UserReadMessageEvent,
+    ConnectionDetails
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -122,14 +123,15 @@ export class SfuExtended {
 
     public connect(options: {
         url: string,
-        username: UserId,
-        password: string,
-        nickname: UserNickname,
+        username?: UserId,
+        password?: string,
+        nickname?: UserNickname,
         timeout?: number,
         binaryChunkSize?: number
         failedProbesThreshold?: number,
         authToken?: string,
-        pingInterval?: number
+        pingInterval?: number,
+        details?: ConnectionDetails
     }) {
         if (!options) {
             throw new TypeError("No options provided");
@@ -144,7 +146,8 @@ export class SfuExtended {
             custom: {
                 username: options.username,
                 password: options.password,
-                nickname: options.nickname
+                nickname: options.nickname,
+                details: options.details
             }
         };
         const self = this;
@@ -774,6 +777,14 @@ export class SfuExtended {
                 id: options.id,
                 internalMessageId: promiseId
             });
+        });
+    }
+
+    public logout() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
+            self.#emmitAction(InternalApi.LOGOUT, {}, resolve, reject);
         });
     }
 

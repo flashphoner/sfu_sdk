@@ -156,7 +156,7 @@ export class Connection {
                     clientVersion: "0.5.28",
                     clientOSVersion: window.navigator.appVersion,
                     clientBrowserVersion: window.navigator.userAgent,
-                    custom: options.authToken ? null : options.custom
+                    custom: options.custom
                 };
                 // Enable intervalic ping checking if ping options are set
                 if (failedProbesThreshold > 0 && pingInterval > 0) {
