@@ -195,11 +195,29 @@ const onOperationFailed = function(state, event) {
 const playStreams = async function (state) {
     try {
         // Create remote display item to show remote streams
-        const display = initRemoteDisplay(state.room, document.getElementById("remoteVideo"), {quality:true, autoAbr: true}, {thresholds: [
-            {parameter: "nackCount", maxLeap: 10},
-        {parameter: "freezeCount", maxLeap: 10},
-        {parameter: "packetsLost", maxLeap: 10}
-    ], abrKeepOnGoodQuality: ABR_KEEP_ON_QUALITY, abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY, interval: ABR_QUALITY_CHECK_PERIOD},createDefaultMeetingController, createDefaultMeetingModel, createDefaultMeetingView, oneToOneParticipantFactory(remoteTrackProvider(state.room)));
+        const displayOptions = {
+            quality:true,
+            autoAbr: true
+        };
+        const abrOptions = {
+            thresholds: [
+                {parameter: "nackCount", maxLeap: 10},
+                {parameter: "freezeCount", maxLeap: 10},
+                {parameter: "packetsLost", maxLeap: 10}
+            ],
+            abrKeepOnGoodQuality: ABR_KEEP_ON_QUALITY,
+            abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY,
+            interval: ABR_QUALITY_CHECK_PERIOD
+        };
+        const display = initRemoteDisplay(
+            state.room,
+            document.getElementById("remoteVideo"),
+            displayOptions, abrOptions,
+            createDefaultMeetingController,
+            createDefaultMeetingModel,
+            createDefaultMeetingView,
+            oneToOneParticipantFactory(remoteTrackProvider(state.room))
+        );
         state.setDisplay(display);
         // Start WebRTC negotiation
         await state.room.join(state.pc, null, null, 1);

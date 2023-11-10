@@ -100,11 +100,21 @@ async function connect() {
 
         //setup remote display for showing remote audio/video tracks
         const remoteDisplay = document.getElementById("display");
-        initDefaultRemoteDisplay(room, remoteDisplay, {quality: true},{thresholds: [
+        const displayOptions = {
+            quality: true,
+            autoAbr: false
+        };
+        const abrOptions = {
+            thresholds: [
                 {parameter: "nackCount", maxLeap: 10},
                 {parameter: "freezeCount", maxLeap: 10},
                 {parameter: "packetsLost", maxLeap: 10}
-            ], abrKeepOnGoodQuality: ABR_KEEP_ON_QUALITY, abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY, interval: ABR_QUALITY_CHECK_PERIOD});
+            ],
+            abrKeepOnGoodQuality: ABR_KEEP_ON_QUALITY,
+            abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY,
+            interval: ABR_QUALITY_CHECK_PERIOD
+        };
+        initDefaultRemoteDisplay(room, remoteDisplay, displayOptions, abrOptions);
 
         //get configured local video streams
         let streams = cControls.getVideoStreams();

@@ -522,7 +522,7 @@ const createOneToManyParticipantView = function () {
         dispose: function () {
             player.dispose();
             for (const element of audioElements.values()) {
-                element.remove();
+                element.dispose();
             }
             audioElements.clear();
         },
@@ -547,32 +547,13 @@ const createOneToManyParticipantView = function () {
             player.showVideoTrack(track);
         },
         addAudioTrack: function (track, audioTrack, show) {
-            const stream = new MediaStream();
-            stream.addTrack(audioTrack);
-            const audioElement = document.createElement("audio");
-            if (!show) {
-                hideItem(audioElement);
-            }
-            audioElement.controls = "controls";
-            audioElement.muted = true;
-            audioElement.autoplay = true;
-            audioElement.onloadedmetadata = function (e) {
-                audioElement.play().then(function () {
-                    if (Browser().isSafariWebRTC() && Browser().isiOS()) {
-                        console.warn("Audio track should be manually unmuted in iOS Safari");
-                    } else {
-                        audioElement.muted = false;
-                    }
-                });
-            };
-            audioElements.set(track.mid, audioElement);
-            audioDisplay.appendChild(audioElement);
-            audioElement.srcObject = stream;
+            const audioPlayer = createAudioPlayer(audioDisplay, track, audioTrack, show);
+            audioElements.set(track.mid, audioPlayer);
         },
         removeAudioTrack: function (track) {
             const audioElement = audioElements.get(track.mid);
             if (audioElement) {
-                audioElement.remove();
+                audioElement.dispose();
                 audioElements.delete(track.mid);
             }
         },
@@ -725,17 +706,17 @@ const createVideoPlayer = function (participantDiv) {
             if (!this.muteButton) {
                 const newVideoMuteBtn = document.createElement("button");
                 this.muteButton = newVideoMuteBtn;
-                newVideoMuteBtn.innerText = "mute";
+                newVideoMuteBtn.innerText = "Mute video";
                 newVideoMuteBtn.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
                 newVideoMuteBtn.addEventListener('click', async function () {
                     newVideoMuteBtn.disabled = true;
                     try {
-                        if (newVideoMuteBtn.innerText === "mute") {
+                        if (newVideoMuteBtn.innerText === "Mute video") {
                             await onMute(true);
-                            newVideoMuteBtn.innerText = "unmute";
-                        } else if (newVideoMuteBtn.innerText === "unmute") {
+                            newVideoMuteBtn.innerText = "Unmute video";
+                        } else if (newVideoMuteBtn.innerText === "Unmute video") {
                             await onMute(false);
-                            newVideoMuteBtn.innerText = "mute";
+                            newVideoMuteBtn.innerText = "Mute video";
                         }
                     } finally {
                         newVideoMuteBtn.disabled = false;
@@ -848,6 +829,74 @@ const createVideoPlayer = function (participantDiv) {
     }
 }
 
+const createAudioPlayer = function (audioDisplay, track, audioTrack, show) {
+    let audioElement;
+    let audioMuteButton
+
+    const displayMute = function (audioTag) {
+        let text = "";
+        if (audioTag.muted) {
+            text = "Unmute audio";
+        } else {
+            text = "Mute audio";
+        }
+        return text;
+    }
+
+    const createAudioElement = function () {
+        const div = document.createElement("audio");
+        div.controls = "controls";
+        div.muted = true;
+        div.autoplay = true;
+        return div;
+    }
+
+    const createAudioMuteButton = function (trackId, audioTag) {
+        const div = document.createElement("button");
+        div.innerText = displayMute(audioTag) + " " + trackId;
+        div.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
+        div.onclick = function (e) {
+            audioTag.muted = !audioTag.muted;
+            div.innerText = displayMute(audioTag) + " " + trackId;
+        };
+        return div;
+    }
+
+    const create = function (audioDisplay, track, audioTrack, show) {
+        const stream = new MediaStream();
+        stream.addTrack(audioTrack);
+        audioElement = createAudioElement();
+        audioMuteButton = createAudioMuteButton(track.mid, audioElement);
+        audioElement.onloadedmetadata = function (e) {
+            audioElement.play().then(function () {
+                if (Browser().isSafariWebRTC() && Browser().isiOS()) {
+                    console.warn("Audio track should be manually unmuted in iOS Safari");
+                } else {
+                    audioElement.muted = false;
+                    audioMuteButton.innerText = displayMute(audioElement) + " " + track.mid;
+                }
+            });
+        };
+        if (show) {
+            hideItem(audioMuteButton);
+        } else {
+            hideItem(audioElement);
+        }
+        audioDisplay.appendChild(audioElement);
+        audioDisplay.appendChild(audioMuteButton);
+        audioElement.srcObject = stream;
+    }
+
+    create(audioDisplay, track, audioTrack, show);
+
+    return {
+        dispose() {
+            audioElement.remove();
+            audioMuteButton.remove();
+        }
+    };
+}
+
 const createOneToOneParticipantView = function () {
 
     const participantDiv = createContainer(null);
@@ -867,7 +916,7 @@ const createOneToOneParticipantView = function () {
             }
             videoPlayers.clear();
             for (const element of audioElements.values()) {
-                element.remove();
+                element.dispose();
             }
             audioElements.clear();
         },
@@ -900,32 +949,13 @@ const createOneToOneParticipantView = function () {
             }
         },
         addAudioTrack: function (track, audioTrack, show) {
-            const stream = new MediaStream();
-            stream.addTrack(audioTrack);
-            const audioElement = document.createElement("audio");
-            if (!show) {
-                hideItem(audioElement);
-            }
-            audioElement.controls = "controls";
-            audioElement.muted = true;
-            audioElement.autoplay = true;
-            audioElement.onloadedmetadata = function (e) {
-                audioElement.play().then(function () {
-                    if (Browser().isSafariWebRTC() && Browser().isiOS()) {
-                        console.warn("Audio track should be manually unmuted in iOS Safari");
-                    } else {
-                        audioElement.muted = false;
-                    }
-                });
-            };
-            audioElements.set(track.mid, audioElement);
-            audioDisplay.appendChild(audioElement);
-            audioElement.srcObject = stream;
+            const audioPlayer = createAudioPlayer(audioDisplay, track, audioTrack, show);
+            audioElements.set(track.mid, audioPlayer);
         },
         removeAudioTrack: function (track) {
             const audioElement = audioElements.get(track.mid);
             if (audioElement) {
-                audioElement.remove();
+                audioElement.dispose();
                 audioElements.delete(track.mid);
             }
         },
@@ -1743,28 +1773,6 @@ const createContainer = function (parent) {
         parent.appendChild(div);
     }
     return div;
-}
-
-const createQualityButton = function (qualityName, buttonsList, parent) {
-    const div = document.createElement("button");
-    div.innerText = qualityName;
-    div.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-    div.style.color = QUALITY_COLORS.UNAVAILABLE;
-    if (buttonsList) {
-        buttonsList.push(div);
-    }
-    if (parent) {
-        parent.appendChild(div);
-    }
-    return div;
-}
-
-const setQualityButtonsColor = function (qualityDivs) {
-    for (let c = 0; c < qualityDivs.length; c++) {
-        if (qualityDivs[c].style.color !== QUALITY_COLORS.UNAVAILABLE) {
-            qualityDivs[c].style.color = QUALITY_COLORS.AVAILABLE;
-        }
-    }
 }
 
 // Helper functions to display/hide an element
