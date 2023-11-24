@@ -76,7 +76,8 @@ import {
     UserInfoChangedEvent,
     LastReadMessageUpdated,
     UserReadMessageEvent,
-    ConnectionDetails
+    ConnectionDetails,
+    AuthenticationStatusEvent
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -131,6 +132,7 @@ export class SfuExtended {
         failedProbesThreshold?: number,
         authToken?: string,
         pingInterval?: number,
+        device?: string,
         details?: ConnectionDetails
     }) {
         if (!options) {
@@ -147,6 +149,7 @@ export class SfuExtended {
                 username: options.username,
                 password: options.password,
                 nickname: options.nickname,
+                device: options.device,
                 details: options.details
             }
         };
@@ -479,6 +482,9 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.SEND_MESSAGE_SYNC) {
                             const message = (data[0] as SfuMessageEvent).message;
                             this.#notifier.notify(SfuEvent.SEND_MESSAGE_SYNC, message);
+                        } else if (data[0].type === SfuEvent.AUTHENTICATION_STATUS) {
+                            const event = data[0] as AuthenticationStatusEvent;
+                            this.#notifier.notify(SfuEvent.AUTHENTICATION_STATUS, event);
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }

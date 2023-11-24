@@ -44,7 +44,8 @@ export enum SfuEvent {
     BOOKMARK_DELETED = "BOOKMARK_DELETED",
     BOOKMARK_EDITED = "BOOKMARK_EDITED",
     CHAT_WITH_BOOKMARKS_DELETED = "CHAT_WITH_BOOKMARKS_DELETED",
-    SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC"
+    SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC",
+    AUTHENTICATION_STATUS = "AUTHENTICATION_STATUS"
 }
 
 export enum RoomEvent {
@@ -1109,6 +1110,14 @@ export enum ConnectionType {
 export type ConnectionDetails = {
     id: string,
     type: ConnectionType
+}
+
+export enum AuthenticationStatus {
+    VERIFYING_BY_EMAIL = "VERIFYING_BY_EMAIL"
+}
+
+export type AuthenticationStatusEvent = InternalMessage & {
+    status: AuthenticationStatus
 }
 
 export type UserId = string;
