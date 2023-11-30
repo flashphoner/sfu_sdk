@@ -77,7 +77,8 @@ import {
     LastReadMessageUpdated,
     UserReadMessageEvent,
     ConnectionDetails,
-    AuthenticationStatusEvent
+    AuthenticationStatusEvent,
+    MessageWithUploadingAttachments,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -87,6 +88,10 @@ import {Room} from "./room";
 import {ResetPasswordHandler} from "./reset-password-handler";
 
 type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo;
+
+type MessageWithUploadingAttachmentState = {
+    [messageId: string] : MessageWithUploadingAttachments
+}
 
 export class SfuExtended {
 
@@ -103,7 +108,8 @@ export class SfuExtended {
     #rooms: { [key: string]: RoomExtended } = {};
     //TODO(naz): Provide union instead of InternalMessage
     #notifier: Notifier<SfuEvent, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
-    #attachmentState: Array<Attachment> = [];
+    #uploadingAttachmentState: MessageWithUploadingAttachmentState = {}
+    #downloadingAttachmentState: Array<Attachment> = [];
     #binaryChunkSize: number;
     #logger: Logger = new Logger();
     #loggerPrefix: PrefixFunction;
@@ -198,6 +204,9 @@ export class SfuExtended {
                             this.#notifier.notify(SfuEvent.MESSAGE, message);
                         } else if (data[0].type === InternalApi.MESSAGE_STATE) {
                             const messageState = data[0] as MessageStatusEvent;
+                            if (!!messageState.waitingUploadingAttachments) {
+                                this.#uploadingAttachmentState[messageState.status.id] = messageState.messageWithUploadingAttachments;
+                            }
                             if (!promises.resolve(data[0].internalMessageId, messageState.status)) {
                                 this.#notifier.notify(SfuEvent.MESSAGE_STATE, messageState.status);
                             }
@@ -218,9 +227,9 @@ export class SfuExtended {
                         } else if (data[0].type === InternalApi.SFU_ATTACHMENT_REQUEST_ACK) {
                             const ack = data[0] as AttachmentRequestAck;
                             const request = ack.attachmentRequest as AttachmentRequest;
-                            const state = this.#attachmentState.find(s => s.messageId === ack.attachmentRequest.messageId);
+                            const state = this.#downloadingAttachmentState.find(s => s.messageId === ack.attachmentRequest.messageId);
                             if (!state) {
-                                this.#attachmentState.push({
+                                this.#downloadingAttachmentState.push({
                                     ...request,
                                     payload: null,
                                     internalMessageId: ack.internalMessageId
@@ -497,11 +506,12 @@ export class SfuExtended {
             (name: string, data: ArrayBuffer) => {
                 switch (name) {
                     case InternalApi.BINARY_DATA:
-                        const headerSize = 38;
+                        const headerSize = 4;
                         const buffer = new Uint8Array(data);
-                        const id = SfuExtended.fromUTF8ArrayToStr(buffer.slice(1, ATTACHMENT_ID_LENGTH + 1));
+                        const messageTransferId = buffer[1];
+                        const attachmentTransferId = buffer[2];
                         const eof = buffer[headerSize - 1];
-                        const attachment = this.#attachmentState.find((attachment) => attachment.attachmentId === id);
+                        const attachment = this.#downloadingAttachmentState.find((attachment) => attachment.attachmentTransferId === attachmentTransferId && attachment.messageTransferId === messageTransferId);
                         if (attachment) {
                             if (!attachment.payload) {
                                 attachment.payload = data.slice(headerSize, data.byteLength);
@@ -514,15 +524,15 @@ export class SfuExtended {
                             }
                             if (eof === 1) {
                                 this.#notifyMessageAttachmentState(attachment, AttachmentState.DOWNLOADED);
-                                const index = this.#attachmentState.indexOf(attachment);
-                                this.#attachmentState.splice(index, 1);
+                                const index = this.#downloadingAttachmentState.indexOf(attachment);
+                                this.#downloadingAttachmentState.splice(index, 1);
                                 // ToDo (igor): need to resolve or reject in any case
                                 promises.resolve(attachment.internalMessageId, attachment);
                             } else {
                                 this.#notifyMessageAttachmentState(attachment, AttachmentState.PENDING);
                             }
                         } else {
-                            this.#logger.info("Unable to find attachment " + id);
+                            this.#logger.info("Unable to find attachment with messageTransferId " + messageTransferId + " attachmentTransferId " + attachmentTransferId);
                         }
                         break;
                     default:
@@ -536,7 +546,8 @@ export class SfuExtended {
             (e) => {
                 self.#_state = State.DISCONNECTED;
                 self.disconnect();
-                self.#attachmentState.length = 0;
+                self.#downloadingAttachmentState.length = 0;
+                self.#uploadingAttachmentState = {};
                 if (e.reason === 'Normal disconnect') {
                     self.#notifier.notify(SfuEvent.DISCONNECTED, e as InternalMessage);
                 } else {
@@ -847,42 +858,58 @@ export class SfuExtended {
 
     public getSendingAttachmentsHandler(attachments: Array<MessageAttachmentData>, messageId: string) {
         const self = this;
+        const messageWithAttachmentsState = self.#uploadingAttachmentState[messageId];
+        if (!messageWithAttachmentsState) {
+            return;
+        }
+
+        const messageTransferId = messageWithAttachmentsState.messageTransferId;
         const cancelledAttachments: {[key: number]: {status: AttachmentStatus}} = {};
         let promiseForWaitResultMessageStatus: {resolve: Function, reject: Function};
         let resultMessageStatus: MessageStatus;
         let attachmentsIsReady = false;
 
+        function getAttachmentTransferId(attachmentId: string) {
+            return messageWithAttachmentsState.attachmentsInfo.find((attachmentInfo) => attachmentInfo.id === attachmentId).attachmentTransferId;
+        }
+
         function sendMessageWithAttachments(messageId: string) {
             return new Promise<MessageStatus>(function (resolve, reject) {
                 promises.add(messageId, resolve, reject);
                 self.#connection.send(InternalApi.SEND_MESSAGE_WITH_ATTACHMENTS, {
-                    id: messageId
+                    id: messageId,
+                    transferId: messageTransferId
                 });
             })
         }
 
         function cancelSendAttachment(attachmentId: string) {
             return new Promise<AttachmentStatus>(function (resolve, reject) {
+                const attachmentTransferId = getAttachmentTransferId(attachmentId);
                 self.#emmitAction(InternalApi.CANCEL_SENDING_ATTACHMENT, {
-                    id: attachmentId}, resolve, reject);
+                    messageTransferId: messageTransferId,
+                    attachmentTransferId: attachmentTransferId
+                }, resolve, reject);
             })
         }
 
-        function sendAttachmentChunk(data: Blob, id: string, end: number, index: number) {
+        function sendAttachmentChunk(data: Blob, messageTransferId: number, attachmentTransferId: number, end: number, index: number) {
             return new Promise<AttachmentStatus>(function (resolve, reject) {
-                promises.add(id.toString(), resolve, reject);
+                promises.add(messageTransferId.toString() + attachmentTransferId.toString(), resolve, reject);
                 /**
-                 * 38-bytes header:
+                 * 4 -bytes header:
                  * 1st byte - command (10 - uploadAttachment)
-                 * 2nd-37th bytes - attachment id
-                 * 38th byte - end of file (0 - false, 1 - true)
+                 * 2nd byte - message transfer id
+                 * 3rd byte - attachment transfer id
+                 * 4th byte - end of file (0 - false, 1 - true)
                  * @type {Uint8Array}
                  */
 
-                const header = new Uint8Array(38);
+                const header = new Uint8Array(4);
                 header[0] = 10;
-                header.set(SfuExtended.strToUTF8Array(id), 1);
-                header[37] = end;
+                header[1] = messageTransferId;
+                header[2] = attachmentTransferId;
+                header[3] = end;
                 const start = index * self.#binaryChunkSize;
                 const chunk = new Blob([header, data.slice(start, start + self.#binaryChunkSize)]);
                 self.#emmitBinaryAction(chunk);
@@ -891,8 +918,8 @@ export class SfuExtended {
 
         async function uploadAttachment(attachment: MessageAttachmentData) {
             return new Promise<AttachmentStatus>(async function (resolve, reject) {
-                const id = attachment.id;
                 const {payload} = attachment;
+                const attachmentTransferId = getAttachmentTransferId(attachment.id);
                 const data = new Blob([payload]);
                 const chunks = Math.ceil(data.size / self.#binaryChunkSize);
                 for (let i = 0; i < chunks; i++) {
@@ -900,15 +927,15 @@ export class SfuExtended {
                     if (i === chunks - 1) {
                         end = 1;
                     }
-                    const cancellationPromise = cancelledAttachments[id];
+                    const cancellationPromise = cancelledAttachments[attachment.id];
                     if (cancellationPromise === undefined) {
-                        const result = await sendAttachmentChunk(data, id, end, i);
+                        const result = await sendAttachmentChunk(data, messageTransferId, attachmentTransferId, end, i);
                         const attachmentState = result as AttachmentStatus;
                         if (attachmentState.state === AttachmentState.UPLOADED) {
                             resolve(attachmentState);
                         }
                     } else {
-                        delete cancelledAttachments[id];
+                        delete cancelledAttachments[attachment.id];
                         resolve(cancellationPromise.status);
                         break;
                     }

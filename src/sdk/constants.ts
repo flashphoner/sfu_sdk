@@ -714,7 +714,9 @@ export type MessageAttachmentData = {
 export type AttachmentRequest = {
     chatId: string;
     messageId: string;
+    messageTransferId?: number;
     attachmentId: string;
+    attachmentTransferId?: number;
     name: string;
 }
 
@@ -749,7 +751,20 @@ export type SfuMessageEvent = InternalMessage & {
 }
 
 export type MessageStatusEvent = InternalMessage & {
-    status: MessageStatus
+    status: MessageStatus,
+    waitingUploadingAttachments: boolean,
+    messageWithUploadingAttachments: MessageWithUploadingAttachments
+}
+
+export type MessageWithUploadingAttachments = {
+    messageId: string,
+    messageTransferId: number,
+    attachmentsInfo: Array<UploadingAttachmentInfo>
+}
+
+export type UploadingAttachmentInfo = {
+    id: string,
+    attachmentTransferId: number
 }
 
 export type AttachmentStatusEvent = InternalMessage & {
