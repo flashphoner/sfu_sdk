@@ -15,7 +15,7 @@ export enum SfuEvent {
     MESSAGE_STATE = "MESSAGE_STATE",
     MESSAGE_ATTACHMENT_STATE = "MESSAGE_ATTACHMENT_STATE",
     LAST_READ_MESSAGE_UPDATED = "LAST_READ_MESSAGE_UPDATED",
-    USER_READ_MESSAGE = "USER_READ_MESSAGE",
+    UPDATE_MESSAGES_DELIVERY_STATUS = "UPDATE_MESSAGES_DELIVERY_STATUS",
     CONTACT_UPDATE = "CONTACT_UPDATE",
     CONTACT_REMOVED = "CONTACT_REMOVED",
     CONTACT_INVITE = "CONTACT_INVITE",
@@ -771,11 +771,12 @@ export type AttachmentStatusEvent = InternalMessage & {
     status: AttachmentStatus
 }
 
-export type UserReadMessageEvent = InternalMessage & {
+export type UpdateMessagesDeliveryStatusEvent = InternalMessage & {
     chatId: string,
+    dateFrom: number,
+    dateTo: number,
     userId: string,
-    oldLastReadMessageDate: number,
-    lastReadMessageDate: number
+    status: DeliveryStatus
 }
 
 export type LastReadMessageUpdated = InternalMessage & {

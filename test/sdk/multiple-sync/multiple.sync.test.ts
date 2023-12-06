@@ -18,7 +18,8 @@ import {
     UserPmiSettings,
     UserSpecificChatInfo,
     LastReadMessageUpdated,
-    UserReadMessageEvent
+    UpdateMessagesDeliveryStatusEvent,
+    DeliveryStatus
 } from "../../../src/sdk/constants";
 
 const MESSAGE_BODY = "test message";
@@ -983,12 +984,13 @@ describe("multiple-sync", () => {
 
             const waitEvents = (chatId: string, messageId: string, messageDate: number): Promise<void> => {
                 const onMessageStatusBulkEventHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
-                    sfu.on(SfuEvent.USER_READ_MESSAGE, (msg) => {
-                        const updateEvent = msg as UserReadMessageEvent;
+                    sfu.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, (msg) => {
+                        const updateEvent = msg as UpdateMessagesDeliveryStatusEvent;
                         expect(chatId).toEqual(updateEvent.chatId);
-                        expect(updateEvent.oldLastReadMessageDate).toBe(0);
-                        expect(updateEvent.lastReadMessageDate).toBe(messageDate);
+                        expect(updateEvent.dateFrom).toBe(0);
+                        expect(updateEvent.dateTo).toBe(messageDate);
                         expect(updateEvent.userId).toEqual(aliceFirstInstance.user().username);
+                        expect(updateEvent.status).toEqual(DeliveryStatus.READ);
                         eventsCount.num++;
                         if (eventsCount.num === 3) {
                             resolve();

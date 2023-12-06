@@ -39,7 +39,8 @@ import {
     ChatWithBookmarksDeleted,
     BookmarkEdited,
     ChatSectionsError,
-    UserReadMessageEvent
+    DeliveryStatus,
+    UpdateMessagesDeliveryStatusEvent
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -1769,12 +1770,13 @@ describe("chat", () => {
             it("user should be notified about reading message by user", async () => {
                 const waitUserReadMessageEvent = (chatId: string, messageDate: number): Promise<void> => {
                     return new Promise<void>((resolve) => {
-                        bob.on(SfuEvent.USER_READ_MESSAGE, async (msg) => {
-                            const state = msg as UserReadMessageEvent;
+                        bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, async (msg) => {
+                            const state = msg as UpdateMessagesDeliveryStatusEvent;
                             expect(state).toBeTruthy();
                             expect(state.chatId).toEqual(chatId);
-                            expect(state.oldLastReadMessageDate).toBe(0);
-                            expect(state.lastReadMessageDate).toBe(messageDate);
+                            expect(state.dateFrom).toBe(0);
+                            expect(state.dateTo).toBe(messageDate);
+                            expect(state.status).toEqual(DeliveryStatus.READ);
                             await bob.deleteChat({id: chatId});
                             resolve();
                         });
@@ -1856,6 +1858,69 @@ describe("chat", () => {
                 expect(deletedMessage).toBeTruthy();
                 await deletePromise;
 
+                await bob.deleteChat({id: chat.id});
+            });
+            it('user should be notified about deferred delivery', async () => {
+                const chat = await bob.createChat({
+                    members: [TEST_USER_1.username]
+                });
+                const messageForRead = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                await alice.markMessageRead({id: messageForRead.id, chatId: chat.id});
+                await alice.disconnect();
+
+                const pendingMessage = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                const waitUpdateDeliveryStatusEvent = (dateFrom: number, dateTo: number): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        const callBack = (msg) => {
+                            const state = msg as UpdateMessagesDeliveryStatusEvent;
+                            expect(state).toBeTruthy();
+                            expect(state.chatId).toEqual(chat.id);
+                            expect(state.dateFrom).toBe(dateFrom);
+                            expect(state.dateTo).toBe(dateTo);
+                            expect(state.status).toEqual(DeliveryStatus.DELIVERED);
+                            bob.off(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                            resolve();
+                        }
+                        bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                    });
+                }
+
+                alice = await connect(TEST_USER_1);
+                alice.loadChatMessages({
+                    chatId: chat.id,
+                    timeFrame: {
+                        start: 0,
+                        end: -1
+                    }
+                });
+                await waitUpdateDeliveryStatusEvent(pendingMessage.date, pendingMessage.date);
+
+                await alice.disconnect();
+
+                const firstPendingMessage = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+                const secondPendingMessage = await bob.sendMessage({
+                    chatId: chat.id,
+                    body: MESSAGE_BODY
+                });
+
+                alice = await connect(TEST_USER_1);
+                alice.loadChatMessages({
+                    chatId: chat.id,
+                    timeFrame: {
+                        start: 0,
+                        end: -1
+                    }
+                });
+                await waitUpdateDeliveryStatusEvent(firstPendingMessage.date - 1, secondPendingMessage.date);
                 await bob.deleteChat({id: chat.id});
             });
             it('should receive event about deleting bookmark', async () => {
@@ -2440,12 +2505,13 @@ describe("chat", () => {
             it("user should be notified about reading message by user", async () => {
                 const waitUserReadMessageEvent = (channelId: string, messageDate: number): Promise<void> => {
                     return new Promise<void>((resolve) => {
-                        bob.on(SfuEvent.USER_READ_MESSAGE, async (msg) => {
-                            const state = msg as UserReadMessageEvent;
+                        bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, async (msg) => {
+                            const state = msg as UpdateMessagesDeliveryStatusEvent;
                             expect(state).toBeTruthy();
                             expect(state.chatId).toEqual(channelId);
-                            expect(state.oldLastReadMessageDate).toBe(0);
-                            expect(state.lastReadMessageDate).toBe(messageDate);
+                            expect(state.dateFrom).toBe(0);
+                            expect(state.dateTo).toBe(messageDate);
+                            expect(state.status).toBe(DeliveryStatus.READ);
                             await bob.deleteChat({id: channelId});
                             resolve();
                         });
@@ -2463,6 +2529,70 @@ describe("chat", () => {
                 });
                 alice.markMessageRead({id: message.id, chatId: channel.id});
                 await waitUserReadMessageEvent(channel.id, message.date);
+            });
+            it('user should be notified about deferred delivery', async () => {
+                const channel = await bob.createChat({
+                    ...TEST_PUBLIC_CHANNEL,
+                    members: [TEST_USER_1.username]
+                });
+                const messageForRead = await bob.sendMessage({
+                    chatId: channel.id,
+                    body: MESSAGE_BODY
+                });
+                await alice.markMessageRead({id: messageForRead.id, chatId: channel.id});
+                await alice.disconnect();
+
+                const pendingMessage = await bob.sendMessage({
+                    chatId: channel.id,
+                    body: MESSAGE_BODY
+                });
+                const waitUpdateDeliveryStatusEvent = (dateFrom: number, dateTo: number): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        const callBack = (msg) => {
+                            const state = msg as UpdateMessagesDeliveryStatusEvent;
+                            expect(state).toBeTruthy();
+                            expect(state.chatId).toEqual(channel.id);
+                            expect(state.dateFrom).toBe(dateFrom);
+                            expect(state.dateTo).toBe(dateTo);
+                            expect(state.status).toEqual(DeliveryStatus.DELIVERED);
+                            bob.off(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                            resolve();
+                        }
+                        bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                    });
+                }
+
+                alice = await connect(TEST_USER_1);
+                alice.loadChatMessages({
+                    chatId: channel.id,
+                    timeFrame: {
+                        start: 0,
+                        end: -1
+                    }
+                });
+                await waitUpdateDeliveryStatusEvent(pendingMessage.date, pendingMessage.date);
+
+                await alice.disconnect();
+
+                const firstPendingMessage = await bob.sendMessage({
+                    chatId: channel.id,
+                    body: MESSAGE_BODY
+                });
+                const secondPendingMessage = await bob.sendMessage({
+                    chatId: channel.id,
+                    body: MESSAGE_BODY
+                });
+
+                alice = await connect(TEST_USER_1);
+                alice.loadChatMessages({
+                    chatId: channel.id,
+                    timeFrame: {
+                        start: 0,
+                        end: -1
+                    }
+                });
+                await waitUpdateDeliveryStatusEvent(firstPendingMessage.date - 1, secondPendingMessage.date);
+                await bob.deleteChat({id: channel.id});
             });
             it("member's state should update after it was added to send permission list", async (done) => {
                 alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {

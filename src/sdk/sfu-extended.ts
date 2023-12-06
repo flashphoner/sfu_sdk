@@ -75,10 +75,10 @@ import {
     FirstAndLastChatMessage,
     UserInfoChangedEvent,
     LastReadMessageUpdated,
-    UserReadMessageEvent,
     ConnectionDetails,
     AuthenticationStatusEvent,
     MessageWithUploadingAttachments,
+    UpdateMessagesDeliveryStatusEvent,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -219,10 +219,10 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, updateEvent)) {
                                 this.#notifier.notify(SfuEvent.LAST_READ_MESSAGE_UPDATED, updateEvent);
                             }
-                        } else if (data[0].type === SfuEvent.USER_READ_MESSAGE) {
-                            const updateEvent = data[0] as UserReadMessageEvent;
+                        } else if (data[0].type === SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS) {
+                            const updateEvent = data[0] as UpdateMessagesDeliveryStatusEvent;
                             if (!promises.resolve(data[0].internalMessageId, updateEvent)) {
-                                this.#notifier.notify(SfuEvent.USER_READ_MESSAGE, updateEvent);
+                                this.#notifier.notify(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, updateEvent);
                             }
                         } else if (data[0].type === InternalApi.SFU_ATTACHMENT_REQUEST_ACK) {
                             const ack = data[0] as AttachmentRequestAck;
