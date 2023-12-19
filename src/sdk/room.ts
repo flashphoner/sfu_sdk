@@ -617,7 +617,7 @@ export class Room {
             tid: undefined,
             disposed: false,
             demandTrack(remoteTrackId?: string): Promise<void> {
-                if (this.disposed) {
+                if (this.disposed && !!remoteTrackId) {
                     return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
                 }
                 const self = this;
