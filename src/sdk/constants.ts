@@ -618,12 +618,15 @@ export type AddRemoveTracks = InternalMessage & {
 
 export type QualityState = InternalMessage & {
     info: {
+        userId: UserId,
         nickName: UserNickname,
         tracks: Array<{
             mid: string,
             quality: Array<{
                 quality:string,
-                available:boolean
+                available:boolean,
+                width?: number,
+                height?: number
             }>,
         }>
     }

@@ -7,13 +7,18 @@ import {
     SfuEvent,
     FragmentedMessage,
     InternalApi,
-    InternalMessage, JoinedRoom, LeftRoom, EvictedFromRoom,
+    InternalMessage,
+    JoinedRoom,
+    LeftRoom,
+    EvictedFromRoom,
     ParticipantRenamed,
-    RoomMessage, OperationFailed,
+    RoomMessage,
+    OperationFailed,
     Operations,
     ParticipantRole,
     RemoteSdp,
-    RemoteSdpType, RoleAssigned,
+    RemoteSdpType,
+    RoleAssigned,
     RoomError,
     RoomEvent,
     RoomState,
@@ -22,7 +27,8 @@ import {
     UserNickname,
     RemoteSdpInfo,
     StatsType,
-    TrackType
+    TrackType,
+    QualityState,
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
@@ -272,6 +278,9 @@ export class Room {
             if (!promises.resolve(removeTracks.internalMessageId, removeTracks)) {
                 this.notifier.notify(RoomEvent.REMOVE_TRACKS, removeTracks);
             }
+        } else if (e.type === RoomEvent.TRACK_QUALITY_STATE) {
+            const state = e as QualityState;
+            this.notifier.notify(RoomEvent.TRACK_QUALITY_STATE, state);
         } else if (e.type === RoomEvent.WAITING_ROOM_UPDATE) {
             const waitingRoomUpdate = e as WaitingRoomUpdate;
             if (promises.promised(e.internalMessageId)) {
