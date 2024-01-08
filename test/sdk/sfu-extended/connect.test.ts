@@ -57,7 +57,7 @@ describe("connect", () => {
     it("Should disconnect by missing pings", (done) => {
         sfu.on(SfuEvent.CONNECTION_FAILED, async (e) => {
             const event = e as ConnectionFailedEvent;
-            expect(event.info).toMatch("connection seems to be down");
+            expect(event.reason).toMatch("connection seems to be down");
             done();
         });
         sfu.connect({

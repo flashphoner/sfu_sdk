@@ -79,12 +79,12 @@ import {
     AuthenticationStatusEvent,
     MessageWithUploadingAttachments,
     UpdateMessagesDeliveryStatusEvent,
+    ConnectionFailedEvent,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
-import {Room} from "./room";
 import {ResetPasswordHandler} from "./reset-password-handler";
 
 type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo;
@@ -548,10 +548,18 @@ export class SfuExtended {
                 self.disconnect();
                 self.#downloadingAttachmentState.length = 0;
                 self.#uploadingAttachmentState = {};
+                const event: ConnectionFailedEvent = {
+                    reason: e.reason,
+                    code: e.code as number,
+                    type: SfuEvent.DISCONNECTED,
+                    roomId: '',
+                    internalMessageId: ''
+                }
                 if (e.reason === 'Normal disconnect') {
-                    self.#notifier.notify(SfuEvent.DISCONNECTED, e as InternalMessage);
+                    self.#notifier.notify(SfuEvent.DISCONNECTED, event);
                 } else {
-                    self.#notifier.notify(SfuEvent.CONNECTION_FAILED, e as InternalMessage);
+                    event.type = SfuEvent.CONNECTION_FAILED;
+                    self.#notifier.notify(SfuEvent.CONNECTION_FAILED, event);
                 }
             },
             this.#logger

@@ -1116,7 +1116,8 @@ export type OperationFailedEvent = InternalMessage & {
 }
 
 export type ConnectionFailedEvent = InternalMessage & {
-    info: string
+    reason: string,
+    code?: number
 }
 
 export enum ConnectionType {

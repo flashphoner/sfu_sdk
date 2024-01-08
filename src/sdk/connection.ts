@@ -74,7 +74,7 @@ class WSPingReceiver {
         this.logger.warn(info);
         await this.connection.close({
             type: SfuEvent.CONNECTION_FAILED,
-            info: info
+            reason: info
         } as ConnectionFailedEvent);
     }
 }
