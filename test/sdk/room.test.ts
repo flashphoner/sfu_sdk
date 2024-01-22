@@ -180,6 +180,7 @@ describe("room", () => {
             expect(message.info.userId).toBeTruthy();
             const t = await room0.getRemoteTrack(TrackType.VIDEO, true);
             await t.demandTrack(message.info.info[0].id);
+
             room0.getStats(t.track, StatsType.INBOUND, async (stats) => {
                 expect(stats.type).toBe(StatsType.INBOUND);
                 expect(stats.mediaType).toBe("video");

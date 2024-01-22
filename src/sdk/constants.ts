@@ -224,6 +224,8 @@ export enum InternalApi {
     EVICT_PARTICIPANT = "evictParticipant",
     RENAME_PARTICIPANT = "renameParticipant",
     CHANGE_QUALITY = "changeQuality",
+    CHANGE_SID = "changeSid",
+    CHANGE_TID = "changeTid",
     AUTHORIZE_WAITING_LIST = "authorizeWaitingList",
     MESSAGE = "SFU_MESSAGE",
     MESSAGE_STATE = "SFU_MESSAGE_STATE",
@@ -616,18 +618,13 @@ export type AddRemoveTracks = InternalMessage & {
     }
 }
 
-export type QualityState = InternalMessage & {
+export type TracksQualityState = InternalMessage & {
     info: {
-        userId: UserId,
         nickName: UserNickname,
+        userId:UserId;
         tracks: Array<{
             mid: string,
-            quality: Array<{
-                quality:string,
-                available:boolean,
-                width?: number,
-                height?: number
-            }>,
+            quality: Array<Quality>,
         }>
     }
 }
@@ -1153,6 +1150,21 @@ export type UserPhoneNumber = string;
 export type UserHostKey = string;
 
 export type UserTimezone = string
+
+export type Quality = {
+    quality:string;
+    available:boolean;
+    layersInfo: {
+        spatialLayers:Array<{
+            resolution:{
+                width:number;
+                height:number;
+            };
+            sid:number;
+        }>;
+        temporalLayers:Array<{tid:number}>;
+    }
+}
 
 export const WS_CONNECTION_TIMEOUT = 10000;
 
