@@ -624,7 +624,6 @@ export class Room {
             track: transceiver.receiver.track,
             preferredQuality: undefined,
             tid: undefined,
-            sid:undefined,
             disposed: false,
             demandTrack(remoteTrackId?: string): Promise<void> {
                 if (this.disposed && !!remoteTrackId) {
@@ -661,7 +660,7 @@ export class Room {
                 }
                 transceiver.receiver.track.enabled = true;
                 return room.muteRemoteTrack(transceiver.mid, false);
-            }, setPreferredQuality(quality?: string): Promise<void> {
+            }, setPreferredQuality(quality?: string, tid?: string): Promise<void> {
                 if (this.disposed) {
                     return new Promise<void>(((resolve, reject) => reject()));
                 }
@@ -670,48 +669,20 @@ export class Room {
                     if (quality !== undefined) {
                         self.preferredQuality = quality;
                     }
+                    if (tid !== undefined) {
+                        self.tid = tid;
+                    }
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
                     room.connection.send(InternalApi.CHANGE_QUALITY, {
                         roomId: room._id,
                         id: transceiver.mid,
                         quality: self.preferredQuality,
-                        internalMessageId: id
-                    });
-                });
-            }, setSid(sid:number):Promise<void> {
-                if (this.disposed) {
-                    return new Promise<void>(((resolve, reject) => reject()));
-                }
-                this.sid = sid;
-                const self = this;
-                return new Promise<void>((resolve, reject) => {
-                    const id = uuidv4();
-                    promises.add(id, resolve, reject);
-                    room.connection.send(InternalApi.CHANGE_SID, {
-                        roomId: room._id,
-                        id: transceiver.mid,
-                        sid: self.sid,
-                        internalMessageId: id
-                    });
-                });
-            },setTid(tid:number):Promise<void> {
-                if (this.disposed) {
-                    return new Promise<void>(((resolve, reject) => reject()));
-                }
-                this.tid = tid;
-                const self = this;
-                return new Promise<void>((resolve, reject) => {
-                    const id = uuidv4();
-                    promises.add(id, resolve, reject);
-                    room.connection.send(InternalApi.CHANGE_TID, {
-                        roomId: room._id,
-                        id: transceiver.mid,
                         tid: self.tid,
                         internalMessageId: id
                     });
                 });
-            },async dispose() {
+            }, async dispose() {
                 if (this.disposed) {
                     return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
                 }
@@ -731,15 +702,12 @@ export class Room {
 export interface RemoteTrack {
     readonly track: MediaStreamTrack;
     readonly preferredQuality?: string;
-    readonly tid?: number;
-    readonly sid?: number
+    readonly tid?: string;
     readonly disposed: boolean;
 
     demandTrack(remoteMid?: string): Promise<void>;
-    mute(): Promise<void>;
-    unmute(): Promise<void>;
-    setPreferredQuality(quality?: string): Promise<void>;
-    setSid(sid: number): Promise<void>;
-    setTid(tid: number): Promise<void>;
+    mute(): void;
+    unmute(): void;
+    setPreferredQuality(quality?: string, tid?: string): Promise<void>;
     dispose(): Promise<void>;
 }

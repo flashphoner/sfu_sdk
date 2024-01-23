@@ -1,7 +1,6 @@
-const createControls = function (config) {
+const createControls = function(config) {
 
-    let trackCallback = function () {
-    };
+    let trackCallback = function(){};
 
     const controls = {
         entrance: {
@@ -25,17 +24,16 @@ const createControls = function (config) {
             rid: document.getElementById("addVideoTrackEncodingRid"),
             active: document.getElementById("addVideoTrackEncodingActive"),
             maxBitrate: document.getElementById("addVideoTrackEncodingMaxBitrate"),
-            resolutionScale: document.getElementById("addVideoTrackEncodingResolutionScale"),
-            scalabilityMode: document.getElementById("addVideoTrackScalabilityMode")
+            resolutionScale: document.getElementById("addVideoTrackEncodingResolutionScale")
         },
         tables: {
             video: $('#videoTracksTable').DataTable({
                 "sDom": 't',
                 "columns": [
                     {
-                        "className": 'details-control',
-                        "orderable": false,
-                        "data": null,
+                        "className":      'details-control',
+                        "orderable":      false,
+                        "data":           null,
                         "defaultContent": ''
                     },
                     {"data": "source"},
@@ -60,7 +58,6 @@ const createControls = function (config) {
                     {"data": "active"},
                     {"data": "maxBitrate"},
                     {"data": "resolutionScale"},
-                    {"data": "scalabilityMode"},
                     {"data": "action"}
                 ]
             })
@@ -73,7 +70,7 @@ const createControls = function (config) {
     controls.entrance.roomPin.value = config.room.pin;
     controls.entrance.nickName.value = config.room.nickName;
 
-    const addAudioTrackRow = async function (track) {
+    const addAudioTrackRow = async function(track) {
         const stream = await getMedia([track]);
         let button = '<button id="' + stream.id + '-button" class="btn btn-primary">Delete</button>';
         const row = controls.tables.audio.row.add({
@@ -84,14 +81,14 @@ const createControls = function (config) {
         }).node();
         controls.tables.audio.draw();
 
-        $('#' + stream.id + "-button").on('click', function () {
+        $('#' + stream.id + "-button").on('click', function(){
             //terminate stream
             console.log("terminate audio stream " + stream.id);
             let track = stream.getAudioTracks()[0];
             track.stop();
             track.dispatchEvent(new Event("ended"));
         }).prop('disabled', true);
-        stream.getTracks()[0].onended = function () {
+        stream.getTracks()[0].onended = function() {
             controls.tables.audio.row(row).remove().draw();
         }
         trackCallback({
@@ -102,7 +99,7 @@ const createControls = function (config) {
         });
     }
 
-    const addVideoTrackRow = async function (track) {
+    const addVideoTrackRow = async function(track) {
         const stream = await getMedia([track]);
         let button = '<button id="' + stream.id + '-button" class="btn btn-primary">Delete</button>';
         const row = controls.tables.video.row.add({
@@ -116,14 +113,14 @@ const createControls = function (config) {
         }).node();
         controls.tables.video.draw();
 
-        $('#' + stream.id + "-button").on('click', function () {
+        $('#' + stream.id + "-button").on('click', function(){
             //terminate stream
             console.log("terminate video stream " + stream.id);
             let track = stream.getVideoTracks()[0];
             track.stop();
             track.dispatchEvent(new Event("ended"));
         }).prop('disabled', true);
-        stream.getTracks()[0].addEventListener("ended", function () {
+        stream.getTracks()[0].addEventListener("ended", function() {
             controls.tables.video.row(row).remove().draw();
         });
         trackCallback({
@@ -133,40 +130,40 @@ const createControls = function (config) {
         });
     }
 
-    const format = function (d) {
+    const format = function(d) {
         if (!d.encodings) {
             return;
         }
-        let details = '<table cellpadding="5" cellspacing="0" border="0" style="padding-left:50px;">';
-        d.encodings.forEach(function (encoding) {
+        let details =  '<table cellpadding="5" cellspacing="0" border="0" style="padding-left:50px;">';
+        d.encodings.forEach(function(encoding){
             details += '<tr>';
             for (const [key, value] of Object.entries(encoding)) {
-                details += '<td>' + key + '</td>' +
-                    '<td>' + value + '</td>';
+                details += '<td>'+ key + '</td>'+
+                    '<td>'+ value + '</td>';
             }
             details += '</tr>';
         });
-        details += '</table>';
+        details +='</table>';
         return details;
     }
 
-    const muteForm = function (form) {
+    const muteForm = function(form) {
         for (const [key, value] of Object.entries(form)) {
             value.disabled = true;
         }
     }
 
-    const unmuteForm = function (form) {
+    const unmuteForm = function(form) {
         for (const [key, value] of Object.entries(form)) {
             value.disabled = false;
         }
     }
 
-    const muteInput = function () {
+    const muteInput = function() {
         muteForm(controls.entrance);
     }
 
-    const roomConfig = function () {
+    const roomConfig = function() {
         let roomConfig = {
             url: controls.entrance.url.value,
             roomName: controls.entrance.roomName.value,
@@ -182,9 +179,9 @@ const createControls = function (config) {
         return roomConfig;
     }
 
-    const getVideoStreams = function () {
+    const getVideoStreams = function() {
         let streams = [];
-        controls.tables.video.rows().every(function (rowIdx, tableLoop, rowLoop) {
+        controls.tables.video.rows().every(function(rowIdx, tableLoop, rowLoop) {
             let data = this.data();
             streams.push({
                 stream: data.stream,
@@ -195,9 +192,9 @@ const createControls = function (config) {
         });
         return streams;
     }
-    const getAudioStreams = function () {
+    const getAudioStreams = function() {
         let streams = [];
-        controls.tables.audio.rows().every(function (rowIdx, tableLoop, rowLoop) {
+        controls.tables.audio.rows().every(function(rowIdx, tableLoop, rowLoop) {
             let data = this.data();
             streams.push({
                 stream: data.stream,
@@ -208,11 +205,11 @@ const createControls = function (config) {
         return streams;
     }
 
-    const onTrack = function (callback) {
+    const onTrack = function(callback) {
         trackCallback = callback;
     }
 
-    const displayTables = async function () {
+    const displayTables = async function() {
         // Add event listener for opening and closing details
         $('#videoTracksTableBody').on('click', 'td.details-control', function () {
             let tr = $(this).closest('tr');
@@ -237,16 +234,15 @@ const createControls = function (config) {
         }
 
         // Click event listener to add a new video track
-        document.getElementById("addVideoTrack").addEventListener("click", function (e) {
+        document.getElementById("addVideoTrack").addEventListener("click", function(e){
             let encodings = [];
-            controls.tables.encodings.rows().every(function () {
+            controls.tables.encodings.rows().every(function() {
                 let encoding = this.data();
                 encodings.push({
                     rid: encoding.rid,
                     active: encoding.active,
                     maxBitrate: encoding.maxBitrate,
-                    scaleResolutionDownBy: encoding.resolutionScale,
-                    scalabilityMode: encoding.scalabilityMode
+                    scaleResolutionDownBy: encoding.resolutionScale
                 })
             });
             let track = {
@@ -258,27 +254,26 @@ const createControls = function (config) {
             }
             addVideoTrackRow(track);
         });
-
+    
         // Click event listener to remove video quality
-        $("#videoTrackEncodingsTable").on("click", ".remove", function () {
+        $("#videoTrackEncodingsTable").on("click", ".remove", function(){
             controls.tables.encodings.row($(this).parents('tr')).remove().draw();
         });
-
+    
         // Click event listener to add video quality
-        document.getElementById("addVideoTrackEncoding").addEventListener("click", function () {
+        document.getElementById("addVideoTrackEncoding").addEventListener("click", function(){
             let button = '<button class="btn btn-primary remove">Delete</button>';
             controls.tables.encodings.row.add({
                 rid: controls.addVideoEncoding.rid.value,
                 active: controls.addVideoEncoding.active.value,
                 maxBitrate: controls.addVideoEncoding.maxBitrate.value,
                 resolutionScale: controls.addVideoEncoding.resolutionScale.value,
-                scalabilityMode: controls.addVideoEncoding.scalabilityMode.value,
                 action: button
             }).draw();
         });
 
         // Click event listener to add a new audio track
-        document.getElementById("addAudioTrack").addEventListener("click", function (e) {
+        document.getElementById("addAudioTrack").addEventListener("click", function(e){
             let encodings = [];
             let track = {
                 source: controls.addAudioTrack.source.value,
@@ -287,10 +282,10 @@ const createControls = function (config) {
             }
             addAudioTrackRow(track);
         });
-
+    
     }
 
-    const cleanTables = function () {
+    const cleanTables = function() {
         controls.tables.video.rows().remove().draw();
         controls.tables.audio.rows().remove().draw();
         controls.tables.encodings.rows().remove().draw();
@@ -303,16 +298,15 @@ const createControls = function (config) {
         getAudioStreams: getAudioStreams,
         getVideoStreams: getVideoStreams,
         onTrack: onTrack,
-        cleanTables: cleanTables,
-        controls: controls
+        cleanTables: cleanTables
     }
 }
 
-const getMedia = async function (tracks) {
+const getMedia = async function(tracks) {
     //convert to constraints
     let screen = false;
-    const constraints = {};
-    tracks.forEach(function (track) {
+    const constraints= {};
+    tracks.forEach(function(track){
         if (track.source === "mic") {
             //audio
             constraints.audio = {};

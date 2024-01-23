@@ -36,37 +36,6 @@ const defaultConfig = {
     }
 };
 
-const scalabilityModes = [
-    'L1T1',
-    'L1T2',
-    'L1T3',
-    'L2T1',
-    'L2T2',
-    'L2T3',
-    'L3T1',
-    'L3T2',
-    'L3T3',
-    'L2T1h',
-    'L2T2h',
-    'L2T3h',
-    'S2T1',
-    'S2T2',
-    'S2T3',
-    'S2T1h',
-    'S2T2h',
-    'S2T3h',
-    'S3T1',
-    'S3T2',
-    'S3T3',
-    'S3T1h',
-    'S3T2h',
-    'S3T3h',
-    'L2T2_KEY',
-    'L2T3_KEY',
-    'L3T2_KEY',
-    'L3T3_KEY'
-];
-
 /**
  * Load track configuration and show entrance modal
  */
@@ -202,50 +171,10 @@ const publishPreconfiguredStreams = async function (room, pc, streams) {
             localDisplay.add(s.stream.id, "local", s.stream, contentType);
         });
         //join room
-        await room.join(pc, null, config, 1);
+        await room.join(pc, null, config, 10);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
             $('#' + s.stream.id + "-button").prop('disabled', false);
-        });
-        cControls.controls.addVideoTrack.codec.addEventListener('change', async (event) => {
-            const mimeType = "video/" + event.target.value;
-            while (cControls.controls.addVideoEncoding.scalabilityMode.firstChild) {
-                cControls.controls.addVideoEncoding.scalabilityMode.firstChild.remove();
-            }
-            const option = document.createElement('option');
-            option.value = '';
-            option.innerText = 'NONE';
-            cControls.controls.addVideoEncoding.scalabilityMode.appendChild(option);
-
-            const capabilityPromises = [];
-            for (const mode of scalabilityModes) {
-                capabilityPromises.push(navigator.mediaCapabilities.encodingInfo({
-                    type: 'webrtc',
-                    video: {
-                        contentType: mimeType,
-                        width: 640,
-                        height: 480,
-                        bitrate: 10000,
-                        framerate: 29.97,
-                        scalabilityMode: mode
-                    }
-                }));
-            }
-            const capabilityResults = await Promise.all(capabilityPromises);
-            for (let i = 0; i < scalabilityModes.length; ++i) {
-                if (capabilityResults[i].supported) {
-                    const option = document.createElement('option');
-                    option.value = scalabilityModes[i];
-                    option.innerText = scalabilityModes[i];
-                    cControls.controls.addVideoEncoding.scalabilityMode.appendChild(option);
-                }
-            }
-
-            if (cControls.controls.addVideoEncoding.scalabilityMode.childElementCount > 1) {
-                cControls.controls.addVideoEncoding.scalabilityMode.disabled = false;
-            } else {
-                cControls.controls.addVideoEncoding.scalabilityMode.disabled = true;
-            }
         });
     } catch (e) {
         onOperationFailed("Failed to publish a preconfigured streams", e);
@@ -330,13 +259,6 @@ const subscribeTrackToEndedEvent = function (room, track, pc) {
  * @param {*} encodings
  */
 const addTrackToPeerConnection = function (pc, stream, track, encodings) {
-    if (encodings) {
-        for (const encoding of encodings) {
-            if (encoding.scalabilityMode === "") {
-                delete encoding.scalabilityMode;
-            }
-        }
-    }
     pc.addTransceiver(track, {
         direction: "sendonly",
         streams: [stream],

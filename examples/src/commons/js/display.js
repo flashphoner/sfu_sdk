@@ -534,9 +534,9 @@ const createOneToManyParticipantView = function () {
         removeVideoTrack: function (track) {
             player.removeVideoTrack(track);
         },
-        addVideoSource: function (remoteVideoTrack, track, onResize, muteHandler, onSidClick, onTidClick) {
+        addVideoSource: function (remoteVideoTrack, track, onResize, muteHandler) {
             this.currentTrack = track;
-            player.setVideoSource(remoteVideoTrack, onResize, muteHandler, onSidClick, onTidClick);
+            player.setVideoSource(remoteVideoTrack, onResize, muteHandler);
         },
         removeVideoSource: function (track) {
             if (this.currentTrack && this.currentTrack.mid === track.mid) {
@@ -561,11 +561,11 @@ const createOneToManyParticipantView = function () {
             const additionalUserId = userId ? "#" + getShortUserId(userId) : "";
             participantNicknameDisplay.innerText = "Name: " + nickname + additionalUserId;
         },
-        updateQuality: function (track, quality) {
-            player.updateQuality(quality);
+        updateQuality: function (track, qualityName, available) {
+            player.updateQuality(qualityName, available);
         },
-        addQuality: function (track, quality, onQualityPick) {
-            player.addQuality(quality, onQualityPick);
+        addQuality: function (track, qualityName, available, onQualityPick) {
+            player.addQuality(qualityName, available, onQualityPick);
         },
         clearQualityState: function (track) {
             player.clearQualityState();
@@ -593,54 +593,25 @@ const createVideoPlayer = function (participantDiv) {
     const trackDisplay = createContainer(streamDisplay);
 
     let videoElement;
-    // traciId/
-    // {btn: button,
-    // qualities:Map{quality
-    //      {name:string,
-    //      available:boolean,
-    //      btn: button,
-    //             spatialLayersInfo:Map{
-    //                  available:boolean,
-    //                  resolution{width:number,height:number},
-    //                  sid:number,
-    //                  btn: button},
-    //                  temporalLayersInfo:Map{
-    //                  available:boolean,
-    //                  tid:number,
-    //                  btn: button}
-    //                  }
-    //      }
 
-    const tracksInfo = new Map();
+    const trackButtons = new Map();
     const qualityButtons = new Map();
 
     const lock = function () {
-        for (const btn of tracksInfo.values()) {
+        for (const btn of trackButtons.values()) {
             btn.disabled = true;
         }
         for (const state of qualityButtons.values()) {
             state.btn.disabled = true;
-            for (const [sid, spatialLayerButton] of state.layerButtons.spatialLayerButtons) {
-                spatialLayerButton.btn.disabled = true;
-            }
-            for (const [sid, temporalLayerButton] of state.layerButtons.temporalLayerButtons) {
-                temporalLayerButton.btn.disabled = true;
-            }
         }
     }
 
     const unlock = function () {
-        for (const btn of tracksInfo.values()) {
+        for (const btn of trackButtons.values()) {
             btn.disabled = false;
         }
         for (const state of qualityButtons.values()) {
             state.btn.disabled = false;
-            for (const [sid, spatialLayerButton] of state.layerButtons.spatialLayerButtons) {
-                spatialLayerButton.btn.disabled = false;
-            }
-            for (const [sid, temporalLayerButton] of state.layerButtons.temporalLayerButtons) {
-                temporalLayerButton.btn.disabled = false;
-            }
         }
     }
 
@@ -677,24 +648,9 @@ const createVideoPlayer = function (participantDiv) {
 
     const repickQuality = function (qualityName) {
         for (const [quality, state] of qualityButtons.entries()) {
-            state.layerButtons.temporalLayerButtons.forEach((lState, __) => {
-                if(lState.btn.style.color === QUALITY_COLORS.SELECTED) {
-                    lState.btn.style.color = QUALITY_COLORS.AVAILABLE;
-                }
-            });
-            state.layerButtons.spatialLayerButtons.forEach((lState, __) => {
-                if(lState.btn.style.color === QUALITY_COLORS.SELECTED) {
-                    lState.btn.style.color = QUALITY_COLORS.AVAILABLE;
-                }
-            });
             if (quality === qualityName) {
-                state.layerButtons.temporalLayerButtons.forEach((lState, __) => showItem(lState.btn));
-                state.layerButtons.spatialLayerButtons.forEach((lState, __) => showItem(lState.btn));
-
                 state.btn.style.color = QUALITY_COLORS.SELECTED;
             } else if (state.btn.style.color === QUALITY_COLORS.SELECTED) {
-                state.layerButtons.temporalLayerButtons.forEach((lState, __) => hideItem(lState.btn));
-                state.layerButtons.spatialLayerButtons.forEach((lState, __) => hideItem(lState.btn));
                 if (state.available) {
                     state.btn.style.color = QUALITY_COLORS.AVAILABLE;
                 } else {
@@ -704,52 +660,22 @@ const createVideoPlayer = function (participantDiv) {
         }
     }
 
-    const repickSid = function (qualityName, sid) {
-        const qualityState = qualityButtons.get(qualityName);
-        for (const [__, state] of qualityState.layerButtons.spatialLayerButtons.entries()) {
-            if (state.layerInfo.sid === sid) {
-                state.btn.style.color = QUALITY_COLORS.SELECTED;
-            } else if (state.layerInfo.available) {
-                state.btn.style.color = QUALITY_COLORS.AVAILABLE;
-            } else {
-                state.btn.style.color = QUALITY_COLORS.UNAVAILABLE;
-            }
-        }
-    }
-
-    const repickTid = function (qualityName, tid) {
-        const qualityState = qualityButtons.get(qualityName);
-        for (const [__, state] of qualityState.layerButtons.temporalLayerButtons.entries()) {
-            if (state.layerInfo.tid === tid) {
-                state.btn.style.color = QUALITY_COLORS.SELECTED;
-            } else if (state.layerInfo.available) {
-                state.btn.style.color = QUALITY_COLORS.AVAILABLE;
-            } else {
-                state.btn.style.color = QUALITY_COLORS.UNAVAILABLE;
-            }
-        }
-    }
-
     return {
         rootDiv: streamDisplay,
         muteButton: null,
         autoButton: null,
-        tidListener: null,
-        sidListener: null,
         dispose: function () {
             streamDisplay.remove();
         },
         clearQualityState: function () {
             qualityButtons.forEach((state, qName) => {
                 state.btn.remove();
-                state.layerButtons.temporalLayerButtons.forEach((lState, __) => lState.btn.remove());
-                state.layerButtons.spatialLayerButtons.forEach((lState, __) => lState.btn.remove());
             });
             qualityButtons.clear();
         },
         addVideoTrack: function (track, asyncCallback) {
             const trackButton = document.createElement("button");
-            tracksInfo.set(track.mid, trackButton);
+            trackButtons.set(track.mid, trackButton);
             trackButton.innerText = "Track №" + track.mid + ": " + track.contentType;
             trackButton.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
             trackButton.style.color = QUALITY_COLORS.AVAILABLE;
@@ -770,13 +696,13 @@ const createVideoPlayer = function (participantDiv) {
             trackDisplay.appendChild(trackButton);
         },
         removeVideoTrack: function (track) {
-            const trackButton = tracksInfo.get(track.mid);
+            const trackButton = trackButtons.get(track.mid);
             if (trackButton) {
                 trackButton.remove();
-                tracksInfo.delete(track.mid);
+                trackButtons.delete(track.mid);
             }
         },
-        setVideoSource: function (remoteVideoTrack, onResize, onMute, onSidClick, onTidClick) {
+        setVideoSource: function (remoteVideoTrack, onResize, onMute) {
             if (!this.muteButton) {
                 const newVideoMuteBtn = document.createElement("button");
                 this.muteButton = newVideoMuteBtn;
@@ -798,8 +724,6 @@ const createVideoPlayer = function (participantDiv) {
                 });
                 videoMuteDisplay.appendChild(newVideoMuteBtn);
             }
-            this.sidListener = onSidClick;
-            this.tidListener = onTidClick;
 
             if (videoElement) {
                 videoElement.remove();
@@ -854,7 +778,7 @@ const createVideoPlayer = function (participantDiv) {
             if (videoElement) {
                 showItem(videoElement);
             }
-            for (const [mid, btn] of tracksInfo.entries()) {
+            for (const [mid, btn] of trackButtons.entries()) {
                 if (mid === track.mid) {
                     btn.style.color = QUALITY_COLORS.SELECTED;
                 } else if (btn.style.color === QUALITY_COLORS.SELECTED) {
@@ -864,191 +788,39 @@ const createVideoPlayer = function (participantDiv) {
             trackNameDisplay.innerText = "Current video track: " + track.mid;
             showItem(trackNameDisplay);
         },
-        updateQuality: function (quality) {
-            console.log("updateQuality" + quality.available);
-            const qualityInfo = qualityButtons.get(quality.quality);
-            if (qualityInfo) {
-                const qualityButton = qualityInfo.btn;
-                qualityInfo.available = quality.available;
-                const isSelectedQuality = qualityButton.style.color === QUALITY_COLORS.SELECTED;
-
-                if (quality.available) {
-                    if(!isSelectedQuality) {
-                        qualityButton.style.color = QUALITY_COLORS.AVAILABLE;
-                    }
+        updateQuality: function (qualityName, available) {
+            const value = qualityButtons.get(qualityName);
+            if (value) {
+                const qualityButton = value.btn;
+                value.available = available;
+                if (qualityButton.style.color === QUALITY_COLORS.SELECTED) {
+                    return;
+                }
+                if (available) {
+                    qualityButton.style.color = QUALITY_COLORS.AVAILABLE;
                 } else {
                     qualityButton.style.color = QUALITY_COLORS.UNAVAILABLE;
                 }
-                const self = this;
-                for (const spatialLayer of quality.layersInfo.spatialLayers) {
-                    const localLayerInfo = qualityInfo.layerButtons.spatialLayerButtons.get(spatialLayer.sid);
-                    if (localLayerInfo) {
-                        if (spatialLayer.available) {
-                            localLayerInfo.btn.style.color = QUALITY_COLORS.AVAILABLE;
-                        } else {
-                            localLayerInfo.btn.style.color = QUALITY_COLORS.UNAVAILABLE;
-                        }
-                        localLayerInfo.btn.innerText = "sid-" + spatialLayer.sid + " | " + spatialLayer.resolution.width + "x" + spatialLayer.resolution.height;
-                    } else {
-                        const layerButton = document.createElement("button");
-                        layerButton.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-                        if (!isSelectedQuality) {
-                            hideItem(layerButton);
-                        }
-                        layerButton.innerText = "sid-" + spatialLayer.sid + " | " + spatialLayer.resolution.width + "x" + spatialLayer.resolution.height;
-                        layerButton.addEventListener('click', async function () {
-                            console.log("Clicked on sid button " + spatialLayer.sid);
-                            if (layerButton.style.color === QUALITY_COLORS.SELECTED || layerButton.style.color === QUALITY_COLORS.UNAVAILABLE || !videoElement) {
-                                return;
-                            }
-                            if (self.sidListener) {
-                                lock();
-                                self.sidListener(spatialLayer.sid).finally(() => {
-                                    unlock();
-                                    repickSid(quality.quality, spatialLayer.sid);
-                                });
-                            }
-                        });
-                        if (spatialLayer.available) {
-                            layerButton.style.color = QUALITY_COLORS.AVAILABLE;
-                        } else {
-                            layerButton.style.color = QUALITY_COLORS.UNAVAILABLE;
-                        }
-                        qualityInfo.layerButtons.spatialLayerButtons.set(spatialLayer.sid, {
-                            btn: layerButton,
-                            layerInfo: spatialLayer
-                        });
-                        qualityDisplay.appendChild(layerButton);
-                    }
-                }
-
-                for (const temporalLayer of quality.layersInfo.temporalLayers) {
-                    const localLayerInfo = qualityInfo.layerButtons.temporalLayerButtons.get(temporalLayer.tid);
-                    if (localLayerInfo) {
-                        if (temporalLayer.available) {
-                            localLayerInfo.btn.style.color = QUALITY_COLORS.AVAILABLE;
-                        } else {
-                            localLayerInfo.btn.style.color = QUALITY_COLORS.UNAVAILABLE;
-                        }
-                        localLayerInfo.btn.innerText = "tid-" + temporalLayer.tid;
-                    } else {
-                        const layerButton = document.createElement("button");
-                        layerButton.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-                        if (!isSelectedQuality) {
-                            hideItem(layerButton);
-                        }
-                        layerButton.innerText = "tid-" + temporalLayer.tid;
-                        layerButton.addEventListener('click', async function () {
-                            console.log("Clicked on tid button " + temporalLayer.tid);
-                            if (layerButton.style.color === QUALITY_COLORS.SELECTED || layerButton.style.color === QUALITY_COLORS.UNAVAILABLE || !videoElement) {
-                                return;
-                            }
-                            if (self.tidListener) {
-                                lock();
-                                self.tidListener(temporalLayer.tid).finally(() => {
-                                    unlock();
-                                    repickTid(quality.quality, temporalLayer.tid);
-                                });
-                            }
-                        });
-                        if (temporalLayer.available) {
-                            layerButton.style.color = QUALITY_COLORS.AVAILABLE;
-                        } else {
-                            layerButton.style.color = QUALITY_COLORS.UNAVAILABLE;
-                        }
-                        qualityInfo.layerButtons.temporalLayerButtons.set(temporalLayer.tid, {
-                            btn: layerButton,
-                            layerInfo: temporalLayer
-                        })
-                        qualityDisplay.appendChild(layerButton);
-                    }
-                }
             }
         },
-        addQuality: function (quality, onQualityClick) {
-            console.log("addQuality" + quality.available);
-
+        addQuality: function (qualityName, available, onPickQuality) {
             const qualityButton = document.createElement("button");
-            qualityButton.innerText = quality.quality;
+            qualityButtons.set(qualityName, {btn: qualityButton, available: available});
+            qualityButton.innerText = qualityName;
             qualityButton.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-            if (quality.available) {
+            if (available) {
                 qualityButton.style.color = QUALITY_COLORS.AVAILABLE;
             } else {
                 qualityButton.style.color = QUALITY_COLORS.UNAVAILABLE;
             }
             qualityDisplay.appendChild(qualityButton);
-            const self = this;
             qualityButton.addEventListener('click', async function () {
-                console.log("Clicked on quality button " + quality.quality);
+                console.log("Clicked on quality button " + qualityName);
                 if (qualityButton.style.color === QUALITY_COLORS.SELECTED || qualityButton.style.color === QUALITY_COLORS.UNAVAILABLE || !videoElement) {
                     return;
                 }
                 lock();
-                onQualityClick().finally(() => {
-                    unlock();
-                    repickQuality(quality.quality);
-                });
-            });
-
-            const spatialLayers = new Map();
-            for (const spatialLayer of quality.layersInfo.spatialLayers) {
-                const layerButton = document.createElement("button");
-                layerButton.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-                hideItem(layerButton);
-                layerButton.innerText = "sid-" + spatialLayer.sid + " | " + spatialLayer.resolution.width + "x" + spatialLayer.resolution.height;
-                layerButton.addEventListener('click', async function () {
-                    console.log("Clicked on sid button " + spatialLayer.sid);
-                    if (layerButton.style.color === QUALITY_COLORS.SELECTED || layerButton.style.color === QUALITY_COLORS.UNAVAILABLE || !videoElement) {
-                        return;
-                    }
-                    if (self.sidListener) {
-                        lock();
-                        self.sidListener(spatialLayer.sid).finally(() => {
-                            unlock();
-                            repickSid(quality.quality, spatialLayer.sid);
-                        });
-                    }
-                });
-                if (spatialLayer.available) {
-                    layerButton.style.color = QUALITY_COLORS.AVAILABLE;
-                } else {
-                    layerButton.style.color = QUALITY_COLORS.UNAVAILABLE;
-                }
-                spatialLayers.set(spatialLayer.sid, {btn: layerButton, layerInfo: spatialLayer});
-                qualityDisplay.appendChild(layerButton);
-            }
-
-            const temporalLayers = new Map();
-            for (const temporalLayer of quality.layersInfo.temporalLayers) {
-                const layerButton = document.createElement("button");
-                layerButton.setAttribute("style", "display:inline-block; border: solid; border-width: 1px");
-                hideItem(layerButton);
-                layerButton.innerText = "tid-" + temporalLayer.tid;
-                layerButton.addEventListener('click', async function () {
-                    console.log("Clicked on tid button " + temporalLayer.tid);
-                    if (layerButton.style.color === QUALITY_COLORS.SELECTED || layerButton.style.color === QUALITY_COLORS.UNAVAILABLE || !videoElement) {
-                        return;
-                    }
-                    if (self.tidListener) {
-                        lock();
-                        self.tidListener(temporalLayer.tid).finally(() => {
-                            unlock();
-                            repickTid(quality.quality, temporalLayer.tid);
-                        });
-                    }
-                });
-                if (temporalLayer.available) {
-                    layerButton.style.color = QUALITY_COLORS.AVAILABLE;
-                } else {
-                    layerButton.style.color = QUALITY_COLORS.UNAVAILABLE;
-                }
-                temporalLayers.set(temporalLayer.tid, {btn: layerButton, layerInfo: temporalLayer})
-                qualityDisplay.appendChild(layerButton);
-            }
-            qualityButtons.set(quality.quality, {
-                btn: qualityButton,
-                available: quality.available,
-                layerButtons: {spatialLayerButtons: spatialLayers, temporalLayerButtons: temporalLayers}
+                onPickQuality().finally(() => unlock());
             });
         },
         pickQuality: function (qualityName) {
@@ -1158,10 +930,10 @@ const createOneToOneParticipantView = function () {
                 player.dispose();
             }
         },
-        addVideoSource: function (remoteVideoTrack, track, onResize, muteHandler, onSidClick, onTidClick) {
+        addVideoSource: function (remoteVideoTrack, track, onResize, muteHandler) {
             const player = videoPlayers.get(track.mid);
             if (player) {
-                player.setVideoSource(remoteVideoTrack, onResize, muteHandler, onSidClick, onTidClick);
+                player.setVideoSource(remoteVideoTrack, onResize, muteHandler);
             }
         },
         removeVideoSource: function (track) {
@@ -1197,10 +969,10 @@ const createOneToOneParticipantView = function () {
                 player.updateQuality(qualityName, available);
             }
         },
-        addQuality: function (track, quality, onQualityPick) {
+        addQuality: function (track, qualityName, available, onQualityPick) {
             const player = videoPlayers.get(track.mid);
             if (player) {
-                player.addQuality(quality, onQualityPick);
+                player.addQuality(qualityName, available, onQualityPick);
             }
         },
         pickQuality: function (track, qualityName) {
@@ -1268,10 +1040,6 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                         } else {
                             return self.unmuteVideo(track);
                         }
-                    }, (sid) => {
-                        return remoteTrack.setSid(sid)
-                    }, (tid) => {
-                        return remoteTrack.setTid(tid)
                     });
                     self.requestVideoTrack(track, remoteTrack).then(() => {
                         participantView.showVideoTrack(track);
@@ -1359,23 +1127,6 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                         const quality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                         if (quality) {
                             quality.available = remoteQualityInfo.available;
-                            for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
-                                const localTidInfo = quality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                                if(localTidInfo) {
-                                    localTidInfo.available = info.available;
-                                } else {
-                                    quality.layersInfo.temporalLayers.push(info);
-                                }
-                            }
-                            for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
-                                const localSidInfo = quality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                                if(localSidInfo) {
-                                    localSidInfo.available = info.available;
-                                    localSidInfo.resolution = info.resolution;
-                                } else {
-                                    quality.layersInfo.spatialLayers.push(info);
-                                }
-                            }
                         } else {
                             track.quality.push(remoteQualityInfo);
                         }
@@ -1385,7 +1136,7 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                 let abrManager = this.abrManagers.get(track.id);
                 if (abrManager && track.quality.length === 0 && remoteTrackQuality.quality.length > 0) {
                     const self = this;
-                    participantView.addQuality(track, {quality:"Auto",available:true,layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                    participantView.addQuality(track, "Auto", true, async () => {
                         const manager = self.abrManagers.get(track.id);
                         if (!manager) {
                             return;
@@ -1404,23 +1155,6 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                     const localQuality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                     if (localQuality) {
                         localQuality.available = remoteQualityInfo.available;
-                        for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
-                            const localTidInfo = localQuality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                            if(localTidInfo) {
-                                localTidInfo.available = info.available;
-                            } else {
-                                localQuality.layersInfo.temporalLayers.push(info);
-                            }
-                        }
-                        for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
-                            const localSidInfo = localQuality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                            if(localSidInfo) {
-                                localSidInfo.available = info.available;
-                                localSidInfo.resolution = info.resolution;
-                            } else {
-                                localQuality.layersInfo.spatialLayers.push(info);
-                            }
-                        }
                         if (abrManager) {
                             abrManager.setQualityAvailable(remoteQualityInfo.quality, remoteQualityInfo.available);
                         }
@@ -1435,13 +1169,13 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                         }
                         if (displayOptions.quality) {
                             const self = this;
-                            participantView.addQuality(track, remoteQualityInfo, async (sid, tid) => {
+                            participantView.addQuality(track, remoteQualityInfo.quality, remoteQualityInfo.available, async () => {
                                 const manager = self.abrManagers.get(track.id);
                                 if (manager) {
                                     manager.setManual();
                                     manager.setQuality(remoteQualityInfo.quality);
                                 }
-                                return self.pickQuality(track, remoteQualityInfo.quality, sid, tid);
+                                return self.pickQuality(track, remoteQualityInfo.quality);
                             });
                         }
                     }
@@ -1474,7 +1208,7 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                         abrManager.setTrack(remoteTrack);
                         abrManager.stop();
                         if (track.quality.length > 0) {
-                            participantView.addQuality(track, {quality:"Auto",available:true, layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                            participantView.addQuality(track, "Auto", true, async () => {
                                 const manager = self.abrManagers.get(track.id);
                                 if (!manager) {
                                     return;
@@ -1496,7 +1230,7 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                             abrManager.setQualityAvailable(qualityDescriptor.quality, qualityDescriptor.available);
                         }
                         if (displayOptions.quality) {
-                            participantView.addQuality(track, qualityDescriptor, async () => {
+                            participantView.addQuality(track, qualityDescriptor.quality, qualityDescriptor.available, async () => {
                                 const manager = self.abrManagers.get(track.id);
                                 if (manager) {
                                     manager.setManual();
@@ -1514,11 +1248,11 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                 });
             });
         },
-        pickQuality: async function (track, qualityName, tid, sid) {
+        pickQuality: async function (track, qualityName) {
             let remoteVideoTrack = this.remoteVideoTracks.get(track.mid);
             if (remoteVideoTrack) {
-                return remoteVideoTrack.setPreferredQuality(qualityName, sid, tid).then(() => {
-                    participantView.pickQuality(track, qualityName, sid, tid);
+                return remoteVideoTrack.setPreferredQuality(qualityName).then(() => {
+                    participantView.pickQuality(track, qualityName);
                 });
             }
         },
@@ -1577,10 +1311,6 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                 } else {
                     return model.unmuteVideo(anotherTrack);
                 }
-            }, (sid) => {
-                return model.remoteVideoTrack.setSid(sid)
-            }, (tid) => {
-                return model.remoteVideoTrack.setTid(tid)
             });
             model.requestVideoTrack(anotherTrack, model.remoteVideoTrack).then(() => {
                 participantView.showVideoTrack(anotherTrack)
@@ -1742,7 +1472,7 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
 
         },
         setUserId: function (userId) {
-            this.userId = userId;
+          this.userId = userId;
         },
         setNickname: function (nickname) {
             this.nickname = nickname;
@@ -1760,32 +1490,15 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                         const quality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                         if (quality) {
                             quality.available = remoteQualityInfo.available;
-                            for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
-                                const localTidInfo = quality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                                if(localTidInfo) {
-                                    localTidInfo.available = info.available;
-                                } else {
-                                    quality.layersInfo.temporalLayers.push(info);
-                                }
-                            }
-                            for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
-                                const localSidInfo = quality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                                if(localSidInfo) {
-                                    localSidInfo.available = info.available;
-                                    localSidInfo.resolution = info.resolution;
-                                } else {
-                                    quality.layersInfo.spatialLayers.push(info);
-                                }
-                            }
                         } else {
                             track.quality.push(remoteQualityInfo);
                         }
                     }
-                    continue;
+                    return;
                 }
                 if (this.abr && track.quality.length === 0 && remoteTrackQuality.quality.length > 0) {
                     const self = this;
-                    participantView.addQuality(track, {quality:"Auto",available:true, layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                    participantView.addQuality(track, "Auto", true, async () => {
                         if (!self.abr) {
                             return;
                         }
@@ -1803,28 +1516,11 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                     const localQuality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                     if (localQuality) {
                         localQuality.available = remoteQualityInfo.available;
-                        for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
-                            const localTidInfo = localQuality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                            if(localTidInfo) {
-                                localTidInfo.available = info.available;
-                            } else {
-                                localQuality.layersInfo.temporalLayers.push(info);
-                            }
-                        }
-                        for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
-                            const localSidInfo = localQuality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                            if(localSidInfo) {
-                                localSidInfo.available = info.available;
-                                localSidInfo.resolution = info.resolution;
-                            } else {
-                                localQuality.layersInfo.spatialLayers.push(info);
-                            }
-                        }
                         if (this.abr) {
                             this.abr.setQualityAvailable(remoteQualityInfo.quality, remoteQualityInfo.available)
                         }
                         if (displayOptions.quality) {
-                            participantView.updateQuality(track, remoteQualityInfo);
+                            participantView.updateQuality(track, localQuality.quality, localQuality.available);
                         }
                     } else {
                         track.quality.push(remoteQualityInfo);
@@ -1834,7 +1530,7 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                         }
                         if (displayOptions.quality) {
                             const self = this;
-                            participantView.addQuality(track, remoteQualityInfo, async () => {
+                            participantView.addQuality(track, remoteQualityInfo.quality, remoteQualityInfo.available, async () => {
                                 if (self.abr) {
                                     self.abr.setManual();
                                     self.abr.setQuality(remoteQualityInfo.quality);
@@ -1867,7 +1563,7 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                         self.abr.setTrack(remoteTrack);
 
                         if (track.quality.length > 0) {
-                            participantView.addQuality(track, {quality:"Auto",available:true,layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                            participantView.addQuality(track, "Auto", true, async () => {
                                 if (!self.abr) {
                                     return;
                                 }
@@ -1888,7 +1584,7 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                             self.abr.setQualityAvailable(qualityDescriptor.quality, qualityDescriptor.available);
                         }
                         if (displayOptions.quality) {
-                            participantView.addQuality(track, qualityDescriptor, async () => {
+                            participantView.addQuality(track, qualityDescriptor.quality, qualityDescriptor.available, async () => {
                                 if (self.abr) {
                                     self.abr.setManual();
                                     self.abr.setQuality(qualityDescriptor.quality);
