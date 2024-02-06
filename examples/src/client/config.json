@@ -15,10 +15,13 @@
         "source": "camera",
         "width": 1280,
         "height": 720,
-        "codec": "H264",
+        "codec": "vp9",
         "encodings": [
-          { "rid": "m", "active": true, "maxBitrate": 300000, "scaleResolutionDownBy": 2 },
-          { "rid": "h", "active": true, "maxBitrate": 900000 }
+          {
+            "rid": "nonsense",
+            "active": true,
+            "scalabilityMode": "L1T3"
+          }
         ]
       }]
     }

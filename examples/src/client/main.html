@@ -71,6 +71,7 @@
                                     <select class="form-select-sm" id="addVideoTrackCodec">
                                         <option value="H264" selected>H264</option>
                                         <option value="VP8">VP8</option>
+                                        <option value="VP9">VP9</option>
                                     </select>
                                 </th>
                                 <th>
@@ -90,6 +91,7 @@
                                         <th>Active</th>
                                         <th>MaxBitrate</th>
                                         <th>ResolutionScale</th>
+                                        <th>Scalability Mode</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
@@ -117,6 +119,11 @@
                                                 <option value="2">2</option>
                                                 <option value="4">4</option>
                                                 <option value="6">6</option>
+                                            </select>
+                                        </th>
+                                        <th>
+                                            <select class="form-select-sm" id="addVideoTrackScalabilityMode">
+                                                <option selected value="">NONE</option>
                                             </select>
                                         </th>
                                         <th>
