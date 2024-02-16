@@ -189,9 +189,11 @@ const statsToTable = function(stats) {
                 pStats.push(trackToTable(track, participant.nickName, "NA"));
                 tracksOut++;
                 bitrateOut += track.bitrate;
-                firOut += track.feedbackStats.receivedFIR;
-                pliOut += track.feedbackStats.receivedPLI;
-                nackOut += track.feedbackStats.receivedNACK;
+                if (track.type === 'video' && track.feedbackStats) {
+                    firOut += track.feedbackStats.receivedFIR;
+                    pliOut += track.feedbackStats.receivedPLI;
+                    nackOut += track.feedbackStats.receivedNACK;
+                }
             }
         });
         participant.incomingTracks.forEach(function(track) {
