@@ -644,7 +644,9 @@ export class Room {
                     // If the track was deleted before the promise was resolved, need to release the transceiver
                     if (!self.disposed) {
                         self.disposed = true;
-                        room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                        if (transceiver.receiver && transceiver.receiver.track) {
+                            room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                        }
                     }
                     throw error;
                 });
@@ -721,7 +723,9 @@ export class Room {
                 } catch (e) {
 
                 } finally {
-                    room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                    if (transceiver.receiver && transceiver.receiver.track) {
+                        room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                    }
                 }
             }
         };
