@@ -15,6 +15,7 @@ import {
 } from "../../../src/sdk/constants";
 import {connect, waitForRoomEvent, waitForUsers} from "../../util/utils";
 import {waitForPeerConnectionStableState} from "../../util/pcUtils";
+import {RoomExtended} from "../../../src/sdk/room-extended";
 
 const wrtc = require("wrtc");
 const RTCAudioSourceSineWave = require("../../lib/rtcaudiosourcesinewave");
@@ -32,35 +33,42 @@ describe("notifications", () => {
         await alice.disconnect();
     })
     describe("waiting room", () => {
-        it("Should authorize waiting participant", async (done) => {
+        it("Should authorize waiting participant", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
-            const waitingListHandler = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                expect(list.users[0].userId).toBeTruthy();
-                await bobRoom.authorizeWaitingList(list.users[0].userId, true);
-            }
-            bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler)
-                .on(RoomEvent.JOINED, async (msg) => {
-                    const state = msg as JoinedRoom;
-                    expect(state.name).toEqual(TEST_USER_1.nickname);
-                    expect(state.userId).toBeTruthy();
-                    await bobRoom.destroyRoom();
-                    done();
-                });
 
             const aliceRoom = await alice.roomAvailable({
                 id: bobRoom.id(),
                 pin: bobRoom.pin()
             });
-            await aliceRoom.join(alicePc)
+
+            const authorizeParticipantAndDestroyRoom = async () => new Promise<void>((resolve) => {
+                const waitingListHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    expect(list.users[0].userId).toBeTruthy();
+                    await bobRoom.authorizeWaitingList(list.users[0].userId, true);
+                }
+                const joinHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.JOINED, joinHandler);
+                    const state = msg as JoinedRoom;
+                    expect(state.name).toEqual(TEST_USER_1.nickname);
+                    expect(state.userId).toBeTruthy();
+                    await bobRoom.destroyRoom();
+                    resolve();
+                }
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler)
+                    .on(RoomEvent.JOINED, joinHandler);
+            });
+
+            aliceRoom.join(alicePc);
+            await authorizeParticipantAndDestroyRoom();
         });
-        it('Should authorize waiting participant after the second attempt', async (done) => {
+        it('Should authorize waiting participant after the second attempt', async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
@@ -70,144 +78,189 @@ describe("notifications", () => {
                 id: bobRoom.id(),
                 pin: bobRoom.pin()
             });
-            const waitingListHandlerReject = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandlerReject);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                await bobRoom.authorizeWaitingList(list.users[0].userId, false);
-            };
-            bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandlerReject);
-            await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.AUTHORIZATION_FAILED);
-            const waitingListHandlerAccept = async (msg: InternalMessage) => {
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                await waitForRoomEvent(RoomEvent.WAITING_LIST, bobRoom, (room) => list.users.length === 1,
-                    function () {});
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandlerAccept);
-                await bobRoom.authorizeWaitingList(list.users[0].userId, true);
-            };
-            const room2 = await alice.roomAvailable({
-                id: bobRoom.id(),
-                pin: bobRoom.pin()
-            });
-            bobRoom
-                .on(RoomEvent.WAITING_LIST, waitingListHandlerAccept)
-                .on(RoomEvent.JOINED, async (msg) => {
+
+            const failParticipantAuthorization = async () => new Promise<void>((resolve) => {
+                const waitingListHandlerReject = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandlerReject);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    await bobRoom.authorizeWaitingList(list.users[0].userId, false);
+                    resolve();
+                };
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandlerReject);
+            })
+
+            expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.AUTHORIZATION_FAILED);
+
+            await failParticipantAuthorization();
+
+            const authorizeParticipantAndDestroyRoom = async () => new Promise<void>((resolve) => {
+                const waitingListHandlerAccept = async (msg: InternalMessage) => {
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    await waitForRoomEvent(RoomEvent.WAITING_LIST, bobRoom, (room) => list.users.length === 1,
+                        function () {});
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandlerAccept);
+                    await bobRoom.authorizeWaitingList(list.users[0].userId, true);
+                };
+                const joinHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.JOINED, joinHandler);
                     const state = msg as JoinedRoom;
                     expect(state.name).toEqual(TEST_USER_1.nickname);
                     expect(state.userId).toBeTruthy();
                     await bobRoom.destroyRoom();
-                    done();
-                });
-            await room2.join(new wrtc.RTCPeerConnection());
+                    resolve();
+                };
+
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandlerAccept)
+                    .on(RoomEvent.JOINED, joinHandler);
+            });
+
+            const aliceRoom2 = await alice.roomAvailable({
+                id: bobRoom.id(),
+                pin: bobRoom.pin()
+            });
+
+            aliceRoom2.join(new wrtc.RTCPeerConnection());
+            await authorizeParticipantAndDestroyRoom();
         });
         it("Should kick waiting participant", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
-            const waitingListHandler = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                await bobRoom.authorizeWaitingList(list.users[0].userId, false);
-                await bobRoom.destroyRoom();
-            }
-            bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+
             const aliceRoom = await alice.roomAvailable({
                 id: bobRoom.id(),
                 pin: bobRoom.pin()
             });
-            await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.AUTHORIZATION_FAILED);
+            const kickParticipant = async () => new Promise<void>((resolve) => {
+                const waitingListHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    await bobRoom.authorizeWaitingList(list.users[0].userId, false);
+                    await bobRoom.destroyRoom();
+                    resolve();
+                }
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+            });
+            expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.AUTHORIZATION_FAILED);
+            await kickParticipant();
         });
-        it("Should move participant to waiting room", async (done) => {
+        it("Should move participant to waiting room", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
-            const waitingListHandler0 = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler0);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                await bobRoom.authorizeWaitingList(list.users[0].userId, true);
-            }
-            bobRoom
-                .on(RoomEvent.WAITING_LIST, waitingListHandler0)
-                .on(RoomEvent.JOINED, async (msg) => {
+
+            const authorizeParticipantAndMoveToWaitingRoom = async () => new Promise<void>((resolve) => {
+                const firstWaitingListHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, firstWaitingListHandler);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    bobRoom.authorizeWaitingList(list.users[0].userId, true);
+                }
+
+                const joinHandler = async (msg) => {
+                    bobRoom.off(RoomEvent.JOINED, joinHandler);
                     const state = msg as JoinedRoom;
                     expect(state.name).toEqual(TEST_USER_1.nickname);
-                    bobRoom.on(RoomEvent.WAITING_LIST, async (msg) => {
+
+                    const secondWaitingListHandler = async (msg) => {
+                        bobRoom.off(RoomEvent.WAITING_LIST, secondWaitingListHandler);
                         const list = msg as WaitingListEvent;
                         expect(list.users).toBeTruthy();
                         expect(list.users.length).toEqual(1);
-                        done();
-                    });
-                    await bobRoom.moveToWaitingRoom(state.userId);
-                });
+                        await bobRoom.destroyRoom();
+                        resolve();
+                    };
+
+                    bobRoom.on(RoomEvent.WAITING_LIST, secondWaitingListHandler);
+                    bobRoom.moveToWaitingRoom(state.userId);
+                };
+
+                bobRoom.on(RoomEvent.WAITING_LIST, firstWaitingListHandler)
+                    .on(RoomEvent.JOINED, joinHandler);
+            })
+
             const aliceRoom = await alice.roomAvailable({
                 id: bobRoom.id(),
                 pin: bobRoom.pin()
             });
-            aliceRoom.join(alicePc)
+            aliceRoom.join(alicePc);
+            await authorizeParticipantAndMoveToWaitingRoom();
         });
-        it("Should subscribe to waiting participant", async (done) => {
+        it("Should subscribe to waiting participant", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
-            const waitingListHandler = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                const state = await bobRoom.subscribeToWaitingParticipant(list.users[0].userId);
-                expect(state.info).toBeTruthy();
-                expect(state.info.waitingRoom).toBeTruthy();
-                expect(state.info.info.length).toEqual(1);
-                done();
-            }
-            bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+
             const aliceRoom = await alice.roomAvailable({
                 id: bobRoom.id(),
                 pin: bobRoom.pin()
             });
+
+            const subscribeToWaitingParticipant = async () => new Promise<void>((resolve) => {
+                const waitingListHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    const state = await bobRoom.subscribeToWaitingParticipant(list.users[0].userId);
+                    expect(state.info).toBeTruthy();
+                    expect(state.info.waitingRoom).toBeTruthy();
+                    expect(state.info.info.length).toEqual(1);
+                    await bobRoom.destroyRoom();
+                    resolve();
+                }
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+            });
             const aSource = new RTCAudioSourceSineWave();
             const aTrack = aSource.createTrack();
-            const aSender = alicePc.addTrack(aTrack);
-            await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
+            alicePc.addTrack(aTrack);
+            expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
+            await subscribeToWaitingParticipant();
         });
-        it("Should unsubscribe from waiting participant", async (done) => {
+        it("Should unsubscribe from waiting participant", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({id: bob.user().pmi});
             await bobRoom.join(bobPc);
-            const waitingListHandler = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                let state = await bobRoom.subscribeToWaitingParticipant(list.users[0].userId);
-                expect(state.info).toBeTruthy();
-                expect(state.info.waitingRoom).toBeTruthy();
-                expect(state.info.info.length).toEqual(1);
-                state = await bobRoom.unsubscribeFromWaitingParticipant(list.users[0].userId);
-                expect(state.info).toBeTruthy();
-                expect(state.info.waitingRoom).toBeTruthy();
-                expect(state.info.info.length).toEqual(1);
-                done();
-            }
-            bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+
             const aliceRoom = await alice.roomAvailable({
                 id: bobRoom.id(),
                 pin: bobRoom.pin()
             });
+
+            const subscribeToWaitingParticipantAndUnsubscribe = async () => new Promise<void>((resolve) => {
+                const waitingListHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    let state = await bobRoom.subscribeToWaitingParticipant(list.users[0].userId);
+                    expect(state.info).toBeTruthy();
+                    expect(state.info.waitingRoom).toBeTruthy();
+                    expect(state.info.info.length).toEqual(1);
+                    state = await bobRoom.unsubscribeFromWaitingParticipant(list.users[0].userId);
+                    expect(state.info).toBeTruthy();
+                    expect(state.info.waitingRoom).toBeTruthy();
+                    expect(state.info.info.length).toEqual(1);
+                    await bobRoom.destroyRoom();
+                    resolve();
+                }
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
+            });
             const aSource = new RTCAudioSourceSineWave();
             const aTrack = aSource.createTrack();
-            const aSender = alicePc.addTrack(aTrack);
-            await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
+            alicePc.addTrack(aTrack);
+            expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.ROOM_DESTROYED);
+            await subscribeToWaitingParticipantAndUnsubscribe();
         });
         it("Waiting participant should receive error at meeting end", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -231,7 +284,7 @@ describe("notifications", () => {
         });
     })
     describe("roles", () => {
-        it("Should assign role", async (done) => {
+        it("Should assign role", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
@@ -239,28 +292,35 @@ describe("notifications", () => {
             });
             await bobRoom.join(bobPc);
             await bobRoom.configureWaitingRoom(false);
-            bobRoom.on(RoomEvent.JOINED, async (msg) => {
-                const state = msg as JoinedRoom;
-                expect(state.name).toEqual(TEST_USER_1.nickname);
-                await bobRoom.assignRole(state.userId, ParticipantRole.OWNER);
-                expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
-            });
 
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
             });
             expect(aliceRoom.creationTime()).toBeTruthy();
-            aliceRoom.on(RoomEvent.ROLE_ASSIGNED, async (msg) => {
-                const state = msg as RoleAssigned;
-                if (ParticipantRole.PARTICIPANT === state.role) {
-                    return;
-                }
-                expect(state.role).toEqual(ParticipantRole.OWNER);
-                await aliceRoom.destroyRoom();
-                done();
+
+            const waitWhenAliceJoined = async () => new Promise<void>((resolve) => {
+                const joinHandler = async (msg) => {
+                    const state = msg as JoinedRoom;
+                    expect(state.name).toEqual(TEST_USER_1.nickname);
+                    await bobRoom.assignRole(state.userId, ParticipantRole.OWNER);
+                    expect(bobRoom.role()).toEqual(ParticipantRole.PARTICIPANT);
+                };
+                const rolesHandler = async (msg) => {
+                    const state = msg as RoleAssigned;
+                    if (ParticipantRole.PARTICIPANT === state.role) {
+                        return;
+                    }
+                    expect(state.role).toEqual(ParticipantRole.OWNER);
+                    await aliceRoom.destroyRoom();
+                    resolve();
+                };
+                bobRoom.on(RoomEvent.JOINED, joinHandler)
+                    .on(RoomEvent.ROLE_ASSIGNED, rolesHandler);
             });
-            await aliceRoom.join(alicePc);
+
+            aliceRoom.join(alicePc);
+            await waitWhenAliceJoined();
         });
         it("Should reclaim owner rights", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -294,6 +354,7 @@ describe("notifications", () => {
                 aliceRoom,
                 (room) => room.role() === ParticipantRole.PARTICIPANT,
                 (room) => room.role());
+            await bobRoom.destroyRoom();
         });
         it("previous owner should enter the room without current owner approval", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -342,6 +403,7 @@ describe("notifications", () => {
                 id: aliceRoom.id()
             });
             await bobRoom.join(new wrtc.RTCPeerConnection());
+            await bobRoom.destroyRoom();
         });
         it("Owner should reclaim ownership after reconnection", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -393,6 +455,7 @@ describe("notifications", () => {
                 aliceRoom,
                 (room) => room.role() === ParticipantRole.PARTICIPANT,
                 (room) => room.role());
+            await bobRoom.destroyRoom();
         });
         it("Owner should re-enter the room without approval after disconnect", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -447,8 +510,9 @@ describe("notifications", () => {
                 aliceRoom,
                 (room) => room.role() === ParticipantRole.PARTICIPANT,
                 (room) => room.role());
+            await bobRoom.destroyRoom();
         });
-        it("Should receive participants roles", async (done) => {
+        it("Should receive participants roles", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
@@ -456,34 +520,57 @@ describe("notifications", () => {
             });
             await bobRoom.join(bobPc);
             const bobUserId = bobRoom.userId();
-            const waitingListHandler = async (msg: InternalMessage) => {
-                bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
-                const list = msg as WaitingListEvent;
-                expect(list.users).toBeTruthy();
-                expect(list.users.length).toEqual(1);
-                await bobRoom.authorizeWaitingList(list.users[0].userId, true);
-            }
-            bobRoom
-                .on(RoomEvent.WAITING_LIST, waitingListHandler)
-                .on(RoomEvent.JOINED, async (msg) => {
-                    const state = msg as JoinedRoom;
-                    expect(state.name).toEqual(TEST_USER_1.nickname);
-                    done();
-                });
+
+            await bobRoom.configureWaitingRoom(true);
             const aliceRoom = await alice.roomAvailable({
                 ...TEST_ROOM,
                 id: bobRoom.id()
             });
-            aliceRoom.on(RoomEvent.ROLES_LIST, async (msg) => {
-                const rolesListEvent = msg as RolesListEvent;
-                expect(rolesListEvent.roles).toBeTruthy();
-                expect(rolesListEvent.roles.length).toEqual(2);
-                const bobRoleInfo = rolesListEvent.roles.find((p) => p.userId === bobUserId);
-                expect(bobRoleInfo).toBeTruthy();
-                expect(bobRoleInfo.role).toEqual(ParticipantRole.OWNER);
-                done();
+
+            const authorizeParticipant = async () => new Promise<void>((resolve) => {
+                const waitingListHandler = async (msg: InternalMessage) => {
+                    bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
+                    const list = msg as WaitingListEvent;
+                    expect(list.users).toBeTruthy();
+                    expect(list.users.length).toEqual(1);
+                    bobRoom.authorizeWaitingList(list.users[0].userId, true);
+                    resolve();
+                }
+                bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
             });
-            await aliceRoom.join(alicePc);
+            const waitParticipantRoles = async () => new Promise<void>((resolve) => {
+                let eventsNumber = 0;
+                const checkEventsNumberAndResolve = async () => {
+                    if (eventsNumber === 2) {
+                        await bobRoom.destroyRoom();
+                        resolve();
+                    }
+                }
+                const joinHandler = async (msg: InternalMessage) => {
+                    eventsNumber++;
+                    bobRoom.off(RoomEvent.JOINED, joinHandler);
+                    const state = msg as JoinedRoom;
+                    expect(state.name).toEqual(TEST_USER_1.nickname);
+                    await checkEventsNumberAndResolve();
+                }
+                const rolesList = async (msg: InternalMessage) => {
+                    eventsNumber++;
+                    aliceRoom.off(RoomEvent.ROLES_LIST, rolesList);
+                    const rolesListEvent = msg as RolesListEvent;
+                    expect(rolesListEvent.roles).toBeTruthy();
+                    expect(rolesListEvent.roles.length).toEqual(2);
+                    const bobRoleInfo = rolesListEvent.roles.find((p) => p.userId === bobUserId);
+                    expect(bobRoleInfo).toBeTruthy();
+                    expect(bobRoleInfo.role).toEqual(ParticipantRole.OWNER);
+                    await checkEventsNumberAndResolve();
+                };
+                bobRoom.on(RoomEvent.JOINED, joinHandler);
+                aliceRoom.on(RoomEvent.ROLES_LIST, rolesList);
+            });
+
+            aliceRoom.join(alicePc);
+            await authorizeParticipant();
+            await waitParticipantRoles();
         });
     })
     describe("tracks", () => {
@@ -504,6 +591,7 @@ describe("notifications", () => {
 
             await bobRoom.setParticipantAudioMuted(aliceRoom.userId(), true);
             expect(bobRoom.config().participantsConfig[aliceRoom.userId()].audioMuted).toBeTruthy();
+            await bobRoom.destroyRoom();
         });
         it("Should mute participant's video", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -522,6 +610,7 @@ describe("notifications", () => {
 
             await bobRoom.setParticipantVideoMuted(aliceRoom.userId(), true);
             expect(bobRoom.config().participantsConfig[aliceRoom.userId()].videoMuted).toBeTruthy();
+            await bobRoom.destroyRoom();
         });
         it("Should mute participant's screen sharing", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -540,8 +629,9 @@ describe("notifications", () => {
 
             await bobRoom.setParticipantScreenSharingMuted(aliceRoom.userId(), true);
             expect(bobRoom.config().participantsConfig[aliceRoom.userId()].screenSharingMuted).toBeTruthy();
+            await bobRoom.destroyRoom();
         });
-        it("Should mute own audio track", async (done) => {
+        it("Should mute own audio track", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
             const alicePc = new wrtc.RTCPeerConnection();
             const bobRoom = await bob.createRoom({
@@ -549,7 +639,7 @@ describe("notifications", () => {
             });
             const aSource = new RTCAudioSourceSineWave();
             const aTrack = aSource.createTrack();
-            const aSender = bobPc.addTrack(aTrack);
+            bobPc.addTrack(aTrack);
             await bobRoom.join(bobPc);
             await bobRoom.configureWaitingRoom(false);
 
@@ -558,21 +648,28 @@ describe("notifications", () => {
                 id: bobRoom.id()
             });
 
-            aliceRoom.on(RoomEvent.MUTE_TRACKS, (e) => {
-                const tracks = e as AddRemoveTracks;
-                expect(tracks.info.info).toBeTruthy();
-                const muteTrack = tracks.info.info[0];
-                expect(muteTrack.mute).toBeTruthy();
-                expect(tracks.info.userId).toBeTruthy();
-                done();
-            })
             await aliceRoom.join(alicePc);
 
-            await bobRoom.muteTrack(aTrack.id, true);
+            const waitMuteTracksEvent = async () => new Promise<void>((resolve) => {
+                const muteTracksHandler = async (msg: InternalMessage) => {
+                    aliceRoom.off(RoomEvent.MUTE_TRACKS, muteTracksHandler);
+                    const tracks = msg as AddRemoveTracks;
+                    expect(tracks.info.info).toBeTruthy();
+                    const muteTrack = tracks.info.info[0];
+                    expect(muteTrack.mute).toBeTruthy();
+                    expect(tracks.info.userId).toBeTruthy();
+                    await bobRoom.destroyRoom();
+                    resolve();
+                };
+                aliceRoom.on(RoomEvent.MUTE_TRACKS, muteTracksHandler);
+            });
+
+            bobRoom.muteTrack(aTrack.id, true);
+            await waitMuteTracksEvent();
         })
     })
     describe("hold", () => {
-        it("Should hold participant if room doesn't allow to join at any time", async (done) => {
+        it("Should hold participant if room doesn't allow to join at any time", async () => {
             const bobPmiSettings = await bob.getUserPmiSettings();
             await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: false});
 
@@ -582,15 +679,20 @@ describe("notifications", () => {
             });
             expect(aliceRoom).toBeTruthy();
 
-            aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, async (msg) => {
-                const holdEvent = msg as PlacedInLobbyEvent;
-                expect(holdEvent).toBeTruthy();
-                expect(holdEvent.userId).toBeTruthy();
-                await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
-                done();
-            })
+            const waitWhenParticipantJoinedLobby = async () => new Promise<void>((resolve) => {
+                const placedInLobbyHandler = async (msg) => {
+                    aliceRoom.off(RoomEvent.PLACED_IN_LOBBY, placedInLobbyHandler);
+                    const holdEvent = msg as PlacedInLobbyEvent;
+                    expect(holdEvent).toBeTruthy();
+                    expect(holdEvent.userId).toBeTruthy();
+                    await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+                    resolve();
+                };
+                aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, placedInLobbyHandler);
+            });
 
-            await aliceRoom.join(new wrtc.RTCPeerConnection());
+            aliceRoom.join(new wrtc.RTCPeerConnection());
+            await waitWhenParticipantJoinedLobby();
         })
         it("Should join if room allow to join at any time", async () => {
             const bobPmiSettings = await bob.getUserPmiSettings();
@@ -603,29 +705,29 @@ describe("notifications", () => {
             expect(aliceRoom).toBeTruthy();
 
             await aliceRoom.join(new wrtc.RTCPeerConnection());
+            const bobRoom = await bob.roomAvailable({
+                id: bob.user().pmi,
+                pin: bobPmiSettings.pmiSettings.accessCode
+            });
+            await bobRoom.destroyRoom();
             await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
         })
-        it("Should change participant's state from hold to joined after owner enter the room", async (done) => {
+        it("Should change participant's state from hold to joined after owner enter the room", async () => {
             const bobPmiSettings = await bob.getUserPmiSettings();
             await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: false, useWaitingRoom: false});
 
-            const ownerJoinRoom = async () => {
-                const bobRoom = await bob.roomAvailable({
-                    id: bob.user().pmi,
-                    pin: bobPmiSettings.pmiSettings.accessCode
-                });
-                expect(bobRoom).toBeTruthy();
-
-                bobRoom.on(RoomEvent.JOINED, async (msg) => {
+            const waitWhenParticipantJoined = async (bobRoom: RoomExtended) => new Promise<void>((resolve) => {
+                const aliceJoinedHandler = async (msg) => {
+                    bobRoom.off(RoomEvent.JOINED, aliceJoinedHandler);
                     const joinedEvent = msg as JoinedRoom;
                     if (joinedEvent.name === alice.user().nickname) {
+                        await bobRoom.destroyRoom();
                         await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
-                        done();
+                        resolve();
                     }
-                })
-
-                await bobRoom.join(new wrtc.RTCPeerConnection());
-            }
+                };
+                bobRoom.on(RoomEvent.JOINED, aliceJoinedHandler);
+            });
 
             const aliceRoom = await alice.roomAvailable({
                 id: bob.user().pmi,
@@ -633,53 +735,67 @@ describe("notifications", () => {
             });
             expect(aliceRoom).toBeTruthy();
 
-            aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, async (msg) => {
-                const holdEvent = msg as PlacedInLobbyEvent;
-                expect(holdEvent).toBeTruthy();
-                await ownerJoinRoom();
-            })
-
-            await aliceRoom.join(new wrtc.RTCPeerConnection());
+            const waitWhenParticipantJoinedLobbyAndJoinRoom = async () => new Promise<void>((resolve) => {
+                const placedInLobbyHandler = async (msg) => {
+                    aliceRoom.off(RoomEvent.PLACED_IN_LOBBY, placedInLobbyHandler);
+                    const holdEvent = msg as PlacedInLobbyEvent;
+                    expect(holdEvent).toBeTruthy();
+                    const bobRoom = await bob.roomAvailable({
+                        id: bob.user().pmi,
+                        pin: bobPmiSettings.pmiSettings.accessCode
+                    });
+                    expect(bobRoom).toBeTruthy();
+                    bobRoom.join(new wrtc.RTCPeerConnection());
+                    await waitWhenParticipantJoined(bobRoom);
+                    resolve();
+                };
+                aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, placedInLobbyHandler);
+            });
+            aliceRoom.join(new wrtc.RTCPeerConnection());
+            await waitWhenParticipantJoinedLobbyAndJoinRoom();
         })
-        it("Should hold and then place participant into waiting room after owner enter the room", async (done) => {
+        it("Should hold and then place participant into waiting room after owner enter the room", async () => {
             const bobPmiSettings = await bob.getUserPmiSettings();
             await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings, allowJoinAtAnyTime: false, useWaitingRoom: true});
 
-            const ownerJoinRoom = async () => {
+            const aliceRoom = await alice.roomAvailable({
+                id: bob.user().pmi,
+                pin: bobPmiSettings.pmiSettings.accessCode
+            });
+            expect(aliceRoom).toBeTruthy();
 
+            const authorizeParticipant = async (bobRoom: RoomExtended) => new Promise<void>((resolve) => {
                 const waitingListHandler = async (msg) => {
                     bobRoom.off(RoomEvent.WAITING_LIST, waitingListHandler);
                     const waitingList = msg as WaitingListEvent;
                     expect(waitingList.users.length).toBeGreaterThan(0);
                     await bobRoom.authorizeWaitingList(waitingList.users[0].userId, true);
-                    done();
-                }
-
-                const bobRoom = await bob.roomAvailable({
-                    id: bob.user().pmi,
-                    pin: bobPmiSettings.pmiSettings.accessCode
-                });
-                expect(bobRoom).toBeTruthy();
-
+                    await bobRoom.destroyRoom();
+                    await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+                    resolve();
+                };
                 bobRoom.on(RoomEvent.WAITING_LIST, waitingListHandler);
-
-                await bobRoom.join(new wrtc.RTCPeerConnection());
-            }
-
-            const aliceRoom = await alice.roomAvailable({
-                id: bob.user().pmi,
-                pin: bobPmiSettings.pmiSettings.accessCode
             });
-            expect(aliceRoom).toBeTruthy();
 
-            aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, async (msg) => {
-                const holdEvent = msg as PlacedInLobbyEvent;
-                expect(holdEvent).toBeTruthy();
-                await ownerJoinRoom();
-            })
+            const waitWhenParticipantJoinedLobbyAndAuthorize = async () => new Promise<void>((resolve) => {
+                const placedInLobbyHandler = async (msg) => {
+                    aliceRoom.off(RoomEvent.PLACED_IN_LOBBY, placedInLobbyHandler);
+                    const holdEvent = msg as PlacedInLobbyEvent;
+                    expect(holdEvent).toBeTruthy();
+                    const bobRoom = await bob.roomAvailable({
+                        id: bob.user().pmi,
+                        pin: bobPmiSettings.pmiSettings.accessCode
+                    });
+                    expect(bobRoom).toBeTruthy();
+                    bobRoom.join(new wrtc.RTCPeerConnection());
+                    await authorizeParticipant(bobRoom);
+                    resolve();
+                };
+                aliceRoom.on(RoomEvent.PLACED_IN_LOBBY, placedInLobbyHandler);
+            });
 
-            await aliceRoom.join(new wrtc.RTCPeerConnection());
-            await bob.updateUserPmiSettings({...bobPmiSettings.pmiSettings});
+            aliceRoom.join(new wrtc.RTCPeerConnection());
+            await waitWhenParticipantJoinedLobbyAndAuthorize();
         })
     })
     describe("errors and rejects", () => {
@@ -697,6 +813,7 @@ describe("notifications", () => {
                 pin: "wrong_pin"
             });
             await expect(aliceRoom.join(alicePc)).rejects.toHaveProperty("error", RoomError.WRONG_PIN);
+            await bobRoom.destroyRoom();
         });
         it("Should receive error when trying to join to locked room", async () => {
             const bobPc = new wrtc.RTCPeerConnection();
@@ -749,6 +866,7 @@ describe("notifications", () => {
             id: bobRoom.id()
         });
         expect(aliceRoom.config()).toBeTruthy();
+        await bobRoom.destroyRoom();
     });
     it("Should remove room from inner collection on left", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
@@ -785,7 +903,7 @@ describe("notifications", () => {
         await bobRoom.destroyRoom();
         await waitForRoomEvent(RoomEvent.ENDED, aliceRoom, (room) => alice.getRoom({id: aliceRoom.id()}) === undefined, function () {});
     });
-    it("Should receive control message", async (done) => {
+    it("Should receive control message", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
         const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
@@ -793,51 +911,75 @@ describe("notifications", () => {
         });
         await bobRoom.join(bobPc);
         await bobRoom.configureWaitingRoom(false);
-        bobRoom.on(RoomEvent.JOINED, (msg) => {
-            const status = msg as JoinedRoom;
-            bobRoom.sendControlMessage(TEST_MESSAGE_ROOM, false, status.userId);
-        });
 
         const aliceRoom = await alice.roomAvailable({
             id: bobRoom.id(),
             pin: TEST_ROOM.pin
         });
-        aliceRoom.on(RoomEvent.CONTROL_MESSAGE, async (msg) => {
-            const event = msg as ControlMessageEvent;
-            expect(event.message).toBeTruthy();
-            expect(event.message.body).toEqual(TEST_MESSAGE_ROOM);
-            done();
-        })
-        await aliceRoom.join(alicePc);
+
+        const waitWhenAliceJoined = async () => new Promise<void>((resolve) => {
+           const joinHandler = (msg: InternalMessage) => {
+               bobRoom.off(RoomEvent.JOINED, joinHandler);
+               const status = msg as JoinedRoom;
+               bobRoom.sendControlMessage(TEST_MESSAGE_ROOM, false, status.userId);
+               resolve();
+           };
+            bobRoom.on(RoomEvent.JOINED, joinHandler);
+        });
+
+        const waitControlMessage = async () => new Promise<void>((resolve) => {
+           const controlMessageHandler = async (msg: InternalMessage) => {
+               aliceRoom.off(RoomEvent.CONTROL_MESSAGE, controlMessageHandler);
+               const event = msg as ControlMessageEvent;
+               expect(event.message).toBeTruthy();
+               expect(event.message.body).toEqual(TEST_MESSAGE_ROOM);
+               await bobRoom.destroyRoom();
+               resolve();
+           };
+            aliceRoom.on(RoomEvent.CONTROL_MESSAGE, controlMessageHandler);
+        });
+        aliceRoom.join(alicePc);
+        await waitWhenAliceJoined();
+        await waitControlMessage();
     });
-    it("Should kick participant from room", async (done) => {
+    it("Should kick participant from room", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
         const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
             ...TEST_ROOM
         });
-        bobRoom
-            .on(RoomEvent.JOINED, async (msg) => {
-                const state = msg as JoinedRoom;
-                await bobRoom.evictParticipant(state.userId);
-            })
-            .on(RoomEvent.EVICTED, async (msg) => {
-                const state = msg as EvictedFromRoom;
-                expect(state.userId).toBeTruthy();
-                done();
-            })
+
         await bobRoom.join(bobPc);
         await waitForPeerConnectionStableState(bobPc);
         await bobRoom.configureWaitingRoom(false);
+
+        const waitWhenAliceJoinedAndEvict = async () => new Promise<void>((resolve) => {
+            const joinHandler = async (msg: InternalMessage) => {
+                bobRoom.off(RoomEvent.JOINED, joinHandler);
+                const state = msg as JoinedRoom;
+                bobRoom.evictParticipant(state.userId);
+            };
+
+            const evictHandler = async (msg: InternalMessage) => {
+                bobRoom.off(RoomEvent.EVICTED, evictHandler);
+                const state = msg as EvictedFromRoom;
+                expect(state.userId).toBeTruthy();
+                await bobRoom.destroyRoom();
+                resolve();
+            };
+            bobRoom
+                .on(RoomEvent.JOINED, joinHandler)
+                .on(RoomEvent.EVICTED, evictHandler);
+        });
+
         const aliceRoom = await alice.roomAvailable({
             ...TEST_ROOM,
             id: bobRoom.id()
         });
-        await aliceRoom.join(alicePc);
-        await waitForPeerConnectionStableState(alicePc);
-
+        aliceRoom.join(alicePc);
+        await waitWhenAliceJoinedAndEvict();
     });
-    it("Should rename second participant", async (done) => {
+    it("Should rename second participant", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
         const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
@@ -854,20 +996,22 @@ describe("notifications", () => {
 
         const updatedNickname = "RENAMED";
 
-        bobRoom
-            .on(RoomEvent.JOINED, async (msg) => {
+        const waitWhenAliceJoinedAndRename = async () => new Promise<void>((resolve) => {
+            const joinHandler = async (msg: InternalMessage) => {
+                bobRoom.off(RoomEvent.JOINED, joinHandler);
                 const state = msg as JoinedRoom;
                 await bobRoom.renameParticipant(state.userId, updatedNickname);
                 await waitForRoomEvent(RoomEvent.PARTICIPANT_RENAMED, aliceRoom, (room) => room.nickname() === updatedNickname, (room) => room.nickname())
                 expect(aliceRoom.nickname()).toEqual(updatedNickname);
                 await bobRoom.destroyRoom();
-                done();
-            });
-
-        await aliceRoom.join(alicePc);
-        await waitForPeerConnectionStableState(alicePc);
+                resolve();
+            };
+            bobRoom.on(RoomEvent.JOINED, joinHandler);
+        });
+        aliceRoom.join(alicePc);
+        await waitWhenAliceJoinedAndRename();
     });
-    it("Should change second participant nickname to already taken", async (done) => {
+    it("Should change second participant nickname to already taken", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
         const alicePc = new wrtc.RTCPeerConnection();
         const bobRoom = await bob.createRoom({
@@ -884,18 +1028,20 @@ describe("notifications", () => {
 
         const alreadyTakenNickname = bobRoom.nickname();
 
-        bobRoom
-            .on(RoomEvent.JOINED, async (msg) => {
+        const waitWhenAliceJoinedAndRename = async () => new Promise<void>((resolve) => {
+            const joinHandler = async (msg: InternalMessage) => {
+                bobRoom.off(RoomEvent.JOINED, joinHandler);
                 const state = msg as JoinedRoom;
                 await bobRoom.renameParticipant(state.userId, alreadyTakenNickname);
                 await waitForRoomEvent(RoomEvent.PARTICIPANT_RENAMED, aliceRoom, (room) => room.nickname() === alreadyTakenNickname, (room) => room.nickname())
                 expect(aliceRoom.nickname()).toEqual(alreadyTakenNickname);
                 await bobRoom.destroyRoom();
-                done();
-            });
-
-        await aliceRoom.join(alicePc);
-        await waitForPeerConnectionStableState(alicePc);
+                resolve();
+            };
+            bobRoom.on(RoomEvent.JOINED, joinHandler);
+        });
+        aliceRoom.join(alicePc);
+        await waitWhenAliceJoinedAndRename();
     });
     it("Second participant should change nickname after join room", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
