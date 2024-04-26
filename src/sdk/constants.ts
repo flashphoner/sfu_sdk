@@ -93,7 +93,8 @@ export enum RoomEvent {
     PARTICIPANT_SCREEN_SHARING_MUTED = "PARTICIPANT_SCREEN_SHARING_MUTED",
     PARTICIPANT_RENAMED = "PARTICIPANT_RENAMED",
     STOP_SCREEN_SHARING = "STOP_SCREEN_SHARING",
-    STOP_TRACK = "STOP_TRACK"
+    STOP_TRACK = "STOP_TRACK",
+    BITRATE_TEST_STATUS = "BITRATE_TEST_STATUS",
 }
 
 export enum State {
@@ -193,8 +194,7 @@ export enum Operations {
     ADD_MESSAGE_TO_BOOKMARKS = "ADD_MESSAGE_TO_BOOKMARKS",
     REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS",
     LOAD_BOOKMARKED_MESSAGES = "LOAD_BOOKMARKED_MESSAGES",
-    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS",
-    LEASE_TRACK = "LEASE_TRACK"
+    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS"
 }
 
 export enum ParticipantRole {
@@ -326,7 +326,10 @@ export enum InternalApi {
     LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages",
     LOAD_MESSAGES_WITH_MENTIONS = "loadMessagesWithMentions",
     LEASE_TRACK = "leaseTrack",
-    LOGOUT = "logout"
+    LOGOUT = "logout",
+    START_BITRATE_TEST = "startBitrateTest",
+    END_BITRATE_TEST = "endBitrateTest",
+    GET_TEST_LATENCY = "getBitrateLatency"
 }
 
 export enum ContactError {
@@ -1127,6 +1130,10 @@ export enum ConnectionType {
 export type ConnectionDetails = {
     id: string,
     type: ConnectionType
+}
+
+export type BitrateTestStatus = InternalMessage & {
+    latency: number
 }
 
 export enum AuthenticationStatus {

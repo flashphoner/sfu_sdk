@@ -1,44 +1,47 @@
 import {v4 as uuidv4} from 'uuid';
-import promises, {reject} from "./promises";
+import promises from "./promises";
 import {Notifier} from "./notifier";
 import {
     AddRemoveTracks,
+    BitrateTestStatus,
     CreatedRoom,
-    SfuEvent,
+    EvictedFromRoom,
     FragmentedMessage,
     InternalApi,
     InternalMessage,
     JoinedRoom,
     LeftRoom,
-    EvictedFromRoom,
-    ParticipantRenamed,
-    RoomMessage,
     OperationFailed,
     Operations,
+    ParticipantRenamed,
     ParticipantRole,
     RemoteSdp,
+    RemoteSdpInfo,
     RemoteSdpType,
     RoleAssigned,
     RoomError,
     RoomEvent,
+    RoomMessage,
     RoomState,
-    WaitingRoomUpdate,
+    SfuEvent,
+    StatsType,
+    TracksQualityState,
+    TrackType,
     UserId,
     UserNickname,
-    RemoteSdpInfo,
-    StatsType,
-    TrackType,
-    TracksQualityState,
+    WaitingRoomUpdate,
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
 import Logger from "./logger";
 import {Mutex} from 'async-mutex';
 import {Queue} from 'queue-typescript';
+import {BitrateComponentEventBus, BitrateTest, BitrateTestController, BitrateTestListener} from "./BitrateTest";
 
 
 export class Room {
     static readonly #CONTROL_CHANNEL = "control";
+    static readonly #BITRATE_CHANNEL = "bitrate";
 
     #_state: RoomState = RoomState.NEW;
     #_role: ParticipantRole = ParticipantRole.PARTICIPANT;
@@ -55,6 +58,7 @@ export class Room {
         [key: string]: Array<FragmentedMessage>
     } = {};
     #dChannel: RTCDataChannel;
+    #wrappedDataChannel: WrappedDatachannel;
     #_creationTime: number;
     protected logger: Logger;
     _uid: string;
@@ -63,7 +67,6 @@ export class Room {
         tid: string
     };
     protected stats: WebRTCStats;
-
     #vacantTransceivers: { video: Queue<RTCRtpTransceiver>, audio: Queue<RTCRtpTransceiver> };
 
 
@@ -225,6 +228,7 @@ export class Room {
             if (promises.promised(operationFailed.internalMessageId)) {
                 if (operationFailed.operation === Operations.ROOM_JOIN) {
                     this.#_state = RoomState.DISPOSED;
+                    this.#wrappedDataChannel.close();
                 }
                 promises.reject(operationFailed.internalMessageId, operationFailed);
             }
@@ -290,6 +294,11 @@ export class Room {
             }
         } else if (e.type === SfuEvent.ACK && promises.promised(e.internalMessageId)) {
             promises.resolve(e.internalMessageId);
+        } else if (e.type === RoomEvent.BITRATE_TEST_STATUS) {
+            const bitrateTest = e as BitrateTestStatus;
+            if (promises.promised(e.internalMessageId)) {
+                promises.resolve(e.internalMessageId, bitrateTest.latency);
+            }
         } else {
             //check this is a room event
             if (Object.values(RoomEvent).includes(e.type as RoomEvent)) {
@@ -317,6 +326,9 @@ export class Room {
             }
         }
         this.#dChannel = this.#_pc.createDataChannel(Room.#CONTROL_CHANNEL);
+        const Channel = this.#_pc.createDataChannel(Room.#BITRATE_CHANNEL);
+
+        this.#wrappedDataChannel = new WrappedDatachannel(Channel);
         this.#dChannel.onmessage = (msg) => {
             this.logger.info("dchannel ", "<==", msg);
             const message: InternalMessage = JSON.parse(msg.data);
@@ -343,8 +355,13 @@ export class Room {
                         self.notifier.notify(message.type, msg);
                     }
                 }
-            } else if (message.type === SfuEvent.ACK && promises.promised(message.internalMessageId)) {
-                promises.resolve(message.internalMessageId);
+            } else if (promises.promised(message.internalMessageId)) {
+                if (message.type === SfuEvent.ACK) {
+                    promises.resolve(message.internalMessageId);
+                } else if (message.type === SfuEvent.FAILED) {
+                    const failedEvent = message as OperationFailed;
+                    promises.reject(message.internalMessageId, failedEvent.error);
+                }
             } else {
                 if (Object.values(RoomEvent).includes(message.type as RoomEvent)) {
                     self.notifier.notify(message.type as RoomEvent, message);
@@ -427,6 +444,9 @@ export class Room {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             self.#_state = RoomState.DISPOSED;
+            if (self.#wrappedDataChannel) {
+                self.#wrappedDataChannel.close();
+            }
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.DESTROY_ROOM, {
@@ -437,10 +457,90 @@ export class Room {
         });
     };
 
+    public getBitrateTest(): BitrateTestController {
+        const self = this;
+        if (this.#_state !== RoomState.JOINED) {
+            throw new Error("Room must be in joined state");
+        }
+        const bitrateTest = new BitrateTest(new class implements BitrateComponentEventBus {
+            active(): boolean {
+                return self.#_state === RoomState.JOINED && self.#_pc.connectionState === "connected";
+            }
+
+            requestTestStatus(): Promise<number> {
+                if (self.#_state !== RoomState.JOINED) {
+                    throw new Error("Room must be in joined state");
+                }
+                return new Promise((resolve, reject) => {
+                    const messageId = uuidv4();
+                    promises.add(messageId, resolve, reject);
+                    self.connection.send(InternalApi.GET_TEST_LATENCY, {
+                        roomId: self._id,
+                        internalMessageId: messageId
+                    });
+                });
+            }
+
+            send(object: ArrayBuffer): boolean {
+                return self.#wrappedDataChannel.send(object);
+            }
+
+            startTest(): Promise<void> {
+                if (self.#_state !== RoomState.JOINED) {
+                    throw new Error("Room must be in joined state");
+                }
+                return new Promise((resolve, reject) => {
+                    const messageId = uuidv4();
+                    promises.add(messageId, resolve, reject);
+                    self.connection.send(InternalApi.START_BITRATE_TEST, {
+                        roomId: self._id,
+                        internalMessageId: messageId
+                    });
+                });
+            }
+
+            stopTest(): Promise<void> {
+                if (self.#_state !== RoomState.JOINED) {
+                    throw new Error("Room must be in joined state");
+                }
+                return new Promise((resolve, reject) => {
+                    if (self.#wrappedDataChannel._closed) {
+                        resolve();
+                        return;
+                    }
+                    const messageId = uuidv4();
+                    promises.add(messageId, resolve, reject);
+                    self.connection.send(InternalApi.END_BITRATE_TEST, {
+                        roomId: self._id,
+                        internalMessageId: messageId
+                    });
+                });
+            }
+        })
+        return new class implements BitrateTestController {
+
+            test(timeout: number, maxBitrate?: number): Promise<number> {
+                return bitrateTest.advisedBitrate(timeout);
+            }
+
+            stop(): void {
+                bitrateTest.interruptTest();
+            }
+
+            setListener(listener: BitrateTestListener) {
+                bitrateTest.setListener(listener);
+            }
+        }
+    }
+
     public leaveRoom(): Promise<LeftRoom> {
         const self = this;
         return new Promise<LeftRoom>((resolve, reject) => {
             self.#_state = RoomState.DISPOSED;
+            if (self.#wrappedDataChannel) {
+                self.#wrappedDataChannel.close();
+            }
+
             const id = uuidv4();
             promises.add(id, resolve, reject);
             self.connection.send(InternalApi.LEAVE_ROOM, {
@@ -729,6 +829,50 @@ export class Room {
                 }
             }
         };
+    }
+}
+
+class WrappedDatachannel {
+    _queue = new Queue<string | ArrayBuffer>();
+    _highWatermark = 262144 * 2;
+    _lowWatermark = 262144;
+    _dc: RTCDataChannel;
+    _closed = false;
+
+    constructor(dataChannel: RTCDataChannel) {
+        this._dc = dataChannel;
+        this._dc.bufferedAmountLowThreshold = this._lowWatermark;
+        const self = this;
+        this._dc.onbufferedamountlow = function () {
+            self.sendFirst();
+        }
+    }
+
+    public send(data: string | ArrayBuffer): boolean {
+        if (this._closed) {
+            return false;
+        }
+        if (this._dc.bufferedAmount > this._highWatermark) {
+            return false;
+        } else {
+            if (typeof data === "string") {
+                this._dc.send(data);
+            } else if (data instanceof Uint8Array) {
+                this._dc.send(data);
+            }
+        }
+        return true;
+    }
+
+    public close(): void {
+        this._closed = true;
+    }
+
+    private sendFirst(): void {
+        if (this._queue.length > 0) {
+            const data = this._queue.dequeue()
+            this.send(data);
+        }
     }
 }
 
