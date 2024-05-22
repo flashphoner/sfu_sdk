@@ -15,7 +15,6 @@
     <script type="text/javascript" src="../sfu.js"></script>
     <script type="text/javascript" src="../commons/js/util.js"></script>
     <script type="text/javascript" src="../commons/js/config.js"></script>
-    <script type="text/javascript" src="../commons/js/display.js"></script>
     <script type="text/javascript" src="bitrate_test.js"></script>
 </head>
 <body onload="init()">
@@ -27,27 +26,19 @@
             <div id="connectionForm" class="col-sm-6 text-center">
                 <label for="url" class="control-label">Server url</label>
                 <input class="form-control" id="url" type="text">
-                <label for="roomName" class="control-label">Room name</label>
-                <input class="form-control" id="roomName" type="text">
+                <label for="bitrateTestDuration" class="control-label">Test duration, ms</label>
+                <input class="form-control" id="bitrateTestDuration" type="text">
             </div>
         </div>
-        <div class="row col-sm-12 justify-content-center" style="margin-top: 10px;">
-            <div class="col-sm-6 text-center">
-                <div class="text-center text-muted">Publisher</div>
-                <div id="publishForm" class="input-group col-sm-5" style="margin-top: 10px;">
-                    <input class="form-control" id="publishName" type="text" style="height: 30px;"
-                           placeholder="Publisher name">
-                    <div class="input-group-btn">
-                        <button id="publishBtn" type="button" style="height: 30px; width: auto;">Connect</button>
-                    </div>
-                    <button id="publishBitrateBtn" type="button" style="height: 30px; width: auto;">Check bitrate
-                    </button>
-                    <label for="publishBitrateStatus" class="control-label">Bitrate status</label>
-                    <output id="publishBitrateStatus">
+        <div class="row col-sm-12 justify-content-center" style="margin-top: 20px;">
+            <div class="text-center" style="margin-top: 20px">
+                <button id="bitrateTestBtn" type="button" style="height: 30px; width: auto;">Start</button>
+                <div class="text-center" style="margin-top: 20px">
+                    <div id="bitrateTestStatus"></div>
+                    <div id="bitrateTestErrorInfo"></div>
                 </div>
                 <div class="text-center" style="margin-top: 20px">
-                    <div id="publishStatus"></div>
-                    <div id="publishErrorInfo"></div>
+                    <output id="bitrateTestCurrentState">
                 </div>
             </div>
         </div>
