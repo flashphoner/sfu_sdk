@@ -1,7 +1,9 @@
 import {
+    ALL_TAG,
     ATTACHMENTS,
     ATTACHMENTS_PAYLOAD,
     DOWNLOAD_PATH,
+    EVERYONE_TAG,
     PDF_FILE_NAME,
     PICTURE_FILE_NAME,
     TEST_BIG_PICTURE_ATTACHMENT,
@@ -15,32 +17,27 @@ import {
     TEST_PUBLIC_CHANNEL,
     TEST_USER_0,
     TEST_USER_1,
-    TEST_USER_2,
     TEST_USER_1_TAG,
-    EVERYONE_TAG,
-    ALL_TAG
+    TEST_USER_2
 } from "../../util/constants";
 import {
     ATTACHMENT_CHUNK_SIZE,
     AttachmentState,
     AttachmentStatus,
     ChannelSendPolicy,
-    ChatType,
     ChatError,
+    ChatType,
+    DeliveryStatus,
     Message,
     MessageAttachmentMediaType,
     MessageDeleted,
     MessageEdited,
     MessageState,
+    MessageTargetEntityType,
     SfuEvent,
     SortOrder,
-    UserSpecificChatInfo,
-    BookmarkDeleted,
-    ChatWithBookmarksDeleted,
-    BookmarkEdited,
-    ChatSectionsError,
-    DeliveryStatus,
-    UpdateMessagesDeliveryStatusEvent
+    UpdateMessagesDeliveryStatusEvent,
+    UserSpecificChatInfo
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -126,7 +123,8 @@ describe("chat", () => {
         it("Should send message", async () => {
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY
             });
             expect(status).toBeTruthy();
@@ -139,16 +137,19 @@ describe("chat", () => {
             const replyMessageBody = "test message reply";
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY
             });
             const replyStatus = await bob.sendMessage({
                 parentId: status.id,
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: replyMessageBody
             });
-            const allMessages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const allMessages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
@@ -166,7 +167,8 @@ describe("chat", () => {
         it("Should reject sending message without body and attachment", async () => {
             const chat = await bob.createChat({});
             await expect(bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
             })).rejects.toBeTruthy();
             await bob.deleteChat(chat);
         });
@@ -175,13 +177,15 @@ describe("chat", () => {
             //populate with 3 messages 1 second apart
             for (let i = 0; i < 3; i++) {
                 await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
                 await new Promise(r => setTimeout(r, 1050));
             }
-            const allMessages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const allMessages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
@@ -190,9 +194,10 @@ describe("chat", () => {
             expect(allMessages.length).toEqual(3);
             allMessages.sort((a, b) => a.date - b.date);
 
-            const firstTwo = await bob.loadChatMessages({
-                chatId: chat.id,
-                timeFrame:  {
+            const firstTwo = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+                timeFrame: {
                     start: 0,
                     end: allMessages[1].date
                 }
@@ -202,9 +207,10 @@ describe("chat", () => {
             expect(firstTwo[0].id).toEqual(allMessages[0].id);
             expect(firstTwo[1].id).toEqual(allMessages[1].id);
 
-            const lastTwo = await bob.loadChatMessages({
-                chatId: chat.id,
-                timeFrame:  {
+            const lastTwo = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+                timeFrame: {
                     start: allMessages[1].date,
                     end: -1
                 }
@@ -213,8 +219,9 @@ describe("chat", () => {
             expect(lastTwo[0].id).toEqual(allMessages[1].id);
             expect(lastTwo[1].id).toEqual(allMessages[2].id);
 
-            const onlyTwo = await bob.loadChatMessages({
-                chatId: chat.id,
+            const onlyTwo = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1,
@@ -229,13 +236,15 @@ describe("chat", () => {
             //populate with 5 messages 100ms apart
             for (let i = 0; i < 5; i++) {
                 await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY + i
                 });
                 await new Promise(r => setTimeout(r, 100));
             }
-            const allMessages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const allMessages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
@@ -245,8 +254,9 @@ describe("chat", () => {
 
             allMessages.sort((a, b) => a.date - b.date);
 
-            const center = await bob.loadChatMessages({
-                chatId: chat.id,
+            const center = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 boundaries: {
                     dateMark: allMessages[2].date,
                     lowerLimit: 2,
@@ -265,17 +275,20 @@ describe("chat", () => {
             const searchString = "I'm a needle";
             const chat = await bob.createChat({});
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: "first message"
             });
             for (let i = 0; i < 3; i++) {
                 await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: searchString + " " + i
                 });
             }
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: "last message"
             });
             let searchResults = await bob.searchChatMessages({
@@ -306,19 +319,17 @@ describe("chat", () => {
         it("Should reject sending message if user is not chat member", async () => {
             const chat = await bob.createChat({});
             await expect(alice.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY
             })).rejects.toHaveProperty("error", ChatError.USER_MUST_BE_A_CHAT_MEMBER_TO_SEND_MESSAGES);
             await bob.deleteChat(chat);
         });
-
-
-
-
         it("Should mark message as read", async () => {
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY
             });
             await bob.markMessageRead(status);
@@ -331,7 +342,8 @@ describe("chat", () => {
         it("Should mark message as unread", async () => {
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY
             });
             await bob.markMessageUnread(status);
@@ -397,7 +409,8 @@ describe("chat", () => {
             alice.on(SfuEvent.MESSAGE, onMessageHandler);
 
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY,
                 to: TEST_USER_1.username
             });
@@ -417,7 +430,8 @@ describe("chat", () => {
             let chat = await bob.createChat({});
             const message = await bob.sendMessage({
                 body: MESSAGE_BODY,
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 attachments: [TEST_PICTURE_ATTACHMENT]
             });
             const attachmentsData = [];
@@ -427,13 +441,20 @@ describe("chat", () => {
             })
             const handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
             await handler.sendAttachments();
-            await bob.editChatMessage({chatId: chat.id, messageId: message.id, body: editedBody});
-            const messages = await bob.loadChatMessages({
-                chatId: chat.id,
+            await bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+                messageId: message.id,
+                body: editedBody
+            });
+            const messages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
-                }});
+                }
+            });
             const messageAfterEdit = messages.find((msg) => msg.id === message.id);
             expect(messageAfterEdit).toBeTruthy();
             expect(messageAfterEdit.body).toEqual(editedBody);
@@ -447,7 +468,8 @@ describe("chat", () => {
             let chat = await bob.createChat({});
 
             const status = await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY,
                 attachments: [
                     TEST_PICTURE_ATTACHMENT
@@ -469,14 +491,22 @@ describe("chat", () => {
             await handler.sendAttachments();
 
             const attachmentId = status.attachments[0].id;
-            await bob.editChatMessage({chatId: chat.id, messageId: status.id, body: editedBody, attachmentIdsToDelete: [attachmentId]});
+            await bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+                messageId: status.id,
+                body: editedBody,
+                attachmentIdsToDelete: [attachmentId]
+            });
 
-            const messages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const messages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
-                }});
+                }
+            });
             const messageAfterEdit = messages.find((msg) => msg.id === status.id);
             expect(messageAfterEdit).toBeTruthy();
             expect(messageAfterEdit.body).toEqual(editedBody);
@@ -489,10 +519,15 @@ describe("chat", () => {
         it("Should edit chat message and add attachments", async () => {
             const editedBody = "edited message body";
             let chat = await bob.createChat({});
-            const message = await bob.sendMessage({body: MESSAGE_BODY, chatId: chat.id});
+            const message = await bob.sendMessage({
+                body: MESSAGE_BODY,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
 
-            await bob.editChatMessage({
-                chatId: chat.id,
+            await bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 messageId: message.id,
                 body: editedBody,
                 attachmentsToSend: [TEST_PICTURE_ATTACHMENT]
@@ -506,12 +541,14 @@ describe("chat", () => {
             const handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
             await handler.sendAttachments();
 
-            const messages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const messages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
-                }});
+                }
+            });
             const messageAfterEdit = messages.find((msg) => msg.id === message.id);
             expect(messageAfterEdit).toBeTruthy();
             expect(messageAfterEdit.body).toEqual(editedBody);
@@ -522,31 +559,19 @@ describe("chat", () => {
 
             await bob.deleteChat({id: chat.id});
         });
-        it("Should reject editing message without chatId", async () => {
-            await expect(bob.editChatMessage({
-                chatId: "",
-                messageId: "messageId",
-                body: "body"
-            })).rejects.toHaveProperty("error", ChatError.CAN_NOT_EDIT_MESSAGE_WITHOUT_CHAT_ID);
-        });
         it("Should reject editing message without messageId", async () => {
-            await expect(bob.editChatMessage({
-                chatId: "chatId",
+            await expect(bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: ""},
                 messageId: "",
                 body: "body"
             })).rejects.toHaveProperty("error", ChatError.CAN_NOT_EDIT_MESSAGE_WITHOUT_MESSAGE_ID);
         });
-        it("Should reject editing message if chat doesn't exist", async () => {
-            await expect(bob.editChatMessage({
-                chatId: "chatId",
-                messageId: "messageId",
-                body: "body"
-            })).rejects.toHaveProperty("error", ChatError.EDIT_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS);
-        });
         it("Should reject editing message if message doesn't exist", async () => {
             const chat = await bob.createChat({});
-            await expect(bob.editChatMessage({
-                chatId: chat.id,
+            await expect(bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 messageId: "messageId",
                 body: "body"
             })).rejects.toHaveProperty("error", ChatError.EDIT_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS);
@@ -554,7 +579,8 @@ describe("chat", () => {
         it("Should reject editing message if message will have no content after that", async () => {
             const chat = await bob.createChat({});
             const status = await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: MESSAGE_BODY,
                 attachments: [
                     TEST_PICTURE_ATTACHMENT
@@ -576,7 +602,9 @@ describe("chat", () => {
             await handler.sendAttachments();
 
             const attachmentId = status.attachments[0].id;
-            await expect(bob.editChatMessage({chatId: chat.id,
+            await expect(bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 messageId: status.id,
                 body: '',
                 attachmentIdsToDelete: [attachmentId]
@@ -588,7 +616,8 @@ describe("chat", () => {
             let chat = await bob.createChat({});
             const message = await bob.sendMessage({
                 body: MESSAGE_BODY,
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 attachments: [TEST_PICTURE_ATTACHMENT]
             });
 
@@ -601,8 +630,9 @@ describe("chat", () => {
             let handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
             await handler.sendAttachments();
 
-            await bob.editChatMessage({
-                chatId: chat.id,
+            await bob.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 messageId: message.id,
                 body: editedBody,
                 attachmentIdsToDelete: [TEST_PICTURE_ATTACHMENT.id],
@@ -618,12 +648,14 @@ describe("chat", () => {
             handler = await bob.getSendingAttachmentsHandler(attachmentsData, message.id);
             await handler.sendAttachments();
 
-            const messages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const messages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
-                }});
+                }
+            });
             const messageAfterEdit = messages.find((msg) => msg.id === message.id);
             expect(messageAfterEdit).toBeTruthy();
             expect(messageAfterEdit.body).toEqual(editedBody);
@@ -636,16 +668,26 @@ describe("chat", () => {
         });
         it("Should delete message", async () => {
             let chat = await bob.createChat({});
-            const message = await bob.sendMessage({body: MESSAGE_BODY, chatId: chat.id});
+            const message = await bob.sendMessage({
+                body: MESSAGE_BODY,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
 
-            await bob.deleteChatMessage({chatId: chat.id, messageId: message.id});
+            await bob.deleteMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+                messageId: message.id
+            });
 
-            const messages = await bob.loadChatMessages({
-                chatId: chat.id,
+            const messages = await bob.loadMessages({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 timeFrame: {
                     start: 0,
                     end: -1
-                }});
+                }
+            });
             expect(messages).toBeTruthy();
             expect(messages.length).toBe(1);
             expect(messages[0].status).toEqual(MessageState.DELETED);
@@ -655,274 +697,52 @@ describe("chat", () => {
         it('should send few messages and get chat messages count', async () => {
             let chat = await bob.createChat({});
             for (let i = 0; i < 4; i++) {
-                await bob.sendMessage({body: MESSAGE_BODY, chatId: chat.id});
+                await bob.sendMessage({
+                    body: MESSAGE_BODY,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                });
             }
-            const result = await bob.getChatMessagesCount({id: chat.id});
+            const result = await bob.getMessagesCount({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
             expect(result.messagesCount).toBe(4);
 
             await bob.deleteChat({id: chat.id});
         });
         it('should send few messages and get first and last message', async () => {
             let chat = await bob.createChat({});
-            const firstMessage = await bob.sendMessage({body: MESSAGE_BODY + "1", chatId: chat.id});
-            const secondMessage = await bob.sendMessage({body: MESSAGE_BODY + "2", chatId: chat.id});
-            const thirdMessage = await bob.sendMessage({body: MESSAGE_BODY + "3", chatId: chat.id});
-            const messagesCount = await bob.getChatMessagesCount({id: chat.id});
+            const firstMessage = await bob.sendMessage({
+                body: MESSAGE_BODY + "1",
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
+            const secondMessage = await bob.sendMessage({
+                body: MESSAGE_BODY + "2",
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
+            const thirdMessage = await bob.sendMessage({
+                body: MESSAGE_BODY + "3",
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
+            const messagesCount = await bob.getMessagesCount({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
             expect(messagesCount.messagesCount).toBe(3);
-            const result = await bob.getFirstAndLastMessage({id: chat.id});
+            const result = await bob.getFirstAndLastMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
+            });
             expect(result.firstMessageId).toBe(firstMessage.id);
             expect(result.firstMessageDate).toBe(firstMessage.date);
             expect(result.lastMessageId).toBe(thirdMessage.id);
             expect(result.lastMessageDate).toBe(thirdMessage.date);
 
             await bob.deleteChat({id: chat.id});
-        });
-        it("Should add message to bookmarks", async () => {
-            const chat = await bob.createChat({});
-            const status = await bob.sendMessage({
-                chatId: chat.id,
-                body: MESSAGE_BODY
-            });
-            await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-            const messages = await bob.loadChatMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                }
-            });
-            expect(messages.length).toBe(1);
-            expect(messages[0].bookmarked).toBe(true);
-            await bob.deleteChat(chat);
-        });
-        it("Should reject adding deleted message to bookmarks", async () => {
-            const chat = await bob.createChat({});
-            const status = await bob.sendMessage({
-                chatId: chat.id,
-                body: MESSAGE_BODY
-            });
-            await bob.deleteChatMessage({chatId: chat.id, messageId: status.id});
-            await expect(
-                bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id})
-            ).rejects.toHaveProperty("error", ChatError.CAN_NOT_ADD_DELETED_MESSAGE_TO_BOOKMARKS)
-            await bob.deleteChat(chat);
-        });
-        it("Should remove message from bookmarks", async () => {
-            const chat = await bob.createChat({});
-            const status = await bob.sendMessage({
-                chatId: chat.id,
-                body: MESSAGE_BODY
-            });
-            await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-            let messages = await bob.loadChatMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                }
-            });
-            expect(messages.length).toBe(1);
-            expect(messages[0].bookmarked).toBe(true);
-            await bob.removeMessageFromBookmarks({chatId: chat.id, messageId: status.id});
-            messages = await bob.loadChatMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                }
-            });
-            expect(messages.length).toBe(1);
-            expect(messages[0].bookmarked).toBe(false);
-            await bob.deleteChat(chat);
-        });
-        it("Should load bookmarked messages based on time frame", async () => {
-            const chats = await bob.getUserChats();
-            Object.keys(chats).map(async (id) => {
-                await bob.deleteChat({id: id});
-            });
-            const chat = await bob.createChat({});
-
-            for (let i = 0; i < 5; i++) {
-                const status = await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY + i
-                });
-                if (i !== 1 && i !== 3) {
-                    await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-                }
-            }
-
-            const result = await bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.ASC
-            });
-            expect(result.messages.length).toBe(3);
-            expect(result.totalSize).toBe(3);
-            expect(result.messages[0].body).toEqual(MESSAGE_BODY + 0);
-            expect(result.messages[0].from).toEqual(TEST_USER_0.username);
-            expect(result.messages[1].body).toEqual(MESSAGE_BODY + 2);
-            expect(result.messages[2].body).toEqual(MESSAGE_BODY + 4);
-            await bob.deleteChat(chat);
-        });
-        it("Should load bookmarked messages based on boundaries", async () => {
-            const chats = await bob.getUserChats();
-            Object.keys(chats).map(async (id) => {
-                await bob.deleteChat({id: id});
-            });
-            const chat = await bob.createChat({});
-
-            for (let i = 0; i < 5; i++) {
-                const status = await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY + i
-                });
-                await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-            }
-
-            const allBookmarkedMessages = await bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.DESC
-            });
-
-            const bookmarkedMessagesBasedOnBoundaries = await bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                boundaries: {
-                    dateMark: allBookmarkedMessages.messages[2].date,
-                    lowerLimit: 2,
-                    upperLimit: 1
-                },
-                sortOrder: SortOrder.DESC
-            });
-
-            expect(allBookmarkedMessages.messages.length).toBe(5);
-            expect(allBookmarkedMessages.totalSize).toBe(5);
-            expect(bookmarkedMessagesBasedOnBoundaries.messages.length).toBe(3);
-            expect(bookmarkedMessagesBasedOnBoundaries.totalSize).toBe(5);
-            expect(allBookmarkedMessages.messages[1].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[0].id);
-            expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[1].id);
-            expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnBoundaries.messages[2].id);
-
-            await bob.deleteChat(chat);
-        });
-        it("Should load bookmarked messages based on pageRequest", async () => {
-            const chats = await bob.getUserChats();
-            Object.keys(chats).map(async (id) => {
-                await bob.deleteChat({id: id});
-            });
-            const chat = await bob.createChat({});
-
-            for (let i = 0; i < 5; i++) {
-                const status = await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY + i
-                });
-                await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-            }
-
-            const allBookmarkedMessages = await bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.ASC
-            });
-
-            const bookmarkedMessagesBasedOnPageRequest = await bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                pageRequest: {
-                    page: 2,
-                    pageSize: 2
-                },
-                sortOrder: SortOrder.ASC
-            });
-
-            expect(allBookmarkedMessages.messages.length).toBe(5);
-            expect(allBookmarkedMessages.totalSize).toBe(5);
-            expect(bookmarkedMessagesBasedOnPageRequest.messages.length).toBe(2);
-            expect(bookmarkedMessagesBasedOnPageRequest.totalSize).toBe(5);
-            expect(allBookmarkedMessages.messages[2].id).toEqual(bookmarkedMessagesBasedOnPageRequest.messages[0].id);
-            expect(allBookmarkedMessages.messages[3].id).toEqual(bookmarkedMessagesBasedOnPageRequest.messages[1].id);
-
-            await bob.deleteChat(chat);
-        });
-        it('should reject loading bookmarked messages with incorrect page', async () => {
-            const chat = await bob.createChat({});
-
-            for (let i = 0; i < 3; i++) {
-                const status = await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY + i
-                });
-                await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-            }
-
-            await expect(bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                pageRequest: {
-                    page: 2,
-                    pageSize: 5
-                },
-                sortOrder: SortOrder.ASC
-            })).rejects.toHaveProperty("error", ChatSectionsError.PAGE_NOT_FOUND);
-            await bob.deleteChat(chat);
-        });
-        it("Should load messages that few users saved as bookmarks", async () => {
-            const chats = await bob.getUserChats();
-            Object.keys(chats).map(async (id) => {
-                await bob.deleteChat({id: id});
-            });
-            const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
-
-            for (let i = 0; i < 5; i++) {
-                const status = await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY + i
-                });
-                if (i !== 1 && i !== 3) {
-                    await bob.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-                }
-                if (i !== 1) {
-                    await alice.addMessageToBookmarks({chatId: chat.id, messageId: status.id});
-                }
-            }
-
-            const bobBookmarks = await bob.loadBookmarkedMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.ASC
-            });
-            expect(bobBookmarks.messages.length).toBe(3);
-            expect(bobBookmarks.totalSize).toBe(3);
-            expect(bobBookmarks.messages[0].body).toEqual(MESSAGE_BODY + 0);
-            expect(bobBookmarks.messages[1].body).toEqual(MESSAGE_BODY + 2);
-            expect(bobBookmarks.messages[2].body).toEqual(MESSAGE_BODY + 4);
-            const aliceBookmarks = await alice.loadBookmarkedMessages({
-                chatId: chat.id,
-                timeFrame: {
-                    start: 0,
-                    end: -1
-                },
-                sortOrder: SortOrder.ASC
-            });
-            expect(aliceBookmarks.messages.length).toBe(4);
-            expect(aliceBookmarks.totalSize).toBe(4);
-            expect(aliceBookmarks.messages[0].body).toEqual(MESSAGE_BODY + 0);
-            expect(aliceBookmarks.messages[1].body).toEqual(MESSAGE_BODY + 2);
-            expect(aliceBookmarks.messages[2].body).toEqual(MESSAGE_BODY + 3);
-            expect(aliceBookmarks.messages[3].body).toEqual(MESSAGE_BODY + 4);
-            await bob.deleteChat(chat);
         });
         it("Should load messages with mentions based on time frame", async () => {
             const chats = await bob.getUserChats();
@@ -933,21 +753,25 @@ describe("chat", () => {
 
             for (let i = 0; i < 3; i++) {
                 await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY + i
                 });
             }
 
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: TEST_USER_1_TAG
             });
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: EVERYONE_TAG
             });
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: ALL_TAG
             });
 
@@ -976,30 +800,36 @@ describe("chat", () => {
             for (let i = 0; i < 4; i++) {
                 if (i !== 3) {
                     await bob.sendMessage({
-                        chatId: chat.id,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
                         body: MESSAGE_BODY + i
                     });
                 } else {
                     await bob.sendMessage({
-                        chatId: chat.id,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
                         body: TEST_USER_1_TAG
                     });
                 }
             }
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: ALL_TAG
             });
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: TEST_USER_1_TAG
             });
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: EVERYONE_TAG
             });
             await bob.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId: chat.id},
                 body: TEST_USER_1_TAG
             });
 
@@ -1036,25 +866,35 @@ describe("chat", () => {
             const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
             expect(chat.channel).toBeFalsy();
             expect(chat.type).toEqual(ChatType.PRIVATE);
-            await expect(bob.renameChat({id: chat.id, name: "NEW_NAME"})).rejects.toHaveProperty("error", ChatError.CAN_NOT_RENAME_PRIVATE_CHAT);
+            await expect(bob.renameChat({
+                id: chat.id,
+                name: "NEW_NAME"
+            })).rejects.toHaveProperty("error", ChatError.CAN_NOT_RENAME_PRIVATE_CHAT);
         });
         it('should reject adding member to private chat', async () => {
             const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
             expect(chat.channel).toBeFalsy();
             expect(chat.type).toEqual(ChatType.PRIVATE);
-            await expect(bob.addMemberToChat({id: chat.id, member: TEST_USER_2.username})).rejects.toHaveProperty("error", ChatError.CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT);
+            await expect(bob.addMemberToChat({
+                id: chat.id,
+                member: TEST_USER_2.username
+            })).rejects.toHaveProperty("error", ChatError.CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT);
         });
         it('should reject removing member from private chat', async () => {
             const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
             expect(chat.channel).toBeFalsy();
             expect(chat.type).toEqual(ChatType.PRIVATE);
-            await expect(bob.removeMemberFromChat({id: chat.id, member: TEST_USER_1.username})).rejects.toHaveProperty("error", ChatError.CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT);
+            await expect(bob.removeMemberFromChat({
+                id: chat.id,
+                member: TEST_USER_1.username
+            })).rejects.toHaveProperty("error", ChatError.CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT);
         });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
@@ -1078,7 +918,8 @@ describe("chat", () => {
             it("Should send message with attachment and without body", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
                     ]
@@ -1101,7 +942,8 @@ describe("chat", () => {
             it("Should send message with attachment and should cancel attachment uploading", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
                     ]
@@ -1128,7 +970,8 @@ describe("chat", () => {
             it("Should send message with multiple attachments", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: ATTACHMENTS
                 });
@@ -1145,7 +988,8 @@ describe("chat", () => {
             it("Should send message with multiple attachments and should cancel attachments uploading", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: ATTACHMENTS
                 });
@@ -1167,7 +1011,8 @@ describe("chat", () => {
             it("Should send message with multiple attachments and should cancel sending uploaded attachment", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: ATTACHMENTS
                 });
@@ -1203,7 +1048,8 @@ describe("chat", () => {
                 const messages = 3;
                 for (let i = 0; i < messages; i++) {
                     const status = await bob.sendMessage({
-                        chatId: chat.id,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
                         body: MESSAGE_BODY,
                         attachments: [
                             TEST_BIG_PICTURE_ATTACHMENT
@@ -1245,7 +1091,8 @@ describe("chat", () => {
                     const attachmentRequest = {
                         messageId: msg.id,
                         attachmentId: msg.attachments[0].id,
-                        chatId: msg.chatId,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
                         name: msg.attachments[0].name,
                     }
                     pendingAttachments[msg.attachments[0].id] = attachmentRequest;
@@ -1263,7 +1110,8 @@ describe("chat", () => {
                 alice.on(SfuEvent.MESSAGE, onMessageHandler);
 
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
@@ -1285,7 +1133,7 @@ describe("chat", () => {
                 fsUtils.makeDir(fsUtils.getFilePath(__dirname, "..", DOWNLOAD_PATH));
                 const attachmentsData = [];
                 const pendingAttachments = {};
-                const chunks = Math.ceil(TEST_PDF_ATTACHMENT.size/ATTACHMENT_CHUNK_SIZE);
+                const chunks = Math.ceil(TEST_PDF_ATTACHMENT.size / ATTACHMENT_CHUNK_SIZE);
                 const uploadedChunks = [];
                 const downloadedChunkSize = [];
 
@@ -1313,7 +1161,8 @@ describe("chat", () => {
                     const attachmentRequest = {
                         messageId: msg.id,
                         attachmentId: msg.attachments[0].id,
-                        chatId: msg.chatId,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
                         name: msg.attachments[0].name,
                     }
                     pendingAttachments[msg.attachments[0].id] = attachmentRequest;
@@ -1334,7 +1183,8 @@ describe("chat", () => {
                 alice.on(SfuEvent.MESSAGE, onMessageHandler);
 
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: [
                         TEST_PDF_ATTACHMENT
@@ -1369,7 +1219,8 @@ describe("chat", () => {
             it("Should reject cancellation sending attachment after uploading", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
                     ]
@@ -1396,7 +1247,8 @@ describe("chat", () => {
             it("Should search message attachments in chat", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: ATTACHMENTS
                 });
@@ -1411,7 +1263,6 @@ describe("chat", () => {
 
                 const searchResult = await bob.searchMessageAttachments({
                     chatId: chat.id,
-                    bookmarkedOnly: false,
                     from: TEST_USER_0.username,
                     timeFrame: {
                         start: 0,
@@ -1445,7 +1296,8 @@ describe("chat", () => {
                 const firstChat = await bob.createChat({});
                 const secondChat = await bob.createChat({});
                 const firstStatus = await bob.sendMessage({
-                    chatId: firstChat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: firstChat.id},
                     body: MESSAGE_BODY,
                     attachments: [TEST_PICTURE_ATTACHMENT]
                 });
@@ -1459,7 +1311,8 @@ describe("chat", () => {
                 await handler.sendAttachments();
 
                 const secondStatus = await bob.sendMessage({
-                    chatId: secondChat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: secondChat.id},
                     body: MESSAGE_BODY,
                     attachments: [TEST_PDF_ATTACHMENT]
                 });
@@ -1473,7 +1326,6 @@ describe("chat", () => {
                 await handler.sendAttachments();
 
                 const searchResult = await bob.searchMessageAttachments({
-                    bookmarkedOnly: false,
                     from: TEST_USER_0.username,
                     timeFrame: {
                         start: 0,
@@ -1483,14 +1335,12 @@ describe("chat", () => {
                     sortOrder: SortOrder.DESC
                 });
                 expect(searchResult.attachmentsInfo.length).toBe(2);
-                expect(searchResult.attachmentsInfo[0].chatId).toEqual(secondChat.id);
                 expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PDF_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PDF_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PDF_ATTACHMENT.type);
                 expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PDF_ATTACHMENT.size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(secondStatus.date);
-                expect(searchResult.attachmentsInfo[1].chatId).toEqual(firstChat.id);
                 expect(searchResult.attachmentsInfo[1].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
                 expect(searchResult.attachmentsInfo[1].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
                 expect(searchResult.attachmentsInfo[1].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
@@ -1502,63 +1352,12 @@ describe("chat", () => {
                 await bob.deleteChat(firstChat);
                 await bob.deleteChat(secondChat);
             });
-            it("Should search message attachments in bookmarks", async () => {
-                const firstChat = await bob.createChat({});
-                const secondChat = await bob.createChat({});
-
-                const firstStatus = await bob.sendMessage({
-                    chatId: firstChat.id,
-                    body: MESSAGE_BODY,
-                    attachments: [TEST_PICTURE_ATTACHMENT]
-                });
-                let attachmentsData = [];
-                attachmentsData.push({
-                    id: firstStatus.attachments[0].id,
-                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
-                })
-                let handler = bob.getSendingAttachmentsHandler(attachmentsData, firstStatus.id);
-                await handler.sendAttachments();
-
-                const secondStatus = await bob.sendMessage({
-                    chatId: secondChat.id,
-                    body: MESSAGE_BODY,
-                    attachments: [TEST_PICTURE_ATTACHMENT]
-                });
-                attachmentsData = [];
-                attachmentsData.push({
-                    id: firstStatus.attachments[0].id,
-                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
-                })
-                handler = bob.getSendingAttachmentsHandler(attachmentsData, secondStatus.id);
-                await handler.sendAttachments();
-
-                await bob.addMessageToBookmarks({chatId: firstChat.id, messageId: firstStatus.id});
-                const searchResult = await bob.searchMessageAttachments({
-                    bookmarkedOnly: true,
-                    from: TEST_USER_0.username,
-                    timeFrame: {
-                        start: 0,
-                        end: -1,
-                    },
-                    searchString: "sam",
-                    sortOrder: SortOrder.ASC
-                });
-                expect(searchResult.attachmentsInfo.length).toBe(1);
-                expect(searchResult.attachmentsInfo[0].chatId).toEqual(firstChat.id);
-                expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
-                expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
-                expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
-                expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
-                expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
-                expect(searchResult.attachmentsInfo[0].date).toEqual(firstStatus.date);
-
-                await bob.deleteChat(firstChat);
-            });
             it("Should send few messages and search message attachments based on boundaries", async () => {
                 const chat = await bob.createChat({});
                 for (let i = 0; i < 5; i++) {
                     const status = await bob.sendMessage({
-                        chatId: chat.id,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
                         body: MESSAGE_BODY,
                         attachments: [TEST_PICTURE_ATTACHMENT]
                     });
@@ -1574,7 +1373,6 @@ describe("chat", () => {
 
                 const allAttachments = await bob.searchMessageAttachments({
                     chatId: chat.id,
-                    bookmarkedOnly: false,
                     from: TEST_USER_0.username,
                     timeFrame: {
                         start: 0,
@@ -1586,7 +1384,6 @@ describe("chat", () => {
 
                 const searchResult = await bob.searchMessageAttachments({
                     chatId: chat.id,
-                    bookmarkedOnly: false,
                     from: TEST_USER_0.username,
                     boundaries: {
                         dateMark: allAttachments.attachmentsInfo[2].date,
@@ -1605,7 +1402,8 @@ describe("chat", () => {
             it("Should search message attachments in chat by file type", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: ATTACHMENTS
                 });
@@ -1620,7 +1418,6 @@ describe("chat", () => {
 
                 const searchResult = await bob.searchMessageAttachments({
                     chatId: chat.id,
-                    bookmarkedOnly: false,
                     attachmentsType: MessageAttachmentMediaType.media,
                     timeFrame: {
                         start: 0,
@@ -1643,7 +1440,8 @@ describe("chat", () => {
             it("Should send message with multiple attachments and should check attachments media type", async () => {
                 const chat = await bob.createChat({});
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
                     attachments: ATTACHMENTS
                 });
@@ -1714,7 +1512,8 @@ describe("chat", () => {
                 });
 
                 await bob.sendMessage({
-                    chatId: chat0.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat0.id},
                     body: MESSAGE_BODY
                 });
             });
@@ -1732,7 +1531,8 @@ describe("chat", () => {
                     const attachmentRequest = {
                         messageId: msg.id,
                         attachmentId: msg.attachments[0].id,
-                        chatId: msg.chatId,
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat0.id},
                         name: msg.attachments[0].name,
                     }
                     pendingAttachments[msg.attachments[0].id] = attachmentRequest;
@@ -1751,7 +1551,8 @@ describe("chat", () => {
 
 
                 const status = await bob.sendMessage({
-                    chatId: chat0.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat0.id},
                     body: MESSAGE_BODY,
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
@@ -1773,7 +1574,6 @@ describe("chat", () => {
                         bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, async (msg) => {
                             const state = msg as UpdateMessagesDeliveryStatusEvent;
                             expect(state).toBeTruthy();
-                            expect(state.chatId).toEqual(chatId);
                             expect(state.dateFrom).toBe(0);
                             expect(state.dateTo).toBe(messageDate);
                             expect(state.status).toEqual(DeliveryStatus.READ);
@@ -1788,10 +1588,15 @@ describe("chat", () => {
                 });
 
                 const message = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
-                alice.markMessageRead({id: message.id, chatId: chat.id});
+                alice.markMessageRead({
+                    id: message.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                });
                 await waitUserReadMessageEvent(chat.id, message.date);
             });
             it("Chat member should be notified about editing message", async () => {
@@ -1801,7 +1606,8 @@ describe("chat", () => {
                 });
 
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
                 expect(status).toBeTruthy();
@@ -1819,7 +1625,12 @@ describe("chat", () => {
                     })
                 };
 
-                const editPromise = bob.editChatMessage({chatId: chat.id, messageId: status.id, body: editedBody});
+                const editPromise = bob.editMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    messageId: status.id,
+                    body: editedBody
+                });
                 const editedMessage = await waitForMessageEditedEvent(alice, status.id);
                 expect(editedMessage).toBeTruthy();
                 expect(editedMessage.message.body).toEqual(editedBody);
@@ -1835,7 +1646,8 @@ describe("chat", () => {
                 });
 
                 const status = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
                 expect(status).toBeTruthy();
@@ -1846,33 +1658,43 @@ describe("chat", () => {
                     return new Promise<MessageDeleted>((resolve, reject) => {
                         sfu.on(SfuEvent.CHAT_MESSAGE_DELETED, (msg) => {
                             const messageDeleted = msg as MessageDeleted;
-                            if (messageDeleted && messageDeleted.chatId === chat.id && messageDeleted.messageId === messageId && messageDeleted.state === MessageState.DELETED) {
+                            if (messageDeleted && messageDeleted.messageId === messageId && messageDeleted.state === MessageState.DELETED) {
                                 resolve(messageDeleted);
                             }
                         })
                     })
                 };
 
-                const deletePromise = bob.deleteChatMessage({chatId: chat.id, messageId: status.id});
+                const deletePromise = bob.deleteMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    messageId: status.id
+                });
                 const deletedMessage = await waitForMessageDeletedEvent(alice, status.id);
                 expect(deletedMessage).toBeTruthy();
                 await deletePromise;
 
                 await bob.deleteChat({id: chat.id});
             });
-            it('user should be notified about deferred delivery', async () => {
+             it('user should be notified about deferred delivery', async () => {
                 const chat = await bob.createChat({
                     members: [TEST_USER_1.username]
                 });
                 const messageForRead = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
-                await alice.markMessageRead({id: messageForRead.id, chatId: chat.id});
+                await alice.markMessageRead({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    id: messageForRead.id,
+                });
                 await alice.disconnect();
 
                 const pendingMessage = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
                 const waitUpdateDeliveryStatusEvent = (dateFrom: number, dateTo: number): Promise<void> => {
@@ -1880,7 +1702,6 @@ describe("chat", () => {
                         const callBack = (msg) => {
                             const state = msg as UpdateMessagesDeliveryStatusEvent;
                             expect(state).toBeTruthy();
-                            expect(state.chatId).toEqual(chat.id);
                             expect(state.dateFrom).toBe(dateFrom);
                             expect(state.dateTo).toBe(dateTo);
                             expect(state.status).toEqual(DeliveryStatus.DELIVERED);
@@ -1892,8 +1713,9 @@ describe("chat", () => {
                 }
 
                 alice = await connect(TEST_USER_1);
-                alice.loadChatMessages({
-                    chatId: chat.id,
+                alice.loadMessages({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     timeFrame: {
                         start: 0,
                         end: -1
@@ -1904,17 +1726,20 @@ describe("chat", () => {
                 await alice.disconnect();
 
                 const firstPendingMessage = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
                 const secondPendingMessage = await bob.sendMessage({
-                    chatId: chat.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY
                 });
 
                 alice = await connect(TEST_USER_1);
-                alice.loadChatMessages({
-                    chatId: chat.id,
+                alice.loadMessages({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
                     timeFrame: {
                         start: 0,
                         end: -1
@@ -1923,818 +1748,716 @@ describe("chat", () => {
                 await waitUpdateDeliveryStatusEvent(firstPendingMessage.date - 1, secondPendingMessage.date);
                 await bob.deleteChat({id: chat.id});
             });
-            it('should receive event about deleting bookmark', async () => {
-                const chat = await bob.createChat({type: ChatType.PUBLIC, channel: false});
-                const message = await bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY
-                });
-                await bob.addMessageToBookmarks({
-                    chatId: chat.id,
-                    messageId: message.id
-                });
-                const waitEventPromise = async (): Promise<void> => {
-                    return new Promise((resolve) => {
-                        bob.on(SfuEvent.BOOKMARK_DELETED, async (msg) => {
-                            const event = msg as BookmarkDeleted;
-                            if (event.chatId === chat.id && event.id === message.id) {
-                                resolve();
-                            }
+            describe("multiple-clients", () => {
+                it('should create chat and two clients should receive event', async () => {
+                    const aliceSecondClient = await connect(TEST_USER_1);
+
+                    const waitNewChatEventOnTwoInstance = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            let eventsCount = 0;
+                            alice.on(SfuEvent.NEW_CHAT, (msg) => {
+                                eventsCount++;
+                                if (eventsCount === 2) {
+                                    resolve();
+                                }
+                            });
+                            aliceSecondClient.on(SfuEvent.NEW_CHAT, (msg) => {
+                                eventsCount++;
+                                if (eventsCount === 2) {
+                                    resolve();
+                                }
+                            });
                         })
-                    })
-                }
-                bob.removeMessageFromBookmarks({
-                    chatId: chat.id,
-                    messageId: message.id
-                });
-                await waitEventPromise();
-                await bob.deleteChat({id: chat.id});
-            });
-            it('should receive event about deleting bookmark when second user is deleting message', async () => {
-                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
-                const message = await alice.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY
-                });
-                await bob.addMessageToBookmarks({
-                    chatId: chat.id,
-                    messageId: message.id
-                });
-                const waitEventPromise = async (): Promise<void> => {
-                    return new Promise((resolve) => {
-                        bob.on(SfuEvent.BOOKMARK_DELETED, async (msg) => {
-                            const event = msg as BookmarkDeleted;
-                            if (event.chatId === chat.id && event.id === message.id) {
-                                resolve();
-                            }
-                        })
-                    })
-                }
-                alice.deleteChatMessage({
-                    chatId: chat.id,
-                    messageId: message.id
-                });
-                await waitEventPromise();
-                await bob.deleteChat({id: chat.id});
-            });
-            it('should receive event about deleting chat with bookmarks when second user is deleting chat', async () => {
-                const chat = await alice.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
-                for (let i = 0; i < 3; i++) {
-                    const message = await alice.sendMessage({
-                        chatId: chat.id,
-                        body: MESSAGE_BODY
-                    });
-                    await bob.addMessageToBookmarks({
-                        chatId: chat.id,
-                        messageId: message.id
-                    });
-                }
-                const waitEventPromise = async (): Promise<void> => {
-                    return new Promise((resolve) => {
-                        bob.on(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, async (msg) => {
-                            const event = msg as ChatWithBookmarksDeleted;
-                            if (event.chatId === chat.id && event.deletedBookmarksCount === 3) {
-                                resolve();
-                            }
-                        })
-                    })
-                }
-                alice.deleteChat({id: chat.id});
-                await waitEventPromise();
-            });
-            it('should receive event about deleting chat with bookmarks when second user is removing first from chat', async () => {
-                const chat = await alice.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
-                for (let i = 0; i < 3; i++) {
-                    const message = await alice.sendMessage({
-                        chatId: chat.id,
-                        body: MESSAGE_BODY
-                    });
-                    await bob.addMessageToBookmarks({
-                        chatId: chat.id,
-                        messageId: message.id
-                    });
-                }
-                const waitEventPromise = async (): Promise<void> => {
-                    return new Promise((resolve) => {
-                        bob.on(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, async (msg) => {
-                            const event = msg as ChatWithBookmarksDeleted;
-                            if (event.chatId === chat.id && event.deletedBookmarksCount === 3) {
-                                resolve();
-                            }
-                        })
-                    })
-                }
-                alice.removeMemberFromChat({
-                    id: chat.id,
-                    member: TEST_USER_0.username
-                })
-                await waitEventPromise();
-                await alice.deleteChat({id: chat.id});
-            });
-            it('should receive event about editing bookmark when second user is editing message', async () => {
-                const editedBody = "EDITED BODY";
-                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username], type: ChatType.PUBLIC, channel: false});
-                const message = await alice.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY,
-                    attachments: [
-                        TEST_PICTURE_ATTACHMENT
-                    ]
-                });
-
-                const attachmentsData = [];
-                attachmentsData.push({
-                    id: message.attachments[0].id,
-                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload,
-                })
-                const handler = alice.getSendingAttachmentsHandler(attachmentsData, message.id);
-                await handler.sendAttachments();
-
-                await bob.addMessageToBookmarks({
-                    chatId: chat.id,
-                    messageId: message.id
-                });
-
-                const waitEventPromise = async (): Promise<void> => {
-                    return new Promise((resolve) => {
-                        bob.on(SfuEvent.BOOKMARK_EDITED, async (msg) => {
-                            const event = msg as BookmarkEdited;
-                            if (event.bookmark.chatId === chat.id && event.bookmark.body === editedBody && event.bookmark.attachments.length === 0) {
-                                resolve();
-                            }
-                        })
-                    })
-                }
-
-                const attachmentId = message.attachments[0].id;
-                alice.editChatMessage({chatId: chat.id, messageId: message.id, body: editedBody, attachmentIdsToDelete: [attachmentId]});
-
-                await waitEventPromise();
-                await bob.deleteChat({id: chat.id});
-            });
-        });
-        describe("multiple-clients", () => {
-            it('should create chat and two clients should receive event', async () => {
-                const aliceSecondClient = await connect(TEST_USER_1);
-
-                const waitNewChatEventOnTwoInstance = (): Promise<void> => {
-                    return new Promise<void>((resolve) => {
-                        let eventsCount = 0;
-                        alice.on(SfuEvent.NEW_CHAT, (msg) => {
-                            eventsCount++;
-                            if (eventsCount === 2) {
-                                resolve();
-                            }
-                        });
-                        aliceSecondClient.on(SfuEvent.NEW_CHAT, (msg) => {
-                            eventsCount++;
-                            if (eventsCount === 2) {
-                                resolve();
-                            }
-                        });
-                    })
-                }
-
-                bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
-
-                await waitNewChatEventOnTwoInstance();
-
-                const chats = await bob.getUserChats();
-                await aliceSecondClient.disconnect();
-                Object.keys(chats).forEach((chat) => {
-                    bob.deleteChat({id: chat});
-                });
-            });
-            it('should create chat and second user client should receive event', async () => {
-                const bobSecondClient = await connect(TEST_USER_0);
-
-                const waitNewChatEventOnSecondClientInstance = (): Promise<void> => {
-                    return new Promise<void>((resolve) => {
-                        bobSecondClient.on(SfuEvent.NEW_CHAT, (msg) => {
-                            resolve();
-                        });
-                    })
-                }
-
-                bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
-
-                await waitNewChatEventOnSecondClientInstance();
-
-                const chats = await bob.getUserChats();
-                Object.keys(chats).forEach((chat) => {
-                    bob.deleteChat({id: chat});
-                });
-                await bobSecondClient.disconnect();
-            });
-            it('should send message and two clients should receive message', async () => {
-                const aliceSecondClient = await connect(TEST_USER_1);
-
-                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
-
-                const onNewMessageHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
-                    sfu.on(SfuEvent.MESSAGE, (msg) => {
-                        eventsCount.num++;
-                        if (eventsCount.num === 2) {
-                            resolve();
-                        }
-                    });
-                }
-                const waitMessagesOnTwoInstance = (): Promise<void> => {
-                    return new Promise<void>((resolve) => {
-                        let eventsCount = { num: 0 };
-                        onNewMessageHandler(alice, resolve, eventsCount);
-                        onNewMessageHandler(aliceSecondClient, resolve, eventsCount);
-                    })
-                }
-
-                bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY,
-                });
-                await waitMessagesOnTwoInstance();
-                await aliceSecondClient.disconnect();
-                await bob.deleteChat(chat);
-            });
-            it('should send message and second client should receive sync event', async () => {
-                const bobSecondClient = await connect(TEST_USER_0);
-
-                const chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username], type: ChatType.PUBLIC, channel: false});
-
-                const waitSyncEvent = (): Promise<void> => {
-                    return new Promise<void>((resolve) => {
-                        bobSecondClient.on(SfuEvent.SEND_MESSAGE_SYNC, (msg) => {
-                            resolve();
-                        })
-                    })
-                }
-
-                bob.sendMessage({
-                    chatId: chat.id,
-                    body: MESSAGE_BODY,
-                });
-                await waitSyncEvent();
-                await bob.deleteChat(chat);
-                await bobSecondClient.disconnect();
-            });
-        });
-    });
-    describe("channels", () => {
-        it("Should create public channel", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            expect(channel).toBeTruthy();
-            expect(channel.id).toBeTruthy();
-            expect(channel.channel).toBeTruthy();
-            expect(channel.name).toBe(TEST_PUBLIC_CHANNEL.name);
-            expect(channel.type).toBe(TEST_PUBLIC_CHANNEL.type);
-            expect(channel.channelSendPolicy).toBe(TEST_PUBLIC_CHANNEL.channelSendPolicy);
-            expect(channel.members).toContain(bob.user().username);
-            expect(channel.allowedToAddExternalUser).toBe(false);
-            await bob.deleteChat(channel);
-        });
-        it("Should delete public channel", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            await bob.deleteChat(channel);
-            const pChannels = await bob.getPublicChannels();
-            expect(pChannels[channel.id]).toBeUndefined();
-        });
-        it("Should load public channels", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const pChannels = await bob.getPublicChannels();
-            expect(pChannels).toHaveProperty(channel.id);
-            await bob.deleteChat(channel);
-        });
-        it("Should load public channel user participates in into chats", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const chats = await bob.getUserChats();
-            expect(chats).toHaveProperty(channel.id);
-            await bob.deleteChat(channel);
-        });
-        it("Should create private channel", async () => {
-            const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
-            expect(channel).toBeTruthy();
-            expect(channel.id).toBeTruthy();
-            expect(channel.channel).toBeTruthy();
-            expect(channel.name).toBe(TEST_PRIVATE_CHANNEL.name);
-            expect(channel.type).toBe(TEST_PRIVATE_CHANNEL.type);
-            expect(channel.channelSendPolicy).toBe(TEST_PRIVATE_CHANNEL.channelSendPolicy);
-            await bob.deleteChat(channel);
-        });
-        it("Should delete private channel", async () => {
-            const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
-            await bob.deleteChat(channel);
-            const chats = await bob.getUserChats();
-            expect(chats[channel.id]).toBeUndefined();
-        });
-        it("Should not load private channels into public channels", async () => {
-            const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
-            const pChannels = await bob.getPublicChannels();
-            expect(pChannels[channel.id]).toBeUndefined();
-            await bob.deleteChat(channel);
-        });
-        it("Should load private channel into chats", async () => {
-            const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
-            const chats = await bob.getUserChats();
-            expect(chats).toHaveProperty(channel.id);
-            await bob.deleteChat(channel);
-        });
-        it("Should add member", async () => {
-            let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            channel = await bob.addMemberToChat({id: channel.id, member: TEST_USER_1.username});
-            expect(channel.members).toContain(TEST_USER_1.username);
-            await bob.deleteChat(channel);
-        });
-        it("Should remove member", async () => {
-            let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            channel = await bob.addMemberToChat({id: channel.id, member: TEST_USER_1.username});
-            expect(channel.members).toContain(TEST_USER_1.username);
-            channel = await bob.removeMemberFromChat({id: channel.id, member: TEST_USER_1.username});
-            const member = channel.members.find((member) => member === TEST_USER_1.username);
-            expect(member).toBeUndefined();
-            await bob.deleteChat(channel);
-        });
-        it("Should send message", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const status = await bob.sendMessage({
-                chatId: channel.id,
-                body: MESSAGE_BODY
-            });
-            expect(status).toBeTruthy();
-            expect(status.id).toBeTruthy();
-            expect(status.date).toBeTruthy();
-            expect(status.state).toBeTruthy();
-            await bob.deleteChat(channel);
-        });
-        it("Should send message with attachment", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const status = await bob.sendMessage({
-                chatId: channel.id,
-                body: MESSAGE_BODY,
-                attachments: [
-                    TEST_PICTURE_ATTACHMENT
-                ]
-            });
-            expect(status).toBeTruthy();
-            expect(status.id).toBeTruthy();
-            expect(status.date).toBeTruthy();
-            expect(status.state).toBeTruthy();
-            await bob.deleteChat(channel);
-        });
-        it("Should mark message as read", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const status = await bob.sendMessage({
-                chatId: channel.id,
-                body: MESSAGE_BODY
-            });
-            await bob.markMessageRead(status);
-            await bob.deleteChat(channel);
-        });
-        it("Should mark message as unread", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const status = await bob.sendMessage({
-                chatId: channel.id,
-                body: MESSAGE_BODY
-            });
-            await bob.markMessageUnread(status);
-            await bob.deleteChat(channel);
-        });
-        it("Should rename channel", async () => {
-            const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            const name = "chat_name";
-            await bob.renameChat({id: channel.id, name: name});
-            const pChannels = await bob.getPublicChannels();
-            const channelRenamed = pChannels[channel.id];
-            expect(channelRenamed.name).toEqual(name);
-            await bob.deleteChat(channel);
-        });
-        it("Should add channel to favourites", async () => {
-            let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            channel = await bob.addChatToFavourites(channel);
-            expect(channel.favourite).toBeTruthy();
-            const chats = await bob.getUserChats();
-            channel = chats[channel.id];
-            expect(channel.favourite).toBeTruthy();
-            await bob.deleteChat(channel);
-        });
-        it("Should remove channel from favourites", async () => {
-            let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            channel = await bob.addChatToFavourites(channel);
-            expect(channel.favourite).toBeTruthy();
-            channel = await bob.removeChatFromFavourites(channel);
-            expect(channel.favourite).toBeFalsy();
-            const chats = await bob.getUserChats();
-            channel = chats[channel.id];
-            expect(channel.favourite).toBeFalsy();
-            await bob.deleteChat(channel);
-        });
-        it("Should change send policy", async () => {
-            let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
-            expect(channel.channelSendPolicy).toBe(TEST_PUBLIC_CHANNEL.channelSendPolicy);
-            const policy = ChannelSendPolicy.ADMIN_AND_LIST;
-            channel = await bob.updateChannelSendPolicy({id: channel.id, channelSendPolicy: policy});
-            expect(channel.channelSendPolicy).toBe(policy);
-            await bob.deleteChat(channel);
-        });
-        it("Should add member to policy list", async () => {
-            let channel = await bob.createChat({
-                ...TEST_PUBLIC_CHANNEL,
-                channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST
-            });
-            expect(channel.sendPermissionList.length).toBe(0);
-            channel = await bob.addChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
-            expect(channel.sendPermissionList).toContain(TEST_USER_1.username);
-            await bob.deleteChat(channel);
-        });
-        it("Should remove member from policy list", async () => {
-            let channel = await bob.createChat({
-                ...TEST_PUBLIC_CHANNEL,
-                channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST
-            });
-            expect(channel.sendPermissionList.length).toBe(0);
-            channel = await bob.addChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
-            expect(channel.sendPermissionList).toContain(TEST_USER_1.username);
-            channel = await bob.removeChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
-            const member = channel.sendPermissionList.find((member) => member === TEST_USER_1.username);
-            expect(member).toBeUndefined();
-            await bob.deleteChat(channel);
-        });
-        it("Should update channel's configuration", async () => {
-            const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
-            expect(channel).toBeTruthy();
-            expect(channel.id).toBeTruthy();
-            expect(channel.channel).toBeTruthy();
-            expect(channel.name).toBe(TEST_PRIVATE_CHANNEL.name);
-            expect(channel.type).toBe(TEST_PRIVATE_CHANNEL.type);
-            expect(channel.channelSendPolicy).toBe(TEST_PRIVATE_CHANNEL.channelSendPolicy);
-            expect(channel.allowedToAddExternalUser).toBe(false);
-            const config = {
-                type: ChatType.PUBLIC,
-                channelSendPolicy: ChannelSendPolicy.ADMIN,
-                allowedToAddExternalUser: true
-            }
-            const updatedChannel = await bob.updateChatConfiguration({
-                id: channel.id,
-                ...config
-            });
-            expect(updatedChannel.type).toBe(config.type);
-            expect(updatedChannel.channelSendPolicy).toBe(config.channelSendPolicy);
-            expect(updatedChannel.allowedToAddExternalUser).toBe(true);
-            await bob.deleteChat(channel);
-        });
-        it("updating channel's send policy from admin_and_list to other should clear the list", async () => {
-            let channel = await bob.createChat(TEST_PRIVATE_CHANNEL_WITH_LIST);
-            expect(channel.sendPermissionList.length).toBe(0);
-            channel = await bob.addChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
-            expect(channel.sendPermissionList).toContain(TEST_USER_1.username);
-            const config = {
-                type: ChatType.PUBLIC,
-                channelSendPolicy: ChannelSendPolicy.ADMIN
-            }
-            channel = await bob.updateChatConfiguration({
-                id: channel.id,
-                ...config
-            });
-            expect(channel.type).toBe(config.type);
-            expect(channel.channelSendPolicy).toBe(config.channelSendPolicy);
-            expect(channel.sendPermissionList.length).toBe(0);
-            await bob.deleteChat(channel);
-        });
-        describe("notifications", () => {
-            it("user should be notified when added to channel", async (done) => {
-                alice.on(SfuEvent.NEW_CHAT, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    await bob.deleteChat(channel0);
-                    done();
-                });
-                let channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
-                await bob.addMemberToChat({id: channel0.id, member: TEST_USER_1.username});
-            });
-            it("user should be notified when removed from channel", async (done) => {
-                alice.on(SfuEvent.CHAT_DELETED, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    await bob.deleteChat(channel0);
-                    done();
-                }).on(SfuEvent.NEW_CHAT, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    await bob.removeMemberFromChat({id: channel0.id, member: TEST_USER_1.username});
-                });
-                let channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
-                await bob.addMemberToChat({id: channel0.id, member: TEST_USER_1.username});
-            });
-            it("user should be notified when channel deleted", async (done) => {
-                alice.on(SfuEvent.CHAT_DELETED, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    done();
-                }).on(SfuEvent.NEW_CHAT, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    await bob.deleteChat(channel0);
-                });
-                let channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
-                await bob.addMemberToChat({id: channel0.id, member: TEST_USER_1.username});
-            });
-            it("Should receive message", async (done) => {
-                alice.on(SfuEvent.MESSAGE, async (msg) => {
-                    const message1 = msg as Message;
-                    expect(message1.body).toEqual(MESSAGE_BODY);
-                    await bob.deleteChat(channel0);
-                    done();
-                });
-                let channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    members: [TEST_USER_1.username]
-                });
-
-                await bob.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                });
-            });
-            it("Should receive message with attachment", async (done) => {
-                fsUtils.makeDir(fsUtils.getFilePath(__dirname, "..", DOWNLOAD_PATH));
-                const attachmentsData = [];
-                const pendingAttachments = {};
-
-                let channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    members: [TEST_USER_1.username]
-                });
-
-                const onMessageHandler = async (msg) => {
-                    expect(msg.attachments).toBeTruthy();
-                    const attachmentRequest = {
-                        messageId: msg.id,
-                        attachmentId: msg.attachments[0].id,
-                        chatId: msg.chatId,
-                        name: msg.attachments[0].name,
                     }
-                    pendingAttachments[msg.attachments[0].id] = attachmentRequest;
-                    const attachment = await alice.getMessageAttachment(attachmentRequest);
-                    expect(attachment).toBeTruthy();
 
-                    const path = fsUtils.getFilePath(__dirname, "..", DOWNLOAD_PATH + attachment.name);
-                    fsUtils.writeFile(path, new Uint8Array(attachment.payload), {flag: 'a+'});
+                    bob.createChat({
+                        members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username],
+                        type: ChatType.PUBLIC,
+                        channel: false
+                    });
 
-                    alice.off(SfuEvent.MESSAGE, onMessageHandler);
-                    await bob.deleteChat(channel0);
-                    done();
-                }
+                    await waitNewChatEventOnTwoInstance();
 
-                alice.on(SfuEvent.MESSAGE, onMessageHandler);
+                    const chats = await bob.getUserChats();
+                    await aliceSecondClient.disconnect();
+                    Object.keys(chats).forEach((chat) => {
+                        bob.deleteChat({id: chat});
+                    });
+                });
+                it('should create chat and second user client should receive event', async () => {
+                    const bobSecondClient = await connect(TEST_USER_0);
 
+                    const waitNewChatEventOnSecondClientInstance = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            bobSecondClient.on(SfuEvent.NEW_CHAT, (msg) => {
+                                resolve();
+                            });
+                        })
+                    }
+
+                    bob.createChat({
+                        members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username],
+                        type: ChatType.PUBLIC,
+                        channel: false
+                    });
+
+                    await waitNewChatEventOnSecondClientInstance();
+
+                    const chats = await bob.getUserChats();
+                    Object.keys(chats).forEach((chat) => {
+                        bob.deleteChat({id: chat});
+                    });
+                    await bobSecondClient.disconnect();
+                });
+                it('should send message and two clients should receive message', async () => {
+                    const aliceSecondClient = await connect(TEST_USER_1);
+
+                    const chat = await bob.createChat({
+                        members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username],
+                        type: ChatType.PUBLIC,
+                        channel: false
+                    });
+
+                    const onNewMessageHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
+                        sfu.on(SfuEvent.MESSAGE, (msg) => {
+                            eventsCount.num++;
+                            if (eventsCount.num === 2) {
+                                resolve();
+                            }
+                        });
+                    }
+                    const waitMessagesOnTwoInstance = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            let eventsCount = {num: 0};
+                            onNewMessageHandler(alice, resolve, eventsCount);
+                            onNewMessageHandler(aliceSecondClient, resolve, eventsCount);
+                        })
+                    }
+
+                    bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
+                        body: MESSAGE_BODY,
+                    });
+                    await waitMessagesOnTwoInstance();
+                    await aliceSecondClient.disconnect();
+                    await bob.deleteChat(chat);
+                });
+                it('should send message and second client should receive sync event', async () => {
+                    const bobSecondClient = await connect(TEST_USER_0);
+
+                    const chat = await bob.createChat({
+                        members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username],
+                        type: ChatType.PUBLIC,
+                        channel: false
+                    });
+
+                    const waitSyncEvent = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            bobSecondClient.on(SfuEvent.SEND_MESSAGE_SYNC, (msg) => {
+                                resolve();
+                            })
+                        })
+                    }
+
+                    bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: chat.id},
+                        body: MESSAGE_BODY,
+                    });
+                    await waitSyncEvent();
+                    await bob.deleteChat(chat);
+                    await bobSecondClient.disconnect();
+                });
+            });
+        });
+        describe("channels", () => {
+            it("Should create public channel", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                expect(channel).toBeTruthy();
+                expect(channel.id).toBeTruthy();
+                expect(channel.channel).toBeTruthy();
+                expect(channel.name).toBe(TEST_PUBLIC_CHANNEL.name);
+                expect(channel.type).toBe(TEST_PUBLIC_CHANNEL.type);
+                expect(channel.channelSendPolicy).toBe(TEST_PUBLIC_CHANNEL.channelSendPolicy);
+                expect(channel.members).toContain(bob.user().username);
+                expect(channel.allowedToAddExternalUser).toBe(false);
+                await bob.deleteChat(channel);
+            });
+            it("Should delete public channel", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                await bob.deleteChat(channel);
+                const pChannels = await bob.getPublicChannels();
+                expect(pChannels[channel.id]).toBeUndefined();
+            });
+            it("Should load public channels", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                const pChannels = await bob.getPublicChannels();
+                expect(pChannels).toHaveProperty(channel.id);
+                await bob.deleteChat(channel);
+            });
+            it("Should load public channel user participates in into chats", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                const chats = await bob.getUserChats();
+                expect(chats).toHaveProperty(channel.id);
+                await bob.deleteChat(channel);
+            });
+            it("Should create private channel", async () => {
+                const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
+                expect(channel).toBeTruthy();
+                expect(channel.id).toBeTruthy();
+                expect(channel.channel).toBeTruthy();
+                expect(channel.name).toBe(TEST_PRIVATE_CHANNEL.name);
+                expect(channel.type).toBe(TEST_PRIVATE_CHANNEL.type);
+                expect(channel.channelSendPolicy).toBe(TEST_PRIVATE_CHANNEL.channelSendPolicy);
+                await bob.deleteChat(channel);
+            });
+            it("Should delete private channel", async () => {
+                const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
+                await bob.deleteChat(channel);
+                const chats = await bob.getUserChats();
+                expect(chats[channel.id]).toBeUndefined();
+            });
+            it("Should not load private channels into public channels", async () => {
+                const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
+                const pChannels = await bob.getPublicChannels();
+                expect(pChannels[channel.id]).toBeUndefined();
+                await bob.deleteChat(channel);
+            });
+            it("Should load private channel into chats", async () => {
+                const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
+                const chats = await bob.getUserChats();
+                expect(chats).toHaveProperty(channel.id);
+                await bob.deleteChat(channel);
+            });
+            it("Should add member", async () => {
+                let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                channel = await bob.addMemberToChat({id: channel.id, member: TEST_USER_1.username});
+                expect(channel.members).toContain(TEST_USER_1.username);
+                await bob.deleteChat(channel);
+            });
+            it("Should remove member", async () => {
+                let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                channel = await bob.addMemberToChat({id: channel.id, member: TEST_USER_1.username});
+                expect(channel.members).toContain(TEST_USER_1.username);
+                channel = await bob.removeMemberFromChat({id: channel.id, member: TEST_USER_1.username});
+                const member = channel.members.find((member) => member === TEST_USER_1.username);
+                expect(member).toBeUndefined();
+                await bob.deleteChat(channel);
+            });
+            it("Should send message", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
                 const status = await bob.sendMessage({
-                    chatId: channel0.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: channel.id},
+                    body: MESSAGE_BODY
+                });
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+                expect(status.state).toBeTruthy();
+                await bob.deleteChat(channel);
+            });
+            it("Should send message with attachment", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                const status = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: channel.id},
                     body: MESSAGE_BODY,
                     attachments: [
                         TEST_PICTURE_ATTACHMENT
                     ]
                 });
-                expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
-                expect(status.attachments).toBeTruthy();
-
-                attachmentsData.push({
-                    id: status.attachments[0].id,
-                    payload: TEST_PICTURE_ATTACHMENT_DATA.payload
-                })
-                const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
-                handler.sendAttachments();
+                expect(status).toBeTruthy();
+                expect(status.id).toBeTruthy();
+                expect(status.date).toBeTruthy();
+                expect(status.state).toBeTruthy();
+                await bob.deleteChat(channel);
             });
-            it("user should be notified about reading message by user", async () => {
-                const waitUserReadMessageEvent = (channelId: string, messageDate: number): Promise<void> => {
-                    return new Promise<void>((resolve) => {
-                        bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, async (msg) => {
-                            const state = msg as UpdateMessagesDeliveryStatusEvent;
-                            expect(state).toBeTruthy();
-                            expect(state.chatId).toEqual(channelId);
-                            expect(state.dateFrom).toBe(0);
-                            expect(state.dateTo).toBe(messageDate);
-                            expect(state.status).toBe(DeliveryStatus.READ);
-                            await bob.deleteChat({id: channelId});
-                            resolve();
-                        });
-                    });
+            it("Should mark message as read", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                const status = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: channel.id},
+                    body: MESSAGE_BODY
+                });
+                await bob.markMessageRead(status);
+                await bob.deleteChat(channel);
+            });
+            it("Should mark message as unread", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                const status = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: channel.id},
+                    body: MESSAGE_BODY
+                });
+                await bob.markMessageUnread(status);
+                await bob.deleteChat(channel);
+            });
+            it("Should rename channel", async () => {
+                const channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                const name = "chat_name";
+                await bob.renameChat({id: channel.id, name: name});
+                const pChannels = await bob.getPublicChannels();
+                const channelRenamed = pChannels[channel.id];
+                expect(channelRenamed.name).toEqual(name);
+                await bob.deleteChat(channel);
+            });
+            it("Should add channel to favourites", async () => {
+                let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                channel = await bob.addChatToFavourites(channel);
+                expect(channel.favourite).toBeTruthy();
+                const chats = await bob.getUserChats();
+                channel = chats[channel.id];
+                expect(channel.favourite).toBeTruthy();
+                await bob.deleteChat(channel);
+            });
+            it("Should remove channel from favourites", async () => {
+                let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                channel = await bob.addChatToFavourites(channel);
+                expect(channel.favourite).toBeTruthy();
+                channel = await bob.removeChatFromFavourites(channel);
+                expect(channel.favourite).toBeFalsy();
+                const chats = await bob.getUserChats();
+                channel = chats[channel.id];
+                expect(channel.favourite).toBeFalsy();
+                await bob.deleteChat(channel);
+            });
+            it("Should change send policy", async () => {
+                let channel = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                expect(channel.channelSendPolicy).toBe(TEST_PUBLIC_CHANNEL.channelSendPolicy);
+                const policy = ChannelSendPolicy.ADMIN_AND_LIST;
+                channel = await bob.updateChannelSendPolicy({id: channel.id, channelSendPolicy: policy});
+                expect(channel.channelSendPolicy).toBe(policy);
+                await bob.deleteChat(channel);
+            });
+            it("Should add member to policy list", async () => {
+                let channel = await bob.createChat({
+                    ...TEST_PUBLIC_CHANNEL,
+                    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST
+                });
+                expect(channel.sendPermissionList.length).toBe(0);
+                channel = await bob.addChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
+                expect(channel.sendPermissionList).toContain(TEST_USER_1.username);
+                await bob.deleteChat(channel);
+            });
+            it("Should remove member from policy list", async () => {
+                let channel = await bob.createChat({
+                    ...TEST_PUBLIC_CHANNEL,
+                    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST
+                });
+                expect(channel.sendPermissionList.length).toBe(0);
+                channel = await bob.addChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
+                expect(channel.sendPermissionList).toContain(TEST_USER_1.username);
+                channel = await bob.removeChannelSendPermissionListMember({
+                    id: channel.id,
+                    member: TEST_USER_1.username
+                });
+                const member = channel.sendPermissionList.find((member) => member === TEST_USER_1.username);
+                expect(member).toBeUndefined();
+                await bob.deleteChat(channel);
+            });
+            it("Should update channel's configuration", async () => {
+                const channel = await bob.createChat(TEST_PRIVATE_CHANNEL);
+                expect(channel).toBeTruthy();
+                expect(channel.id).toBeTruthy();
+                expect(channel.channel).toBeTruthy();
+                expect(channel.name).toBe(TEST_PRIVATE_CHANNEL.name);
+                expect(channel.type).toBe(TEST_PRIVATE_CHANNEL.type);
+                expect(channel.channelSendPolicy).toBe(TEST_PRIVATE_CHANNEL.channelSendPolicy);
+                expect(channel.allowedToAddExternalUser).toBe(false);
+                const config = {
+                    type: ChatType.PUBLIC,
+                    channelSendPolicy: ChannelSendPolicy.ADMIN,
+                    allowedToAddExternalUser: true
                 }
-
-                const channel = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    members: [TEST_USER_1.username]
+                const updatedChannel = await bob.updateChatConfiguration({
+                    id: channel.id,
+                    ...config
                 });
-
-                const message = await bob.sendMessage({
-                    chatId: channel.id,
-                    body: MESSAGE_BODY
-                });
-                alice.markMessageRead({id: message.id, chatId: channel.id});
-                await waitUserReadMessageEvent(channel.id, message.date);
+                expect(updatedChannel.type).toBe(config.type);
+                expect(updatedChannel.channelSendPolicy).toBe(config.channelSendPolicy);
+                expect(updatedChannel.allowedToAddExternalUser).toBe(true);
+                await bob.deleteChat(channel);
             });
-            it('user should be notified about deferred delivery', async () => {
-                const channel = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    members: [TEST_USER_1.username]
+            it("updating channel's send policy from admin_and_list to other should clear the list", async () => {
+                let channel = await bob.createChat(TEST_PRIVATE_CHANNEL_WITH_LIST);
+                expect(channel.sendPermissionList.length).toBe(0);
+                channel = await bob.addChannelSendPermissionListMember({id: channel.id, member: TEST_USER_1.username});
+                expect(channel.sendPermissionList).toContain(TEST_USER_1.username);
+                const config = {
+                    type: ChatType.PUBLIC,
+                    channelSendPolicy: ChannelSendPolicy.ADMIN
+                }
+                channel = await bob.updateChatConfiguration({
+                    id: channel.id,
+                    ...config
                 });
-                const messageForRead = await bob.sendMessage({
-                    chatId: channel.id,
-                    body: MESSAGE_BODY
+                expect(channel.type).toBe(config.type);
+                expect(channel.channelSendPolicy).toBe(config.channelSendPolicy);
+                expect(channel.sendPermissionList.length).toBe(0);
+                await bob.deleteChat(channel);
+            });
+            describe("notifications", () => {
+                it("user should be notified when added to channel", async (done) => {
+                    alice.on(SfuEvent.NEW_CHAT, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        await bob.deleteChat(channel0);
+                        done();
+                    });
+                    let channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                    await bob.addMemberToChat({id: channel0.id, member: TEST_USER_1.username});
                 });
-                await alice.markMessageRead({id: messageForRead.id, chatId: channel.id});
-                await alice.disconnect();
+                it("user should be notified when removed from channel", async (done) => {
+                    alice.on(SfuEvent.CHAT_DELETED, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        await bob.deleteChat(channel0);
+                        done();
+                    }).on(SfuEvent.NEW_CHAT, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        await bob.removeMemberFromChat({id: channel0.id, member: TEST_USER_1.username});
+                    });
+                    let channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                    await bob.addMemberToChat({id: channel0.id, member: TEST_USER_1.username});
+                });
+                it("user should be notified when channel deleted", async (done) => {
+                    alice.on(SfuEvent.CHAT_DELETED, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        done();
+                    }).on(SfuEvent.NEW_CHAT, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        await bob.deleteChat(channel0);
+                    });
+                    let channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                    await bob.addMemberToChat({id: channel0.id, member: TEST_USER_1.username});
+                });
+                it("Should receive message", async (done) => {
+                    alice.on(SfuEvent.MESSAGE, async (msg) => {
+                        const message1 = msg as Message;
+                        expect(message1.body).toEqual(MESSAGE_BODY);
+                        await bob.deleteChat(channel0);
+                        done();
+                    });
+                    let channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        members: [TEST_USER_1.username]
+                    });
 
-                const pendingMessage = await bob.sendMessage({
-                    chatId: channel.id,
-                    body: MESSAGE_BODY
+                    await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    });
                 });
-                const waitUpdateDeliveryStatusEvent = (dateFrom: number, dateTo: number): Promise<void> => {
-                    return new Promise<void>((resolve) => {
-                        const callBack = (msg) => {
-                            const state = msg as UpdateMessagesDeliveryStatusEvent;
-                            expect(state).toBeTruthy();
-                            expect(state.chatId).toEqual(channel.id);
-                            expect(state.dateFrom).toBe(dateFrom);
-                            expect(state.dateTo).toBe(dateTo);
-                            expect(state.status).toEqual(DeliveryStatus.DELIVERED);
-                            bob.off(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
-                            resolve();
+                it("Should receive message with attachment", async (done) => {
+                    fsUtils.makeDir(fsUtils.getFilePath(__dirname, "..", DOWNLOAD_PATH));
+                    const attachmentsData = [];
+                    const pendingAttachments = {};
+
+                    let channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        members: [TEST_USER_1.username]
+                    });
+
+                    const onMessageHandler = async (msg) => {
+                        expect(msg.attachments).toBeTruthy();
+                        const attachmentRequest = {
+                            messageId: msg.id,
+                            attachmentId: msg.attachments[0].id,
+                            targetEntityType: MessageTargetEntityType.CHAT,
+                            targetEntityId: {chatId: channel0.id},
+                            name: msg.attachments[0].name,
                         }
-                        bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                        pendingAttachments[msg.attachments[0].id] = attachmentRequest;
+                        const attachment = await alice.getMessageAttachment(attachmentRequest);
+                        expect(attachment).toBeTruthy();
+
+                        const path = fsUtils.getFilePath(__dirname, "..", DOWNLOAD_PATH + attachment.name);
+                        fsUtils.writeFile(path, new Uint8Array(attachment.payload), {flag: 'a+'});
+
+                        alice.off(SfuEvent.MESSAGE, onMessageHandler);
+                        await bob.deleteChat(channel0);
+                        done();
+                    }
+
+                    alice.on(SfuEvent.MESSAGE, onMessageHandler);
+
+                    const status = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY,
+                        attachments: [
+                            TEST_PICTURE_ATTACHMENT
+                        ]
                     });
-                }
+                    expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                    expect(status.attachments).toBeTruthy();
 
-                alice = await connect(TEST_USER_1);
-                alice.loadChatMessages({
-                    chatId: channel.id,
-                    timeFrame: {
-                        start: 0,
-                        end: -1
+                    attachmentsData.push({
+                        id: status.attachments[0].id,
+                        payload: TEST_PICTURE_ATTACHMENT_DATA.payload
+                    })
+                    const handler = bob.getSendingAttachmentsHandler(attachmentsData, status.id);
+                    handler.sendAttachments();
+                });
+                it("user should be notified about reading message by user", async () => {
+                    const waitUserReadMessageEvent = (channelId: string, messageDate: number): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, async (msg) => {
+                                const state = msg as UpdateMessagesDeliveryStatusEvent;
+                                expect(state).toBeTruthy();
+                                expect(state.dateFrom).toBe(0);
+                                expect(state.dateTo).toBe(messageDate);
+                                expect(state.status).toBe(DeliveryStatus.READ);
+                                await bob.deleteChat({id: channelId});
+                                resolve();
+                            });
+                        });
                     }
-                });
-                await waitUpdateDeliveryStatusEvent(pendingMessage.date, pendingMessage.date);
 
-                await alice.disconnect();
+                    const channel = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        members: [TEST_USER_1.username]
+                    });
 
-                const firstPendingMessage = await bob.sendMessage({
-                    chatId: channel.id,
-                    body: MESSAGE_BODY
+                    const message = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        body: MESSAGE_BODY
+                    });
+                    alice.markMessageRead({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        id: message.id,
+                    });
+                    await waitUserReadMessageEvent(channel.id, message.date);
                 });
-                const secondPendingMessage = await bob.sendMessage({
-                    chatId: channel.id,
-                    body: MESSAGE_BODY
-                });
+                it('user should be notified about deferred delivery', async () => {
+                    const channel = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        members: [TEST_USER_1.username]
+                    });
+                    const messageForRead = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        body: MESSAGE_BODY
+                    });
+                    await alice.markMessageRead({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        id: messageForRead.id,
+                    });
+                    await alice.disconnect();
 
-                alice = await connect(TEST_USER_1);
-                alice.loadChatMessages({
-                    chatId: channel.id,
-                    timeFrame: {
-                        start: 0,
-                        end: -1
+                    const pendingMessage = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        body: MESSAGE_BODY
+                    });
+                    const waitUpdateDeliveryStatusEvent = (dateFrom: number, dateTo: number): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            const callBack = (msg) => {
+                                const state = msg as UpdateMessagesDeliveryStatusEvent;
+                                expect(state).toBeTruthy();
+                                expect(state.dateFrom).toBe(dateFrom);
+                                expect(state.dateTo).toBe(dateTo);
+                                expect(state.status).toEqual(DeliveryStatus.DELIVERED);
+                                bob.off(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                                resolve();
+                            }
+                            bob.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, callBack);
+                        });
                     }
+
+                    alice = await connect(TEST_USER_1);
+                    alice.loadMessages({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        timeFrame: {
+                            start: 0,
+                            end: -1
+                        }
+                    });
+                    await waitUpdateDeliveryStatusEvent(pendingMessage.date, pendingMessage.date);
+
+                    await alice.disconnect();
+
+                    const firstPendingMessage = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        body: MESSAGE_BODY
+                    });
+                    const secondPendingMessage = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        body: MESSAGE_BODY
+                    });
+
+                    alice = await connect(TEST_USER_1);
+                    alice.loadMessages({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel.id},
+                        timeFrame: {
+                            start: 0,
+                            end: -1
+                        }
+                    });
+                    await waitUpdateDeliveryStatusEvent(firstPendingMessage.date - 1, secondPendingMessage.date);
+                    await bob.deleteChat({id: channel.id});
                 });
-                await waitUpdateDeliveryStatusEvent(firstPendingMessage.date - 1, secondPendingMessage.date);
-                await bob.deleteChat({id: channel.id});
-            });
-            it("member's state should update after it was added to send permission list", async (done) => {
-                alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    expect(channel1.sendPermissionList).toContain(TEST_USER_1.username);
+                it("member's state should update after it was added to send permission list", async (done) => {
+                    alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        expect(channel1.sendPermissionList).toContain(TEST_USER_1.username);
+                        await bob.deleteChat(channel0);
+                        done();
+                    });
+                    let channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        members: [TEST_USER_1.username]
+                    });
+                    await bob.addChannelSendPermissionListMember({id: channel0.id, member: TEST_USER_1.username});
+                });
+                it("member's state should update after it was removed from send permission list", async (done) => {
+                    alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        const member = channel1.sendPermissionList.find((member) => member === TEST_USER_1.username);
+                        expect(member).toBeUndefined();
+                        await bob.deleteChat(channel0);
+                        done();
+                    });
+                    let channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
+                        members: [TEST_USER_1.username],
+                        sendPermissionList: [TEST_USER_1.username]
+                    });
+                    await bob.removeChannelSendPermissionListMember({id: channel0.id, member: TEST_USER_1.username});
+                });
+                it("public channel visible to everyone", async () => {
+                    const channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
+                    const pChannels1 = await alice.getPublicChannels();
+                    expect(pChannels1).toHaveProperty(channel0.id);
                     await bob.deleteChat(channel0);
-                    done();
                 });
-                let channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    members: [TEST_USER_1.username]
-                });
-                await bob.addChannelSendPermissionListMember({id: channel0.id, member: TEST_USER_1.username});
-            });
-            it("member's state should update after it was removed from send permission list", async (done) => {
-                alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    const member = channel1.sendPermissionList.find((member) => member === TEST_USER_1.username);
-                    expect(member).toBeUndefined();
+                it("private channel not visible to everyone", async () => {
+                    const channel0 = await bob.createChat(TEST_PRIVATE_CHANNEL);
+                    const pChannels1 = await alice.getPublicChannels();
+                    expect(pChannels1[channel0.id]).toBeUndefined();
                     await bob.deleteChat(channel0);
-                    done();
                 });
-                let channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
-                    members: [TEST_USER_1.username],
-                    sendPermissionList: [TEST_USER_1.username]
+                it("send policy EVERYONE", async (done) => {
+                    const channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.EVERYONE,
+                        members: [TEST_USER_1.username]
+                    });
+                    bob.on(SfuEvent.MESSAGE, async (msg) => {
+                        await bob.deleteChat(channel0);
+                        done();
+                    });
+                    await alice.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    });
                 });
-                await bob.removeChannelSendPermissionListMember({id: channel0.id, member: TEST_USER_1.username});
-            });
-            it("public channel visible to everyone", async () => {
-                const channel0 = await bob.createChat(TEST_PUBLIC_CHANNEL);
-                const pChannels1 = await alice.getPublicChannels();
-                expect(pChannels1).toHaveProperty(channel0.id);
-                await bob.deleteChat(channel0);
-            });
-            it("private channel not visible to everyone", async () => {
-                const channel0 = await bob.createChat(TEST_PRIVATE_CHANNEL);
-                const pChannels1 = await alice.getPublicChannels();
-                expect(pChannels1[channel0.id]).toBeUndefined();
-                await bob.deleteChat(channel0);
-            });
-            it("send policy EVERYONE", async (done) => {
-                const channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.EVERYONE,
-                    members: [TEST_USER_1.username]
-                });
-                bob.on(SfuEvent.MESSAGE, async (msg) => {
+                it("send policy ADMIN should fail for non admin", async () => {
+                    const channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.ADMIN,
+                        members: [TEST_USER_1.username]
+                    });
+                    await expect(alice.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    })).rejects.toBeTruthy();
                     await bob.deleteChat(channel0);
-                    done();
                 });
-                await alice.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                });
-            });
-            it("send policy ADMIN should fail for non admin", async () => {
-                const channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.ADMIN,
-                    members: [TEST_USER_1.username]
-                });
-                await expect(alice.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                })).rejects.toBeTruthy();
-                await bob.deleteChat(channel0);
-            });
-            it("send policy ADMIN should work for admin", async () => {
-                const channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.ADMIN,
-                    members: [TEST_USER_1.username]
-                });
-                await expect(bob.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                })).resolves.toBeTruthy();
-                await bob.deleteChat(channel0);
-            });
-            it("send policy ADMIN_AND_LIST should work for listed", async () => {
-                const channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
-                    members: [TEST_USER_1.username],
-                    sendPermissionList: [TEST_USER_1.username]
-                });
-                await expect(alice.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                })).resolves.toBeTruthy();
-                await bob.deleteChat(channel0);
-            });
-            it("send policy ADMIN_AND_LIST should work for admin", async () => {
-                const channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
-                    members: [TEST_USER_1.username],
-                    sendPermissionList: []
-                });
-                await expect(bob.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                })).resolves.toBeTruthy();
-                await bob.deleteChat(channel0);
-            });
-            it("send policy ADMIN_AND_LIST should fail for unlisted", async () => {
-                const channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
-                    members: [TEST_USER_1.username],
-                    sendPermissionList: []
-                });
-                await expect(alice.sendMessage({
-                    chatId: channel0.id,
-                    body: MESSAGE_BODY
-                })).rejects.toBeTruthy();
-                await bob.deleteChat(channel0);
-            });
-            it("member's state should update after owner channel configuration update", async (done) => {
-                alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {
-                    const channel1 = msg as UserSpecificChatInfo;
-                    expect(channel1.id).toEqual(channel0.id);
-                    expect(channel1.type).toEqual(TEST_PRIVATE_CHANNEL_WITH_LIST.type);
-                    expect(channel1.channelSendPolicy).toEqual(TEST_PRIVATE_CHANNEL_WITH_LIST.channelSendPolicy);
-                    expect(channel1.sendPermissionList).toContain(TEST_USER_1.username);
-                    expect(channel1.canSend).toBeTruthy();
+                it("send policy ADMIN should work for admin", async () => {
+                    const channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.ADMIN,
+                        members: [TEST_USER_1.username]
+                    });
+                    await expect(bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    })).resolves.toBeTruthy();
                     await bob.deleteChat(channel0);
-                    done();
                 });
-                let channel0 = await bob.createChat({
-                    ...TEST_PUBLIC_CHANNEL,
-                    members: [TEST_USER_1.username]
+                it("send policy ADMIN_AND_LIST should work for listed", async () => {
+                    const channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
+                        members: [TEST_USER_1.username],
+                        sendPermissionList: [TEST_USER_1.username]
+                    });
+                    await expect(alice.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    })).resolves.toBeTruthy();
+                    await bob.deleteChat(channel0);
                 });
-                await bob.updateChatConfiguration({
-                    id: channel0.id,
-                    type: TEST_PRIVATE_CHANNEL_WITH_LIST.type,
-                    channelSendPolicy: TEST_PRIVATE_CHANNEL_WITH_LIST.channelSendPolicy,
-                    sendPermissionList: [TEST_USER_1.username]
+                it("send policy ADMIN_AND_LIST should work for admin", async () => {
+                    const channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
+                        members: [TEST_USER_1.username],
+                        sendPermissionList: []
+                    });
+                    await expect(bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    })).resolves.toBeTruthy();
+                    await bob.deleteChat(channel0);
+                });
+                it("send policy ADMIN_AND_LIST should fail for unlisted", async () => {
+                    const channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        channelSendPolicy: ChannelSendPolicy.ADMIN_AND_LIST,
+                        members: [TEST_USER_1.username],
+                        sendPermissionList: []
+                    });
+                    await expect(alice.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHAT,
+                        targetEntityId: {chatId: channel0.id},
+                        body: MESSAGE_BODY
+                    })).rejects.toBeTruthy();
+                    await bob.deleteChat(channel0);
+                });
+                it("member's state should update after owner channel configuration update", async (done) => {
+                    alice.on(SfuEvent.CHAT_UPDATED, async (msg) => {
+                        const channel1 = msg as UserSpecificChatInfo;
+                        expect(channel1.id).toEqual(channel0.id);
+                        expect(channel1.type).toEqual(TEST_PRIVATE_CHANNEL_WITH_LIST.type);
+                        expect(channel1.channelSendPolicy).toEqual(TEST_PRIVATE_CHANNEL_WITH_LIST.channelSendPolicy);
+                        expect(channel1.sendPermissionList).toContain(TEST_USER_1.username);
+                        expect(channel1.canSend).toBeTruthy();
+                        await bob.deleteChat(channel0);
+                        done();
+                    });
+                    let channel0 = await bob.createChat({
+                        ...TEST_PUBLIC_CHANNEL,
+                        members: [TEST_USER_1.username]
+                    });
+                    await bob.updateChatConfiguration({
+                        id: channel0.id,
+                        type: TEST_PRIVATE_CHANNEL_WITH_LIST.type,
+                        channelSendPolicy: TEST_PRIVATE_CHANNEL_WITH_LIST.channelSendPolicy,
+                        sendPermissionList: [TEST_USER_1.username]
+                    });
                 });
             });
         });

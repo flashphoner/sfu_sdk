@@ -87,6 +87,27 @@ export const PICTURE_FILE_PATH = "../resources/" + PICTURE_FILE_NAME;
 export const PICTURE_2M_FILE_PATH = "../resources/" + PICTURE_2M_FILE_NAME;
 export const PDF_FILE_PATH = "../resources/" + PDF_FILE_NAME;
 
+export const TEST_SPACE_NAME = "TEST_SPACE";
+export const TEST_CATEGORY_NAME = "TEST_CATEGORY";
+export const TEST_CHANNEL_NAME = "TEST_CHANNEL";
+export const TEST_SPACE_ROLE_NAME = "Support";
+export const TEST_ROLE_COLOR = "TEST_COLOR";
+export const DEFAULT_CATEGORY_NAME = "Category1";
+export const DEFAULT_CHANNEL_NAME = "Channel1";
+export const TEST_THREAD_NAME = "Thread1";
+export const ALLOWS_TO_MANAGE_CATEGORIES = "ALLOWS_TO_MANAGE_CATEGORIES";
+export const ALLOWS_TO_MANAGE_CHANNELS = "ALLOWS_TO_MANAGE_CHANNELS";
+export const ALLOWS_TO_MANAGE_ROLES = "ALLOWS_TO_MANAGE_ROLES";
+export const ALLOWS_TO_MANAGE_SPACE = "ALLOWS_TO_MANAGE_SPACE";
+
+
+export const TEST_SPACE_ROLE = {
+    name: TEST_SPACE_ROLE_NAME,
+    color: TEST_ROLE_COLOR,
+    permissions: [ALLOWS_TO_MANAGE_CATEGORIES, ALLOWS_TO_MANAGE_CHANNELS],
+    members: []
+}
+
 export const TEST_PUBLIC_CHANNEL = {
     channel: true,
     name: "test_public_channel",

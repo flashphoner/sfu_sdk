@@ -2,84 +2,119 @@ import {v4 as uuidv4} from 'uuid';
 import promises from "./promises";
 import {Connection} from "./connection";
 import {
+    AddedRoleToMember,
+    Attachment,
     ATTACHMENT_CHUNK_SIZE,
-    ATTACHMENT_ID_LENGTH,
-    Calendar,
-    CalendarEvent,
-    CalendarEventEvent,
     AttachmentRequest,
     AttachmentRequestAck,
-    Attachment,
-    ChannelSendPolicy,
-    ChatType,
-    Chat,
-    ChatLoadedEvent,
-    ChatMap,
-    ChatsEvent,
-    ContactInviteEvent,
-    ContactRemovedEvent,
-    ContactUpdateEvent, CreatedRoom,
-    InternalApi,
-    InternalMessage,
-    Invite, LeftRoom,
-    Message,
-    MessageAttachment,
-    MessageAttachmentData,
-    MessageStatus,
-    MessageStatusEvent,
     AttachmentState,
     AttachmentStatus,
     AttachmentStatusEvent,
+    AuthenticationStatusEvent,
+    Calendar,
+    CalendarEvent,
+    CalendarEventEvent,
+    SfuSpaceCategory,
+    ChannelSendPolicy,
+    Chat,
+    ChatError,
+    ChatLoadedEvent,
+    ChatMap,
+    ChatMessagesCount,
+    ChatMessagesEvent,
+    ChatReceivePolicy,
+    ChatSearchResultEvent,
+    ChatsEvent,
+    ChatType,
+    ConnectionDetails,
+    ConnectionFailedEvent,
+    ContactInviteEvent,
+    ContactRemovedEvent,
+    ContactUpdateEvent,
+    CreatedRoom,
+    FirstAndLastChatMessage,
+    InternalApi,
+    InternalMessage,
+    Invite,
+    LastReadMessageUpdated,
+    LeftRoom,
+    LoadMessagesWithMentionsResult,
+    Message,
+    MessageAttachment,
+    MessageAttachmentData,
+    MessageAttachmentMediaType,
+    MessageAttachmentsSearchResult,
+    MessageDeleted,
+    MessageEdited,
+    MessageStatus,
+    MessageStatusEvent,
+    MessageWithUploadingAttachments,
     NewChatEvent,
-    OperationFailedEvent, Operations,
+    NewSpaceRoleAdded,
+    NewSpaceCategoryEvent,
+    OperationFailedEvent,
+    Operations,
     PublicChannelsEvent,
-    RemovedChatEvent, RoomAvailable,
-    RoomEvent, RoomInfo,
+    RemovedChatEvent,
+    ResetPasswordRequestStatus,
+    RoomAvailable,
+    RoomEvent,
+    RoomInfo,
     SfuEvent,
     SfuMessageEvent,
+    SignUpStatus,
+    SortOrder,
+    SfuSpace,
+    SpaceInviteCreated,
+    SfuSpaceRole,
     State,
     UpdateChatEvent,
+    UpdateMessagesDeliveryStatusEvent,
     User,
     UserCalendarEvent,
     UserEmail,
-    UserId,
-    UserPassword,
-    UserPmiSettings,
-    UserListEvent,
-    UserNickname,
-    UserRoomsEvent,
-    UserSpecificChatInfo,
-    ChatMessagesEvent,
-    ChatError,
-    ChatReceivePolicy,
-    ChatSearchResultEvent,
-    UserInfo,
-    UserInfoEvent,
-    MessageEdited,
-    MessageDeleted,
-    UserTimezone,
     UserHostKey,
-    UserPhoneNumber,
-    SignUpStatus,
-    UserManagementError,
-    ResetPasswordRequestStatus,
-    ChatMessagesCount,
-    MessageAttachmentsSearchResult,
-    MessageAttachmentMediaType,
-    SortOrder,
-    LoadBookmarkedMessagesResult,
-    LoadMessagesWithMentionsResult,
-    BookmarkDeleted,
-    ChatWithBookmarksDeleted,
-    BookmarkEdited,
-    FirstAndLastChatMessage,
+    UserId,
+    UserInfo,
     UserInfoChangedEvent,
-    LastReadMessageUpdated,
-    ConnectionDetails,
-    AuthenticationStatusEvent,
-    MessageWithUploadingAttachments,
-    UpdateMessagesDeliveryStatusEvent,
-    ConnectionFailedEvent,
+    UserInfoEvent,
+    UserListEvent,
+    UserManagementError,
+    UserNickname,
+    UserPassword,
+    UserPhoneNumber,
+    UserPmiSettings,
+    UserRoomsEvent,
+    UserSpacesEvent,
+    UserSpecificChatInfo,
+    UserTimezone,
+    SfuSpaceInvite,
+    NewSpaceEvent,
+    NewSpaceChannelEvent,
+    SfuSpaceChannel,
+    UserJoinedToSpaceEvent,
+    SpaceRoleDeleted,
+    RemovedRoleFromMember,
+    SpaceCategoryDeleted,
+    SpaceChannelDeleted,
+    SpaceDeletedEvent,
+    SpaceOverviewUpdated,
+    SpaceCategoryUpdated,
+    UserLeftSpace,
+    NewSpaceThreadEvent,
+    SfuSpaceThread,
+    SpaceThreadDeleted,
+    SpaceThreadUpdated,
+    SpaceChannelUpdated,
+    SfuSpaceRolePermissionSection,
+    RolePermissionSectionsEvent,
+    SpaceRoleUpdated,
+    SpaceInviteRevoked,
+    SpaceChannelMoved,
+    SpaceEvent,
+    MessageTargetEntityType,
+    MessageTargetEntityId,
+    SpaceCreatedEvent,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -87,7 +122,9 @@ import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 
-type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo;
+type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace>;
+
+type EventUnion = SfuEvent | SpaceEvent;
 
 type MessageWithUploadingAttachmentState = {
     [messageId: string] : MessageWithUploadingAttachments
@@ -107,7 +144,7 @@ export class SfuExtended {
     #_state: State = State.NEW;
     #rooms: { [key: string]: RoomExtended } = {};
     //TODO(naz): Provide union instead of InternalMessage
-    #notifier: Notifier<SfuEvent, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
+    #notifier: Notifier<EventUnion, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
     #uploadingAttachmentState: MessageWithUploadingAttachmentState = {}
     #downloadingAttachmentState: Array<Attachment> = [];
     #binaryChunkSize: number;
@@ -463,30 +500,10 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT, result);
                             }
-                        } else if (data[0].type === SfuEvent.LOAD_BOOKMARKED_MESSAGES_RESULT) {
-                            const result = data[0] as LoadBookmarkedMessagesResult;
-                            if (!promises.resolve(data[0].internalMessageId, result)) {
-                                this.#notifier.notify(SfuEvent.LOAD_BOOKMARKED_MESSAGES_RESULT, result);
-                            }
                         } else if (data[0].type === SfuEvent.LOAD_MESSAGES_WITH_MENTIONS_RESULT) {
                             const result = data[0] as LoadMessagesWithMentionsResult;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.LOAD_MESSAGES_WITH_MENTIONS_RESULT, result);
-                            }
-                        } else if (data[0].type === SfuEvent.BOOKMARK_DELETED) {
-                            const event = data[0] as BookmarkDeleted;
-                            if (!promises.resolve(data[0].internalMessageId, event)) {
-                                this.#notifier.notify(SfuEvent.BOOKMARK_DELETED, event);
-                            }
-                        } else if (data[0].type === SfuEvent.BOOKMARK_EDITED) {
-                            const bookmarkEdited = data[0] as BookmarkEdited;
-                            if (!promises.resolve(data[0].internalMessageId, bookmarkEdited)) {
-                                this.#notifier.notify(SfuEvent.BOOKMARK_EDITED, bookmarkEdited);
-                            }
-                        } else if (data[0].type === SfuEvent.CHAT_WITH_BOOKMARKS_DELETED) {
-                            const event = data[0] as ChatWithBookmarksDeleted;
-                            if (!promises.resolve(data[0].internalMessageId, event)) {
-                                this.#notifier.notify(SfuEvent.CHAT_WITH_BOOKMARKS_DELETED, event);
                             }
                         } else if (data[0].type === SfuEvent.SEND_MESSAGE_SYNC) {
                             const message = (data[0] as SfuMessageEvent).message;
@@ -494,6 +511,129 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.AUTHENTICATION_STATUS) {
                             const event = data[0] as AuthenticationStatusEvent;
                             this.#notifier.notify(SfuEvent.AUTHENTICATION_STATUS, event);
+                        } else if (data[0].type === SpaceEvent.SPACE_CREATED) {
+                            const event = data[0] as SpaceCreatedEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.space)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_CREATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.NEW_SPACE) {
+                            const event = data[0] as NewSpaceEvent;
+                            promises.resolve(data[0].internalMessageId, event.space)
+                            this.#notifier.notify(SpaceEvent.NEW_SPACE, event);
+                        } else if (data[0].type === SpaceEvent.SPACE_DELETED) {
+                            const event = data[0] as SpaceDeletedEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.id)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_DELETED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_OVERVIEW_UPDATED) {
+                            const event = data[0] as SpaceOverviewUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_OVERVIEW_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.NEW_SPACE_CATEGORY) {
+                            const event = data[0] as NewSpaceCategoryEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.category)) {
+                                this.#notifier.notify(SpaceEvent.NEW_SPACE_CATEGORY, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_CATEGORY_DELETED) {
+                            const event = data[0] as SpaceCategoryDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_CATEGORY_DELETED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_CATEGORY_UPDATED) {
+                            const event = data[0] as SpaceCategoryUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_CATEGORY_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.NEW_SPACE_CHANNEL) {
+                            const event = data[0] as NewSpaceChannelEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.channel)) {
+                                this.#notifier.notify(SpaceEvent.NEW_SPACE_CHANNEL, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_CHANNEL_UPDATED) {
+                            const event = data[0] as SpaceChannelUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_CHANNEL_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_CHANNEL_DELETED) {
+                            const event = data[0] as SpaceChannelDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_CHANNEL_DELETED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_CHANNEL_MOVED) {
+                            const event = data[0] as SpaceChannelMoved;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_CHANNEL_MOVED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.NEW_SPACE_THREAD) {
+                            const event = data[0] as NewSpaceThreadEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.thread)) {
+                                this.#notifier.notify(SpaceEvent.NEW_SPACE_THREAD, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_THREAD_UPDATED) {
+                            const event = data[0] as SpaceThreadUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_THREAD_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_THREAD_DELETED) {
+                            const event = data[0] as SpaceThreadDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_THREAD_DELETED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_INVITE_CREATED) {
+                            const event = data[0] as SpaceInviteCreated;
+                            if (!promises.resolve(data[0].internalMessageId, event.invite)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_INVITE_CREATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_INVITE_REVOKED) {
+                            const event = data[0] as SpaceInviteRevoked;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_INVITE_REVOKED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.NEW_SPACE_ROLE) {
+                            const event = data[0] as NewSpaceRoleAdded;
+                            if (!promises.resolve(data[0].internalMessageId, event.role)) {
+                                this.#notifier.notify(SpaceEvent.NEW_SPACE_ROLE, event);
+                            }
+                        }  else if (data[0].type === SpaceEvent.SPACE_ROLE_UPDATED) {
+                            const event = data[0] as SpaceRoleUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_ROLE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_ROLE_DELETED) {
+                            const event = data[0] as SpaceRoleDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_ROLE_DELETED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.ADDED_ROLE_TO_MEMBER) {
+                            const event = data[0] as AddedRoleToMember;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.ADDED_ROLE_TO_MEMBER, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.REMOVED_ROLE_FROM_MEMBER) {
+                            const event = data[0] as RemovedRoleFromMember;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.REMOVED_ROLE_FROM_MEMBER, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.USER_SPACES) {
+                            const event = data[0] as UserSpacesEvent;
+                            promises.resolve(data[0].internalMessageId, event.spaces)
+                            this.#notifier.notify(SpaceEvent.USER_SPACES, event.spaces);
+                        } else if (data[0].type === SpaceEvent.USER_JOINED_TO_SPACE) {
+                            const event = data[0] as UserJoinedToSpaceEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.USER_JOINED_TO_SPACE, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.USER_LEFT_SPACE) {
+                            const event = data[0] as UserLeftSpace;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.USER_LEFT_SPACE, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.ROLE_PERMISSION_SECTIONS) {
+                            const event = data[0] as RolePermissionSectionsEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.permissionSections)) {
+                                this.#notifier.notify(SpaceEvent.ROLE_PERMISSION_SECTIONS, event);
+                            }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -830,7 +970,8 @@ export class SfuExtended {
         body?: string,
         to?: string,
         parentId?: string,
-        chatId: string,
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
         attachments?: Array<MessageAttachment>
     }) {
         this.#checkAuthenticated();
@@ -841,14 +982,13 @@ export class SfuExtended {
                 reject(new Error(ChatError.CAN_NOT_SEND_NULL_MESSAGE));
             } else if ((!msg.body || msg.body === "") && (!msg.attachments || msg.attachments.length === 0)) {
                 reject(new Error(ChatError.CAN_NOT_SEND_MESSAGE_WITHOUT_CONTENT));
-            } else if (!msg.chatId || msg.chatId === "") {
-                reject(new Error(ChatError.CAN_NOT_SEND_MESSAGE_WITHOUT_CHAT_ID));
             } else {
                 self.#emmitAction(InternalApi.SEND_MESSAGE, {
                     to: msg.to,
                     parentId: msg.parentId,
                     body: msg.body,
-                    chatId: msg.chatId,
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
                     attachments: msg.attachments
                 }, resolve, reject);
             }
@@ -1006,12 +1146,9 @@ export class SfuExtended {
     public getMessageAttachment(attachment: AttachmentRequest) {
         this.#checkAuthenticated();
         const self = this;
-        const {attachmentId, name, messageId, chatId} = attachment;
+        const {targetEntityType, targetEntityId, messageId, attachmentId, name} = attachment;
         if (!messageId || messageId === '') {
             throw new Error('Empty messageId');
-        }
-        if (!chatId || chatId === '') {
-            throw new Error('Empty chatId');
         }
         if (!name || name === '') {
             throw new Error('Empty attachment name');
@@ -1021,8 +1158,9 @@ export class SfuExtended {
         }
         return new Promise<Attachment>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_ATTACHMENT, {
+                targetEntityType: targetEntityType,
+                targetEntityId: targetEntityId,
                 messageId: messageId,
-                chatId: chatId,
                 attachmentId: attachmentId,
                 name: name,
                 size: self.#binaryChunkSize
@@ -1032,7 +1170,8 @@ export class SfuExtended {
 
     #notifyMessageAttachmentState(attachment: Attachment, state: AttachmentState) {
         const status: AttachmentStatus = {
-            chatId: attachment.chatId,
+            targetEntityType: attachment.targetEntityType,
+            targetEntityId: attachment.targetEntityId,
             messageId: attachment.messageId,
             id: attachment.attachmentId,
             name: attachment.name,
@@ -1044,21 +1183,21 @@ export class SfuExtended {
 
     public markMessageRead(msg: {
         id: string,
-        chatId: string
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
     }) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
             if (!msg) {
                 reject(new Error("Can't mark null message"));
-            } else if (!msg.chatId || msg.chatId === "") {
-                reject(new Error("Can't mark message without a chatId"));
             } else if (!msg.id || msg.id === "") {
                 reject(new Error("Can't mark message without massage id"));
             } else {
                 self.#emmitAction(InternalApi.MARK_MESSAGE_READ, {
                     id: msg.id,
-                    chatId: msg.chatId
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
                 }, resolve, reject);
             }
         });
@@ -1066,21 +1205,21 @@ export class SfuExtended {
 
     public markMessageUnread(msg: {
         id: string,
-        chatId: string
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
     }) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
             if (!msg) {
                 reject(new Error("Can't mark null message"));
-            } else if (!msg.chatId || msg.chatId === "") {
-                reject(new Error("Can't mark message without a chatId"));
             } else if (!msg.id || msg.id === "") {
                 reject(new Error("Can't mark message without massage id"));
             } else {
                 self.#emmitAction(InternalApi.MARK_MESSAGE_UNREAD, {
                     id: msg.id,
-                    chatId: msg.chatId
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
                 }, resolve, reject);
             }
         });
@@ -1287,8 +1426,9 @@ export class SfuExtended {
         });
     };
 
-    public loadChatMessages(params: {
-        chatId: string,
+    public loadMessages(params: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
         timeFrame?: {
             start: number,
             end: number,
@@ -1303,7 +1443,7 @@ export class SfuExtended {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<Array<Message>>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.LOAD_CHAT_MESSAGES, params, resolve, reject);
+            self.#emmitAction(InternalApi.LOAD_MESSAGES, params, resolve, reject);
         });
     };
 
@@ -1320,26 +1460,30 @@ export class SfuExtended {
         });
     };
 
-    public getChatMessagesCount(chat: {
-        id: string
+    public getMessagesCount(options: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
     }) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<ChatMessagesCount>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_CHAT_MESSAGES_COUNT, {
-                chatId: chat.id
+            self.#emmitAction(InternalApi.GET_MESSAGES_COUNT, {
+                targetEntityType: options.targetEntityType,
+                targetEntityId: options.targetEntityId
             }, resolve, reject);
         });
     }
 
-    public getFirstAndLastMessage(chat: {
-        id: string
+    public getFirstAndLastMessage(options: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
     }) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<FirstAndLastChatMessage>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_CHAT_MESSAGE, {
-                chatId: chat.id
+            self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_MESSAGE, {
+                targetEntityType: options.targetEntityType,
+                targetEntityId: options.targetEntityId
             }, resolve, reject);
         });
     }
@@ -1347,7 +1491,6 @@ export class SfuExtended {
     public searchMessageAttachments(params: {
         chatId?: string,
         attachmentsType?: MessageAttachmentMediaType,
-        bookmarkedOnly: boolean,
         from?: UserId,
         timeFrame?: {
             start: number,
@@ -1368,42 +1511,10 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.SEARCH_MESSAGE_ATTACHMENTS, {
                 chatId: params.chatId,
                 attachmentsType: params.attachmentsType,
-                bookmarkedOnly: params.bookmarkedOnly,
                 from: params.from,
                 timeFrame: params.timeFrame,
                 boundaries: params.boundaries,
                 searchString: params.searchString,
-                sortOrder: params.sortOrder,
-            }, resolve, reject);
-        });
-    };
-
-    public loadBookmarkedMessages(params: {
-        chatId?: string,
-        timeFrame?: {
-            start: number,
-            end: number,
-            limit?: number
-        },
-        pageRequest?: {
-            page: number,
-            pageSize: number
-        }
-        boundaries?: {
-            dateMark: number,
-            lowerLimit: number,
-            upperLimit: number
-        }
-        sortOrder: SortOrder
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<LoadBookmarkedMessagesResult>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.LOAD_BOOKMARKED_MESSAGES, {
-                chatId: params.chatId,
-                timeFrame: params.timeFrame,
-                pageRequest: params.pageRequest,
-                boundaries: params.boundaries,
                 sortOrder: params.sortOrder,
             }, resolve, reject);
         });
@@ -1486,8 +1597,9 @@ export class SfuExtended {
         });
     };
 
-    public editChatMessage(msg: {
-        chatId: string,
+    public editMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
         messageId: string,
         body: string,
         attachmentsToSend?: Array<MessageAttachment>,
@@ -1496,9 +1608,10 @@ export class SfuExtended {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<MessageStatus>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.EDIT_CHAT_MESSAGE, {
+            self.#emmitAction(InternalApi.EDIT_MESSAGE, {
                 id: msg.messageId,
-                chatId: msg.chatId,
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
                 body: msg.body,
                 attachments: msg.attachmentsToSend,
                 attachmentIdsToDelete: msg.attachmentIdsToDelete
@@ -1506,44 +1619,18 @@ export class SfuExtended {
         });
     }
 
-    public deleteChatMessage(msg: {
-        chatId: string,
-        messageId: string
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<MessageStatus>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.DELETE_CHAT_MESSAGE, {
-                id: msg.messageId,
-                chatId: msg.chatId,
-            }, resolve, reject);
-        });
-    }
-
-    public addMessageToBookmarks(msg: {
-        chatId: string,
+    public deleteMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
         messageId: string
     }) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<void>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.ADD_MESSAGE_TO_BOOKMARKS, {
+            self.#emmitAction(InternalApi.DELETE_MESSAGE, {
                 id: msg.messageId,
-                chatId: msg.chatId
-            }, resolve, reject);
-        });
-    }
-
-    public removeMessageFromBookmarks(msg: {
-        chatId: string,
-        messageId: string
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<void>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.REMOVE_MESSAGE_FROM_BOOKMARKS, {
-                chatId: msg.chatId,
-                id: msg.messageId
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
             }, resolve, reject);
         });
     }
@@ -1803,6 +1890,368 @@ export class SfuExtended {
         return this.#rooms[options.id];
     }
 
+    public getUserSpaces() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<Array<SfuSpace>>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_USER_SPACES, {}, resolve, reject);
+        });
+    }
+
+    public createSpace(space: {
+        name: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpace>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_SPACE, {
+                name: space.name,
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceOverview(space: {
+        id: string;
+        name: string;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_OVERVIEW, {
+                id: space.id,
+                name: space.name,
+            }, resolve, reject);
+        });
+    }
+
+    public deleteSpace(space: {
+        id: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<string>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_SPACE, {
+                id: space.id,
+            }, resolve, reject);
+        });
+    }
+
+    public leaveSpace(space: {
+        id: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LEAVE_SPACE, {
+                id: space.id,
+            }, resolve, reject);
+        });
+    }
+
+    public generateNewSpaceInvite(options: {
+        spaceId: string,
+        lifespan: number
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceInvite>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GENERATE_SPACE_INVITE, {
+                spaceId: options.spaceId,
+                lifespan: options.lifespan
+            }, resolve, reject);
+        });
+    }
+
+    public revokeSpaceInvite(options: {
+        spaceId: string,
+        inviteCode: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceInvite>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REVOKE_SPACE_INVITE, {
+                spaceId: options.spaceId,
+                inviteCode: options.inviteCode
+            }, resolve, reject);
+        });
+    }
+
+    public joinSpaceByInviteCode(inviteCode: string) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpace>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.JOIN_SPACE_BY_INVITE_CODE, {
+                inviteCode: inviteCode,
+            }, resolve, reject);
+        });
+    }
+
+    public createSpaceCategory(category: {
+        spaceId: string,
+        name: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceCategory>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_SPACE_CATEGORY, {
+                spaceId: category.spaceId,
+                name: category.name,
+            }, resolve, reject);
+        });
+    }
+
+    public deleteSpaceCategory(options: {
+        spaceId: string,
+        categoryId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceCategory>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_SPACE_CATEGORY, {
+                spaceId: options.spaceId,
+                categoryId: options.categoryId
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceCategory(options: {
+        spaceId: string,
+        categoryId: string,
+        name: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_CATEGORY, {
+                spaceId: options.spaceId,
+                categoryId: options.categoryId,
+                name: options.name
+            }, resolve, reject);
+        });
+    }
+
+    public createSpaceChannel(channel: {
+        spaceId: string,
+        categoryId?: string,
+        name: string,
+        isPrivate: boolean,
+        roles?: Array<string>,
+        members?: Array<string>
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceChannel>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_SPACE_CHANNEL, {
+                spaceId: channel.spaceId,
+                categoryId: channel.categoryId,
+                name: channel.name,
+                private: channel.isPrivate,
+                roles: channel.roles,
+                members: channel.members
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceChannel(channel: {
+        spaceId: string,
+        channelId: string,
+        name: string,
+        isPrivate: boolean,
+        roles?: Array<string>,
+        members?: Array<string>
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceChannelUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_CHANNEL, {
+                spaceId: channel.spaceId,
+                channelId: channel.channelId,
+                name: channel.name,
+                private: channel.isPrivate,
+                roles: channel.roles,
+                members: channel.members
+            }, resolve, reject);
+        });
+    }
+
+    public moveSpaceChannel(channel: {
+        spaceId: string,
+        categoryId: string,
+        channelId: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceChannelMoved>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.MOVE_SPACE_CHANNEL, {
+                spaceId: channel.spaceId,
+                categoryId: channel.categoryId,
+                channelId: channel.channelId,
+            }, resolve, reject);
+        });
+    }
+
+    public deleteSpaceChannel(options: {
+        spaceId: string,
+        channelId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_SPACE_CHANNEL, {
+                spaceId: options.spaceId,
+                channelId: options.channelId
+            }, resolve, reject);
+        });
+    }
+
+    public createSpaceThread(thread: {
+        spaceId: string,
+        channelId: string,
+        name: string,
+        isPrivate: boolean
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceThread>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_SPACE_THREAD, {
+                spaceId: thread.spaceId,
+                channelId: thread.channelId,
+                name: thread.name,
+                private: thread.isPrivate
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceThread(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string,
+        name: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_THREAD, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId,
+                name: options.name
+            }, resolve, reject);
+        });
+    }
+
+    public deleteSpaceThread(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_SPACE_THREAD, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId
+            }, resolve, reject);
+        });
+    }
+
+    public addSpaceRole(role: {
+        spaceId: string,
+        name: string,
+        color: string,
+        permissions: Array<string>,
+        members: Array<string>
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SfuSpaceRole>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_SPACE_ROLE, {
+                spaceId: role.spaceId,
+                roleName: role.name,
+                color: role.color,
+                permissions: role.permissions,
+                members: role.members
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceRole(role: {
+        spaceId: string,
+        roleId: string,
+        name: string,
+        color: string,
+        permissions: Array<string>,
+        members: Array<string>
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceRoleUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_ROLE, {
+                spaceId: role.spaceId,
+                roleId: role.roleId,
+                roleName: role.name,
+                color: role.color,
+                permissions: role.permissions,
+                members: role.members
+            }, resolve, reject);
+        });
+    }
+
+    public deleteSpaceRole(options: {
+        spaceId: string,
+        roleId: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceRoleDeleted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_SPACE_ROLE, {
+                spaceId: options.spaceId,
+                roleId: options.roleId
+            }, resolve, reject);
+        });
+    }
+
+    public addRoleToMember(options: {
+        spaceId: string,
+        roleId: string,
+        memberId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AddedRoleToMember>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_ROLE_TO_MEMBER, {
+                spaceId: options.spaceId,
+                roleId: options.roleId,
+                memberId: options.memberId
+            }, resolve, reject);
+        });
+    }
+
+    public removeRoleFromMember(options: {
+        spaceId: string,
+        roleId: string,
+        memberId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RemovedRoleFromMember>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_ROLE_FROM_MEMBER, {
+                spaceId: options.spaceId,
+                roleId: options.roleId,
+                memberId: options.memberId
+            }, resolve, reject);
+        });
+    }
+
+    public getRolePermissions() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<Array<SfuSpaceRolePermissionSection>>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_ROLE_PERMISSIONS, {}, resolve, reject);
+        });
+    }
+
     public async disconnect() {
         for (const [key, value] of Object.entries(this.#rooms)) {
             value.leaveRoom();
@@ -1827,12 +2276,12 @@ export class SfuExtended {
         return this.#_state;
     }
 
-    public on(event: SfuEvent, callback: (arg0: NotifyUnion) => void): SfuExtended {
+    public on(event: EventUnion, callback: (arg0: NotifyUnion) => void): SfuExtended {
         this.#notifier.add(event, callback);
         return this;
     };
 
-    public off(event: SfuEvent, callback: (arg0: NotifyUnion) => void): SfuExtended {
+    public off(event: EventUnion, callback: (arg0: NotifyUnion) => void): SfuExtended {
         this.#notifier.remove(event, callback);
         return this;
     };

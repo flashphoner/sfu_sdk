@@ -1,9 +1,10 @@
-import {TEST_ROOM, TEST_USER_1} from "../../util/constants";
+import {TEST_ROOM} from "../../util/constants";
 import {RoomEvent, SfuEvent, SfuExtended} from "../../../src";
 import {
     ChatReceivePolicy,
     InternalMessage,
     Message,
+    MessageTargetEntityType,
     UserSpecificChatInfo,
     WaitingListEvent
 } from "../../../src/sdk/constants";
@@ -167,11 +168,11 @@ describe("chats", () => {
                 const message = msg as Message;
                 expect(message).toBeTruthy();
                 const rooms = await bob.loadActiveRooms();
-                const chatRoom = rooms.find(room => room.id === message.chatId);
+                const chatRoom = rooms.find(room => room.id === message.targetEntityId.chatId);
                 expect(chatRoom).toBeTruthy();
                 if (chatRoom) {
                     const room = bob.getRoom({id: chatRoom.id});
-                    expect(message.chatId).toEqual(room.id());
+                    expect(message.targetEntityId.chatId).toEqual(room.id());
                     await room.destroyRoom();
                 }
                 done();
@@ -179,7 +180,13 @@ describe("chats", () => {
             .on(SfuEvent.CHAT_UPDATED, async (msg) => {
                 const chat = msg as UserSpecificChatInfo;
                 expect(chat.members.length).toEqual(2);
-                await bob.sendMessage({body: "Test from Bob", chatId: roomChatId})
+                await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {
+                        chatId: roomChatId
+                    },
+                    body: "Test from Bob",
+                })
             })
 
         const bobRoom = await bob.createRoom({
@@ -199,7 +206,13 @@ describe("chats", () => {
         alice.on(SfuEvent.MESSAGE, async (msg) => {
             const message = msg as Message;
             expect(message).toBeTruthy();
-            await alice.sendMessage({body: "Test from Alice", chatId: roomChatId})
+            await alice.sendMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: roomChatId
+                },
+                body: "Test from Alice",
+            })
         })
 
         await aliceRoom.join(alicePc);
@@ -239,7 +252,13 @@ describe("chats", () => {
             pin: TEST_ROOM.pin
         });
         alice.on(SfuEvent.NEW_CHAT, async (msg) => {
-            await expect(alice.sendMessage({chatId: roomChatId, body: "Test from Alice"})).rejects.toBeTruthy();
+            await expect(alice.sendMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: roomChatId
+                },
+                body: "Test from Alice"
+            })).rejects.toBeTruthy();
             await bobRoom.destroyRoom();
             done();
         })

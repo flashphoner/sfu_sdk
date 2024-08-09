@@ -39,11 +39,7 @@ export enum SfuEvent {
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
     FIRST_AND_LAST_CHAT_MESSAGE = "FIRST_AND_LAST_CHAT_MESSAGE",
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
-    LOAD_BOOKMARKED_MESSAGES_RESULT = "LOAD_BOOKMARKED_MESSAGES_RESULT",
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
-    BOOKMARK_DELETED = "BOOKMARK_DELETED",
-    BOOKMARK_EDITED = "BOOKMARK_EDITED",
-    CHAT_WITH_BOOKMARKS_DELETED = "CHAT_WITH_BOOKMARKS_DELETED",
     SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC",
     AUTHENTICATION_STATUS = "AUTHENTICATION_STATUS"
 }
@@ -95,6 +91,34 @@ export enum RoomEvent {
     STOP_SCREEN_SHARING = "STOP_SCREEN_SHARING",
     STOP_TRACK = "STOP_TRACK",
     BITRATE_TEST_STATUS = "BITRATE_TEST_STATUS",
+}
+
+export enum SpaceEvent {
+    USER_SPACES = "USER_SPACES",
+    SPACE_CREATED = "SPACE_CREATED",
+    NEW_SPACE = "NEW_SPACE",
+    SPACE_DELETED = "SPACE_DELETED",
+    SPACE_OVERVIEW_UPDATED = "SPACE_OVERVIEW_UPDATED",
+    NEW_SPACE_CATEGORY = "NEW_SPACE_CATEGORY",
+    SPACE_CATEGORY_DELETED = "SPACE_CATEGORY_DELETED",
+    SPACE_CATEGORY_UPDATED = "SPACE_CATEGORY_UPDATED",
+    NEW_SPACE_CHANNEL = "NEW_SPACE_CHANNEL",
+    SPACE_CHANNEL_UPDATED = "SPACE_CHANNEL_UPDATED",
+    SPACE_CHANNEL_DELETED = "SPACE_CHANNEL_DELETED",
+    SPACE_CHANNEL_MOVED = "SPACE_CHANNEL_MOVED",
+    NEW_SPACE_THREAD = "NEW_SPACE_THREAD",
+    SPACE_THREAD_DELETED = "SPACE_THREAD_DELETED",
+    SPACE_THREAD_UPDATED = "SPACE_THREAD_UPDATED",
+    SPACE_INVITE_CREATED = "SPACE_INVITE_CREATED",
+    SPACE_INVITE_REVOKED = "SPACE_INVITE_REVOKED",
+    NEW_SPACE_ROLE = "NEW_SPACE_ROLE",
+    SPACE_ROLE_UPDATED = "SPACE_ROLE_UPDATED",
+    SPACE_ROLE_DELETED = "SPACE_ROLE_DELETED",
+    USER_JOINED_TO_SPACE = "USER_JOINED_TO_SPACE",
+    USER_LEFT_SPACE = "USER_LEFT_SPACE",
+    ADDED_ROLE_TO_MEMBER = "ADDED_ROLE_TO_MEMBER",
+    REMOVED_ROLE_FROM_MEMBER = "REMOVED_ROLE_FROM_MEMBER",
+    ROLE_PERMISSION_SECTIONS = "ROLE_PERMISSION_SECTIONS"
 }
 
 export enum State {
@@ -191,10 +215,8 @@ export enum Operations {
     RESET_PASSWORD = "RESET_PASSWORD",
     GET_CHAT_MESSAGES_COUNT = "GET_CHAT_MESSAGES_COUNT",
     SEARCH_MESSAGE_ATTACHMENTS = "SEARCH_MESSAGE_ATTACHMENTS",
-    ADD_MESSAGE_TO_BOOKMARKS = "ADD_MESSAGE_TO_BOOKMARKS",
-    REMOVE_MESSAGE_FROM_BOOKMARKS = "REMOVE_MESSAGE_FROM_BOOKMARKS",
-    LOAD_BOOKMARKED_MESSAGES = "LOAD_BOOKMARKED_MESSAGES",
-    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS"
+    LOAD_MESSAGES_WITH_MENTIONS = "LOAD_MESSAGES_WITH_MENTIONS",
+    LEASE_TRACK = "LEASE_TRACK"
 }
 
 export enum ParticipantRole {
@@ -269,10 +291,10 @@ export enum InternalApi {
     GET_USER_CHATS = "getUserChats",
     GET_PUBLIC_CHANNELS = "getPublicChannels",
     LOAD_CHAT = "loadChat",
-    LOAD_CHAT_MESSAGES = "loadChatMessages",
+    LOAD_MESSAGES = "loadMessages",
     SEARCH_CHAT_MESSAGES = "searchChatMessages",
-    GET_CHAT_MESSAGES_COUNT = "getChatMessagesCount",
-    GET_FIRST_AND_LAST_CHAT_MESSAGE = "getFirstAndLastChatMessage",
+    GET_MESSAGES_COUNT = "getMessagesCount",
+    GET_FIRST_AND_LAST_MESSAGE = "getFirstAndLastMessage",
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
     RENAME_CHAT = "renameChat",
@@ -314,22 +336,43 @@ export enum InternalApi {
     CHANGE_USER_PHONE_NUMBER = "changeUserPhoneNumber",
     CHANGE_USER_HOST_KEY = "changeUserHostKey",
     CHANGE_USER_TIMEZONE = "changeUserTimezone",
-    EDIT_CHAT_MESSAGE = "editChatMessage",
-    DELETE_CHAT_MESSAGE = "deleteChatMessage",
+    EDIT_MESSAGE = "editMessage",
+    DELETE_MESSAGE = "deleteMessage",
     SIGN_UP = "signUp",
     REMOVE_USER = "removeUser",
     RESET_PASSWORD_REQUEST = "resetPasswordRequest",
     RESET_PASSWORD = "resetPassword",
     SEARCH_MESSAGE_ATTACHMENTS = "searchMessageAttachments",
-    ADD_MESSAGE_TO_BOOKMARKS = "addMessageToBookmarks",
-    REMOVE_MESSAGE_FROM_BOOKMARKS = "removeMessageFromBookmarks",
-    LOAD_BOOKMARKED_MESSAGES = "loadBookmarkedMessages",
     LOAD_MESSAGES_WITH_MENTIONS = "loadMessagesWithMentions",
     LEASE_TRACK = "leaseTrack",
     LOGOUT = "logout",
     START_BITRATE_TEST = "startBitrateTest",
     END_BITRATE_TEST = "endBitrateTest",
-    GET_TEST_LATENCY = "getBitrateLatency"
+    GET_TEST_LATENCY = "getBitrateLatency",
+    GET_USER_SPACES = "getUserSpaces",
+    CREATE_SPACE = "createSpace",
+    DELETE_SPACE = "deleteSpace",
+    LEAVE_SPACE = "leaveSpace",
+    UPDATE_SPACE_OVERVIEW = "updateSpaceOverview",
+    CREATE_SPACE_CATEGORY = "createSpaceCategory",
+    DELETE_SPACE_CATEGORY = "deleteSpaceCategory",
+    UPDATE_SPACE_CATEGORY = "updateSpaceCategory",
+    CREATE_SPACE_CHANNEL = "createSpaceChannel",
+    UPDATE_SPACE_CHANNEL = "updateSpaceChannel",
+    MOVE_SPACE_CHANNEL = "moveSpaceChannel",
+    DELETE_SPACE_CHANNEL = "deleteSpaceChannel",
+    CREATE_SPACE_THREAD = "createSpaceThread",
+    UPDATE_SPACE_THREAD = "updateSpaceThread",
+    DELETE_SPACE_THREAD = "deleteSpaceThread",
+    GENERATE_SPACE_INVITE =  "generateNewSpaceInvite",
+    REVOKE_SPACE_INVITE = "revokeSpaceInvite",
+    JOIN_SPACE_BY_INVITE_CODE =  "joinSpaceByInviteCode",
+    ADD_SPACE_ROLE = "addSpaceRole",
+    UPDATE_SPACE_ROLE = "updateSpaceRole",
+    DELETE_SPACE_ROLE = "deleteSpaceRole",
+    ADD_ROLE_TO_MEMBER = "addRoleToMember",
+    REMOVE_ROLE_FROM_MEMBER = "removeRoleFromMember",
+    GET_ROLE_PERMISSIONS = "getRolePermissions"
 }
 
 export enum ContactError {
@@ -342,7 +385,6 @@ export enum ChatError {
     CAN_NOT_SEND_MESSAGE_WITHOUT_CHAT_ID = "Can't send message without a chatId",
     USER_MUST_BE_A_CHAT_MEMBER_TO_SEND_MESSAGES = "User must be a chat member to send messages",
     CAN_NOT_CANCEL_SENDING_ATTACHMENT = "Can't cancel sending attachment",
-    CAN_NOT_EDIT_MESSAGE_WITHOUT_CHAT_ID = "Can't edit message without chatId",
     CAN_NOT_EDIT_MESSAGE_WITHOUT_MESSAGE_ID = "Can't edit message without messageId",
     EDIT_MESSAGE_ERROR_CHAT_DOES_NOT_EXISTS = "Failed to edit message, chat doesn't exist",
     EDIT_MESSAGE_ERROR_MESSAGE_DOES_NOT_EXISTS = "Failed to edit message, message doesn't exist",
@@ -352,7 +394,6 @@ export enum ChatError {
     CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT = "Adding a member to the private chat is not allowed",
     CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
     CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed",
-    CAN_NOT_ADD_DELETED_MESSAGE_TO_BOOKMARKS = "Can't add deleted message to bookmarks"
 }
 
 export enum ChatSectionsError {
@@ -396,10 +437,15 @@ export enum UserManagementError {
     EMAIL_NOT_FOUND = "Email not found"
 }
 
+export enum SpaceError {
+    USER_ALREADY_JOINED = "User already joined",
+    RESTRICTED_ACCESS = "Restricted access"
+}
+
 export const ATTACHMENT_CHUNK_SIZE = 100000;
 
 export type InternalMessage = {
-    type: SfuEvent | RoomEvent | InternalApi,
+    type: SfuEvent | RoomEvent | SpaceEvent | InternalApi,
     roomId: string,
     internalMessageId: string
 }
@@ -673,7 +719,8 @@ export type MessageStatusUpdate = {
 
 export type MessageStatus = {
     id: string;
-    chatId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     parentMessage: Message;
     delivered: boolean;
     state: MessageState;
@@ -687,7 +734,8 @@ export type MessageStatus = {
 }
 
 export type AttachmentStatus = {
-    chatId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     messageId: string;
     id: string;
     name: string;
@@ -715,7 +763,8 @@ export type MessageAttachmentData = {
 }
 
 export type AttachmentRequest = {
-    chatId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     messageId: string;
     messageTransferId?: number;
     attachmentId: string;
@@ -732,10 +781,24 @@ export type AttachmentRequestAck = InternalMessage & {
     attachmentRequest: AttachmentRequest
 }
 
+export enum MessageTargetEntityType {
+    CHAT = "CHAT",
+    CHANNEL = "CHANNEL",
+    THREAD = "THREAD"
+}
+
+export type MessageTargetEntityId = {
+    chatId?: string;
+    spaceId?: string;
+    channelId?: string;
+    threadId?: string;
+}
+
 export type Message = {
     id: string;
     parentMessage?: Message;
-    chatId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     date: number;
     from: UserId;
     to?: UserId;
@@ -746,7 +809,6 @@ export type Message = {
     privateMessage: boolean;
     edited: boolean;
     dateOfEdit: number;
-    bookmarked: boolean;
 }
 
 export type SfuMessageEvent = InternalMessage & {
@@ -775,7 +837,8 @@ export type AttachmentStatusEvent = InternalMessage & {
 }
 
 export type UpdateMessagesDeliveryStatusEvent = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     dateFrom: number,
     dateTo: number,
     userId: string,
@@ -783,7 +846,8 @@ export type UpdateMessagesDeliveryStatusEvent = InternalMessage & {
 }
 
 export type LastReadMessageUpdated = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     updateInfo: LastReadMessageUpdate
 }
 
@@ -955,7 +1019,8 @@ export type ChatLoadedEvent = InternalMessage & {
 }
 
 export type ChatMessagesEvent = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     messages: Array<Message>
 }
 
@@ -1008,28 +1073,16 @@ export type UserTimezoneChangedEvent = InternalMessage & {
 }
 
 export type MessageEdited = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     message: Message
 }
 
 export type MessageDeleted = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     messageId: string,
     state: MessageState
-}
-
-export type BookmarkDeleted = InternalMessage & {
-    chatId: string,
-    id: string
-}
-
-export type ChatWithBookmarksDeleted = InternalMessage & {
-    chatId: string,
-    deletedBookmarksCount: number
-}
-
-export type BookmarkEdited = InternalMessage & {
-    bookmark: MessageInfo;
 }
 
 export type SignUpStatus = InternalMessage & {
@@ -1044,12 +1097,14 @@ export type ResetPasswordRequestStatus = InternalMessage & {
 }
 
 export type ChatMessagesCount = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     messagesCount: number
 }
 
 export type FirstAndLastChatMessage = InternalMessage & {
-    chatId: string,
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     firstMessageId: string,
     firstMessageDate: number,
     lastMessageId: string,
@@ -1062,7 +1117,8 @@ export enum MessageAttachmentMediaType {
 }
 
 export type AttachmentInfo = {
-    chatId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     messageId: string;
     id: string;
     name: string;
@@ -1080,7 +1136,8 @@ export type MessageAttachmentsSearchResult = InternalMessage & {
 
 export type MessageInfo = {
     id: string;
-    chatId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
     parentMessage: MessageInfo;
     date: number;
     clientDate: number;
@@ -1091,17 +1148,244 @@ export type MessageInfo = {
     privateMessage: boolean;
     edited: boolean;
     dateOfEdit: number;
-    bookmarked: boolean;
-}
-
-export type LoadBookmarkedMessagesResult = InternalMessage & {
-    messages: Array<MessageInfo>;
-    totalSize: number;
 }
 
 export type LoadMessagesWithMentionsResult = InternalMessage & {
     messages: Array<MessageInfo>;
     totalSize: number;
+}
+
+export type SfuSpaceRolePermission = {
+    name: string;
+    displayName: string;
+    description: string;
+    position: number
+}
+
+export type SfuSpaceRolePermissionSection = {
+    name: string;
+    displayName: string;
+    position: number;
+    permissions: Array<SfuSpaceRolePermission>
+}
+
+export type SfuSpaceRole = {
+    id: string;
+    name: string;
+    color: string;
+    permissions: Array<string>;
+}
+
+export type SfuSpaceMember = {
+    userId: string;
+    nickname: string;
+    roles: Array<string>;
+}
+
+export type SfuSpaceCategory = {
+    id: string;
+    name: string;
+    creator: string;
+    createdAt: number;
+}
+
+export type SfuSpaceThread = {
+    id: string;
+    name: string;
+    creator: string;
+    private: boolean;
+    createdAt: number;
+    members: Array<string>;
+    lastReadMessageId: string;
+    lastReadMessageDate: number;
+}
+
+export type SfuSpaceChannel = {
+    id: string;
+    categoryId: string;
+    name: string;
+    creator: string;
+    private: boolean;
+    accessRights: SfuSpaceChannelAccessRights;
+    createdAt: number;
+    members: Array<string>;
+    threads: Array<SfuSpaceThread>
+    lastReadMessageId: string;
+    lastReadMessageDate: number;
+}
+
+export type SfuSpaceInvite = {
+    inviteCode: string;
+    inviter: string;
+    uses: number;
+    createdAt: number;
+    expiresAt: number;
+}
+
+export type SfuSpaceUserBan = {
+    id: string;
+    userId: string;
+    bannedAt: number;
+}
+
+export type SfuSpaceChannelAccessRights = {
+    roles: Array<string>;
+    members: Array<string>;
+}
+
+export type SfuSpace = {
+    id: string;
+    name: string;
+    owner: string;
+    createdAt: number;
+    roles: Array<SfuSpaceRole>;
+    members: Array<SfuSpaceMember>;
+    categories: Array<SfuSpaceCategory>;
+    channels: Array<SfuSpaceChannel>;
+    invites: Array<SfuSpaceInvite>;
+    bans: Array<SfuSpaceUserBan>;
+    permissions: Array<SfuSpaceRolePermission>;
+}
+
+export type SpaceCreatedEvent = InternalMessage & {
+    space: SfuSpace;
+}
+
+export type NewSpaceEvent = InternalMessage & {
+    space: SfuSpace;
+}
+
+export type SpaceDeletedEvent = InternalMessage & {
+    id: string;
+}
+
+export type SpaceOverviewUpdated = InternalMessage & {
+    id: string;
+    name: string;
+}
+
+export type NewSpaceCategoryEvent = InternalMessage & {
+    spaceId: string;
+    category: SfuSpaceCategory;
+}
+
+export type SpaceCategoryDeleted = InternalMessage & {
+    spaceId: string;
+    categoryId: string;
+}
+
+export type SpaceCategoryUpdated = InternalMessage & {
+    spaceId: string;
+    categoryId: string;
+    name: string;
+}
+
+export type NewSpaceChannelEvent = InternalMessage & {
+    spaceId: string;
+    channel: SfuSpaceChannel;
+}
+
+export type SpaceChannelUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    private: boolean;
+    name: string;
+    accessRights: SfuSpaceChannelAccessRights;
+    members: Array<string>;
+}
+
+export type SpaceChannelMoved = InternalMessage & {
+    spaceId: string;
+    categoryId: string;
+    channelId: string;
+}
+
+export type SpaceChannelDeleted = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+}
+
+export type NewSpaceThreadEvent = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    thread: SfuSpaceThread;
+}
+
+export type SpaceThreadUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
+    name: string;
+}
+
+export type SpaceThreadDeleted = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
+}
+
+export type SpaceInviteCreated = InternalMessage & {
+    spaceId: string;
+    invite: SfuSpaceInvite
+}
+
+export type SpaceInviteRevoked = InternalMessage & {
+    spaceId: string;
+    inviteCode: string;
+}
+
+export type NewSpaceRoleAdded = InternalMessage & {
+    spaceId: string;
+    role: SfuSpaceRole;
+    members: Array<string>;
+}
+
+export type SpaceRoleUpdated = InternalMessage & {
+    spaceId: string;
+    roleId: string;
+    name: string;
+    color: string;
+    permissions: Array<string>;
+    membersForAddRole: Array<string>;
+    membersForDeleteRole: Array<string>;
+}
+
+export type SpaceRoleDeleted = InternalMessage & {
+    spaceId: string;
+    roleId: string;
+}
+
+export type UserSpacesEvent = InternalMessage & {
+    spaces: Array<SfuSpace>;
+}
+
+export type UserJoinedToSpaceEvent = InternalMessage & {
+    spaceId: string;
+    userId: string;
+    nickname: string;
+    channels: Array<string>;
+    threads: Array<string>;
+}
+
+export type UserLeftSpace = InternalMessage & {
+    spaceId: string;
+    userId: string;
+}
+
+export type AddedRoleToMember = InternalMessage & {
+    spaceId: string;
+    roleId: string;
+    memberId: string;
+}
+
+export type RemovedRoleFromMember = InternalMessage & {
+    spaceId: string;
+    roleId: string;
+    memberId: string;
+}
+
+export type RolePermissionSectionsEvent = InternalMessage & {
+    permissionSections: Array<SfuSpaceRolePermissionSection>;
 }
 
 export enum SortOrder {

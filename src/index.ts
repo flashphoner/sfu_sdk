@@ -3,6 +3,7 @@ import {SfuExtended} from "./sdk/sfu-extended";
 import {
     SfuEvent,
     RoomEvent,
+    SpaceEvent,
     State,
     RoomState,
     WS_PING_INTERVAL_MS,
@@ -17,6 +18,7 @@ export {
     SfuExtended,
     SfuEvent,
     RoomEvent,
+    SpaceEvent,
     State,
     RoomState,
     WS_PING_INTERVAL_MS,

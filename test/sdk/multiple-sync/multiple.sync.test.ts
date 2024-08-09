@@ -19,7 +19,8 @@ import {
     UserSpecificChatInfo,
     LastReadMessageUpdated,
     UpdateMessagesDeliveryStatusEvent,
-    DeliveryStatus
+    DeliveryStatus,
+    MessageTargetEntityType
 } from "../../../src/sdk/constants";
 
 const MESSAGE_BODY = "test message";
@@ -889,7 +890,10 @@ describe("multiple-sync", () => {
             }
 
             bobFirstInstance.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 body: MESSAGE_BODY,
             });
             await waitEvents();
@@ -924,11 +928,17 @@ describe("multiple-sync", () => {
             }
 
             const message = await bobFirstInstance.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 body: MESSAGE_BODY,
             });
-            bobFirstInstance.editChatMessage({
-                chatId: chat.id,
+            bobFirstInstance.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 messageId: message.id,
                 body: newMessageBody
             });
@@ -964,11 +974,17 @@ describe("multiple-sync", () => {
             }
 
             const message = await bobFirstInstance.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 body: MESSAGE_BODY,
             });
-            bobFirstInstance.editChatMessage({
-                chatId: chat.id,
+            bobFirstInstance.editMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 messageId: message.id,
                 body: newMessageBody
             });
@@ -986,7 +1002,6 @@ describe("multiple-sync", () => {
                 const onMessageStatusBulkEventHandler = (sfu: SfuExtended, resolve: () => void, eventsCount: { num: number }): void => {
                     sfu.on(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, (msg) => {
                         const updateEvent = msg as UpdateMessagesDeliveryStatusEvent;
-                        expect(chatId).toEqual(updateEvent.chatId);
                         expect(updateEvent.dateFrom).toBe(0);
                         expect(updateEvent.dateTo).toBe(messageDate);
                         expect(updateEvent.userId).toEqual(aliceFirstInstance.user().username);
@@ -1001,7 +1016,6 @@ describe("multiple-sync", () => {
                     let eventsCount = { num: 0 };
                     aliceSecondInstance.on(SfuEvent.LAST_READ_MESSAGE_UPDATED, (msg) => {
                         const updateEvent = msg as LastReadMessageUpdated;
-                        expect(updateEvent.chatId).toEqual(chatId);
                         expect(updateEvent.updateInfo.lastReadMessageId).toEqual(messageId);
                         expect(updateEvent.updateInfo.lastReadMessageDate).toEqual(messageDate);
                         eventsCount.num++;
@@ -1015,10 +1029,19 @@ describe("multiple-sync", () => {
             }
 
             const message = await bobFirstInstance.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 body: MESSAGE_BODY,
             });
-            aliceFirstInstance.markMessageRead({id: message.id, chatId: chat.id});
+            aliceFirstInstance.markMessageRead({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
+                id: message.id,
+            });
             await waitEvents(chat.id, message.id, message.date);
             await bobFirstInstance.deleteChat(chat);
         });
@@ -1033,7 +1056,6 @@ describe("multiple-sync", () => {
                 return new Promise<void>((resolve) => {
                     aliceSecondInstance.on(SfuEvent.LAST_READ_MESSAGE_UPDATED, (msg) => {
                         const updateEvent = msg as LastReadMessageUpdated;
-                        expect(updateEvent.chatId).toEqual(chatId);
                         if (
                             updateEvent.updateInfo.oldLastReadMessageDate === messageDate
                             && updateEvent.updateInfo.lastReadMessageDate === 0
@@ -1046,11 +1068,26 @@ describe("multiple-sync", () => {
             }
 
             const message = await bobFirstInstance.sendMessage({
-                chatId: chat.id,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
                 body: MESSAGE_BODY,
             });
-            await aliceFirstInstance.markMessageRead({id: message.id, chatId: chat.id});
-            aliceFirstInstance.markMessageUnread({id: message.id, chatId: chat.id});
+            await aliceFirstInstance.markMessageRead({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
+                id: message.id,
+            });
+            aliceFirstInstance.markMessageUnread({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
+                id: message.id,
+            });
             await waitEvents(chat.id, message.date);
             await bobFirstInstance.deleteChat(chat);
         });
