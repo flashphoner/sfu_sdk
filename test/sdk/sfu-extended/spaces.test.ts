@@ -15,7 +15,11 @@ import {
     TEST_THREAD_NAME,
     TEST_USER_0,
     TEST_USER_1,
-    TEST_USER_2
+    TEST_USER_2,
+    DEFAULT_ROLE_ID,
+    NAME_OF_DEFAULT_ROLE,
+    ALLOWS_TO_VIEW_CHANNELS,
+    ALLOWS_TO_CREATE_INVITE,
 } from "../../util/constants";
 import {
     AddedRoleToMember,
@@ -58,6 +62,10 @@ describe("spaces", () => {
             expect(space.createdAt).toBeGreaterThan(0);
             expect(space.members[0]).toBeTruthy();
             expect(space.members[0].userId).toEqual(TEST_USER_0.username);
+            expect(space.roles[0].id).toEqual(DEFAULT_ROLE_ID);
+            expect(space.roles[0].name).toEqual(NAME_OF_DEFAULT_ROLE);
+            expect(space.roles[0].permissions).toContain(ALLOWS_TO_VIEW_CHANNELS);
+            expect(space.roles[0].permissions).toContain(ALLOWS_TO_CREATE_INVITE);
             expect(space.categories[0]).toBeTruthy();
             expect(space.categories[0].name).toEqual(DEFAULT_CATEGORY_NAME);
             expect(space.channels[0]).toBeTruthy();
@@ -147,8 +155,9 @@ describe("spaces", () => {
                     categoryId: category.id
                 });
                 const spaces = await bob.getUserSpaces();
-                expect(spaces.length).toBe(1);
-                const deletedCategory = spaces[0].categories.find((currentCategory) => currentCategory.id === category.id);
+                const userSpace = spaces.find((item) => item.id === space.id);
+                expect(userSpace).toBeTruthy();
+                const deletedCategory = userSpace.categories.find((currentCategory) => currentCategory.id === category.id);
                 expect(deletedCategory).toBeFalsy();
                 await bob.deleteSpace({id: space.id});
             });
