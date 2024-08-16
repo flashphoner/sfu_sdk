@@ -115,6 +115,8 @@ import {
     MessageTargetEntityType,
     MessageTargetEntityId,
     SpaceCreatedEvent,
+    UnreadMessagesCountEvent,
+    UnreadMessagesCountUpdate,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -494,6 +496,16 @@ export class SfuExtended {
                             const info = data[0] as FirstAndLastChatMessage;
                             if (!promises.resolve(data[0].internalMessageId, info)) {
                                 this.#notifier.notify(SfuEvent.FIRST_AND_LAST_CHAT_MESSAGE, info);
+                            }
+                        } else if (data[0].type === SfuEvent.UNREAD_MESSAGES_COUNT) {
+                            const event = data[0] as UnreadMessagesCountEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.UNREAD_MESSAGES_COUNT, event);
+                            }
+                        } else if (data[0].type === SfuEvent.UNREAD_MESSAGES_COUNT_UPDATE) {
+                            const event = data[0] as UnreadMessagesCountUpdate;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.UNREAD_MESSAGES_COUNT_UPDATE, event);
                             }
                         } else if (data[0].type === SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT) {
                             const result = data[0] as MessageAttachmentsSearchResult;
@@ -1482,6 +1494,20 @@ export class SfuExtended {
         const self = this;
         return new Promise<FirstAndLastChatMessage>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_MESSAGE, {
+                targetEntityType: options.targetEntityType,
+                targetEntityId: options.targetEntityId
+            }, resolve, reject);
+        });
+    }
+
+    public getUnreadMessagesCount(options: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<UnreadMessagesCountEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_UNREAD_MESSAGES_COUNT, {
                 targetEntityType: options.targetEntityType,
                 targetEntityId: options.targetEntityId
             }, resolve, reject);

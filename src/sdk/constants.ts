@@ -38,6 +38,8 @@ export enum SfuEvent {
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
     FIRST_AND_LAST_CHAT_MESSAGE = "FIRST_AND_LAST_CHAT_MESSAGE",
+    UNREAD_MESSAGES_COUNT = "UNREAD_MESSAGES_COUNT",
+    UNREAD_MESSAGES_COUNT_UPDATE = "UNREAD_MESSAGES_COUNT_UPDATE",
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
     SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC",
@@ -295,6 +297,7 @@ export enum InternalApi {
     SEARCH_CHAT_MESSAGES = "searchChatMessages",
     GET_MESSAGES_COUNT = "getMessagesCount",
     GET_FIRST_AND_LAST_MESSAGE = "getFirstAndLastMessage",
+    GET_UNREAD_MESSAGES_COUNT = "getUnreadMessagesCount",
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
     RENAME_CHAT = "renameChat",
@@ -1099,16 +1102,28 @@ export type ResetPasswordRequestStatus = InternalMessage & {
 export type ChatMessagesCount = InternalMessage & {
     targetEntityType: MessageTargetEntityType;
     targetEntityId: MessageTargetEntityId;
-    messagesCount: number
+    messagesCount: number;
 }
 
 export type FirstAndLastChatMessage = InternalMessage & {
     targetEntityType: MessageTargetEntityType;
     targetEntityId: MessageTargetEntityId;
-    firstMessageId: string,
-    firstMessageDate: number,
-    lastMessageId: string,
-    lastMessageDate: number
+    firstMessageId: string;
+    firstMessageDate: number;
+    lastMessageId: string;
+    lastMessageDate: number;
+}
+
+export type UnreadMessagesCountEvent = InternalMessage & {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    unreadMessagesCount: number;
+}
+
+export type UnreadMessagesCountUpdate = InternalMessage & {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    updatesCount: number;
 }
 
 export enum MessageAttachmentMediaType {
