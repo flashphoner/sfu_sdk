@@ -3,16 +3,25 @@ import {Room} from "./room";
 import {Connection} from "./connection";
 import promises from "./promises";
 import {
-    AddRemoveTracks, BooleanEvent,
+    AddRemoveTracks,
+    BooleanEvent,
+    ConferenceType,
     CreatedRoom,
-    InternalApi, InternalMessage, ParticipantAVSMutedEvent, ParticipantConfigEvent,
-    ParticipantRole, RoomEvent, RoomExtendedConfig, RoomConfigEvent,
+    InternalApi,
+    InternalMessage,
+    ParticipantAVSMutedEvent,
+    ParticipantConfigEvent,
+    ParticipantRole,
+    RoomConfigEvent,
+    RoomEvent,
+    RoomExtendedConfig,
+    RoomNameUpdated,
+    RoomScreenSharingConfigEvent,
+    StopScreenSharingEvent,
+    StopTrackEvent,
     UserId,
     UserNickname,
     WaitingRoomUpdate,
-    StopScreenSharingEvent,
-    RoomScreenSharingConfigEvent,
-    StopTrackEvent
 } from "./constants";
 import {PrefixFunction} from "./logger";
 
@@ -21,7 +30,8 @@ export class RoomExtended extends Room {
     #config: RoomExtendedConfig;
     #owner: string;
     #waitingRoomEnabled: boolean;
-    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, userId: UserId, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction) {
+    #_conferenceType: ConferenceType = ConferenceType.GLOBAL;
+    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, userId: UserId, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction, conferenceType?: ConferenceType) {
        super(connection, name, pin, nickname, creationTime, userId);
        this._id = id;
        this.#owner = owner;
@@ -36,6 +46,9 @@ export class RoomExtended extends Room {
            })
        } else {
            this.logger.setPrefix(() => "[Room]");
+       }
+       if (conferenceType) {
+           this.#_conferenceType = conferenceType;
        }
     }
 
@@ -378,6 +391,10 @@ export class RoomExtended extends Room {
             } else {
                 this.notifier.notify(RoomEvent.WAITING_ROOM_UPDATE, waitingRoomUpdate);
             }
+        } else if (e.type === RoomEvent.ROOM_NAME_UPDATED) {
+            const event = e as RoomNameUpdated;
+            super.updateName(event.name);
+            this.#resolveOrNotify(e, e.type, event);
         } else {
             super.processEvent(e);
         }
@@ -385,6 +402,10 @@ export class RoomExtended extends Room {
 
     public owner() {
         return this.#owner;
+    }
+
+    public conferenceType(): ConferenceType {
+        return this.#_conferenceType;
     }
 
     #resolveOrNotify(e: InternalMessage, type: RoomEvent, value: boolean | {}) {

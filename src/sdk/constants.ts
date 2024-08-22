@@ -43,7 +43,9 @@ export enum SfuEvent {
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
     SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC",
-    AUTHENTICATION_STATUS = "AUTHENTICATION_STATUS"
+    AUTHENTICATION_STATUS = "AUTHENTICATION_STATUS",
+    NEW_MEETING = "NEW_MEETING",
+    USER_MEETINGS = "USER_MEETINGS"
 }
 
 export enum RoomEvent {
@@ -93,6 +95,7 @@ export enum RoomEvent {
     STOP_SCREEN_SHARING = "STOP_SCREEN_SHARING",
     STOP_TRACK = "STOP_TRACK",
     BITRATE_TEST_STATUS = "BITRATE_TEST_STATUS",
+    ROOM_NAME_UPDATED = "ROOM_NAME_UPDATED",
 }
 
 export enum SpaceEvent {
@@ -121,6 +124,18 @@ export enum SpaceEvent {
     ADDED_ROLE_TO_MEMBER = "ADDED_ROLE_TO_MEMBER",
     REMOVED_ROLE_FROM_MEMBER = "REMOVED_ROLE_FROM_MEMBER",
     ROLE_PERMISSION_SECTIONS = "ROLE_PERMISSION_SECTIONS"
+}
+
+export enum MeetingSyncEvent {
+    MEETING_ENDED_SYNC = "MEETING_ENDED_SYNC",
+    JOINED_MEETING_SYNC = "JOINED_MEETING_SYNC",
+    LEFT_MEETING_SYNC = "LEFT_MEETING_SYNC",
+    EVICTED_SYNC = "EVICTED_SYNC",
+    ADD_TRACKS_SYNC = "ADD_TRACKS_SYNC",
+    REMOVE_TRACKS_SYNC = "REMOVE_TRACKS_SYNC",
+    MUTE_TRACKS_SYNC = "MUTE_TRACKS_SYNC",
+    PARTICIPANT_LIST_SYNC = "PARTICIPANT_LIST_SYNC",
+    MEETING_NAME_UPDATED_SYNC = "MEETING_NAME_UPDATED_SYNC",
 }
 
 export enum State {
@@ -375,7 +390,8 @@ export enum InternalApi {
     DELETE_SPACE_ROLE = "deleteSpaceRole",
     ADD_ROLE_TO_MEMBER = "addRoleToMember",
     REMOVE_ROLE_FROM_MEMBER = "removeRoleFromMember",
-    GET_ROLE_PERMISSIONS = "getRolePermissions"
+    GET_ROLE_PERMISSIONS = "getRolePermissions",
+    CREATE_CHANNEL_MEETING = "createChannelMeeting",
 }
 
 export enum ContactError {
@@ -448,7 +464,7 @@ export enum SpaceError {
 export const ATTACHMENT_CHUNK_SIZE = 100000;
 
 export type InternalMessage = {
-    type: SfuEvent | RoomEvent | SpaceEvent | InternalApi,
+    type: SfuEvent | RoomEvent | SpaceEvent | MeetingSyncEvent | InternalApi,
     roomId: string,
     internalMessageId: string
 }
@@ -509,6 +525,7 @@ export type CreatedRoom = InternalMessage & {
     name: string,
     owner: string,
     pin: string,
+    conferenceType: ConferenceType,
     inviteId: string,
     chatId: string,
     //unix epoch in UTC
@@ -535,6 +552,7 @@ export type RoomAvailable = InternalMessage & {
     name: string,
     owner: string,
     pin: string,
+    conferenceType: ConferenceType,
     creationTime: number,
     waitingRoomEnabled: boolean,
     config: RoomExtendedConfig
@@ -679,6 +697,105 @@ export type TracksQualityState = InternalMessage & {
             quality: Array<Quality>,
         }>
     }
+}
+
+export type RoomNameUpdated = InternalMessage & {
+    name: string;
+}
+
+export enum ConferenceType {
+    GLOBAL = "GLOBAL",
+    CHANNEL = "CHANNEL",
+    DIRECT = "DIRECT"
+}
+
+export type SFUMeetingParticipantPreview = {
+    userId: UserId,
+    nickname: UserNickname,
+    audioEnabled: boolean,
+    videoEnabled: boolean,
+    screenSharingEnabled: boolean,
+    owner: boolean,
+    mediaConfig: {
+        isAudioMuted: boolean,
+        isVideoMuted: boolean,
+        isScreenSharingMuted: boolean
+    }
+}
+
+export type SFUMeetingPreview = {
+    id: string;
+    type: ConferenceType;
+    owner: string;
+    name?: string;
+    userId: UserId;
+    nickname: UserNickname;
+    participants: Array<SFUMeetingParticipantPreview>;
+    creationTime: number;
+}
+
+export type NewMeeting = InternalMessage & {
+    id: string;
+    conferenceType: ConferenceType;
+    name: string;
+    owner: string;
+    pin: string;
+    creationTime: number;
+    participants: Array<SFUMeetingParticipantPreview>;
+    config: RoomExtendedConfig;
+}
+
+export type MeetingsPreviewEvent = InternalMessage & {
+    meetings: SFUMeetingPreview[];
+}
+
+export type JoinedRoomSync = InternalMessage & {
+    id: string,
+    userId: UserId,
+    name: UserNickname,
+    chatId: string,
+    owner: boolean
+}
+
+export type LeftMeetingSync = InternalMessage & {
+    id: string;
+    userId: string;
+}
+
+export type EvictedSync = InternalMessage & {
+    id: string;
+    userId: string;
+}
+
+export type MeetingEndedSync = InternalMessage & {
+    id: string;
+}
+
+export type ParticipantsListSyncEvent = ParticipantsListEvent & {
+    id: string;
+}
+
+export type AddRemoveTracksSync = InternalMessage & {
+    id: string;
+    info: {
+        userId: UserId,
+        nickName: UserNickname,
+        waitingRoom: boolean,
+        info: Array<{
+            id: string,
+            type: TrackType,
+            contentType: string,
+            mid: string,
+            quality: Array<string>,
+            mute: boolean,
+            creationTime: number
+        }>
+    }
+}
+
+export type MeetingNameUpdatedSync = InternalMessage & {
+    id: string;
+    name: string;
 }
 
 export type WaitingRoomUpdate = InternalMessage & {

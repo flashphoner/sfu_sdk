@@ -669,6 +669,10 @@ export class Room {
         return this._id;
     }
 
+    protected updateName(name: string): void {
+        this._name = name;
+    }
+
     public name(): string {
         return this._name;
     }

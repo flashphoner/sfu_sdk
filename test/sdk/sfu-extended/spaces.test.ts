@@ -39,7 +39,8 @@ import {
     SpaceRoleUpdated,
     UserJoinedToSpaceEvent,
     UserLeftSpace,
-    SfuEvent
+    SfuEvent,
+    ConferenceType,
 } from "../../../src/sdk/constants";
 
 describe("spaces", () => {
@@ -1639,5 +1640,72 @@ describe("spaces", () => {
                 });
             });
         });
+        describe("channel-room", () => {
+            const wrtc = require("wrtc");
+
+            it('should create channel room at server side', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = space.channels[0];
+                const room = await bob.createChannelMeeting({
+                    spaceId: space.id,
+                    channelId: channel.id
+                });
+                expect(room).toBeTruthy();
+                expect(room.name()).toEqual(channel.name);
+                expect(room.conferenceType()).toEqual(ConferenceType.CHANNEL);
+                expect(room.config().locked).toBe(false);
+                expect(room.config().initialAudioMuted).toBe(false);
+                expect(room.config().initialVideoMuted).toBe(true);
+                expect(room.config().initialScreenSharingMuted).toBe(true);
+                expect(room.config().audioMuted).toBe(false);
+                expect(room.config().videoMuted).toBe(false);
+                expect(room.config().screenSharingMuted).toBe(false);
+                expect(room.config().chatMuted).toBe(true);
+                expect(room.config().canChangeNickname).toBe(false);
+                expect(room.config().screenSharingConfig.multipleShares).toBe(true);
+                expect(room.config().screenSharingConfig.everyoneCanShare).toBe(true);
+                expect(room.config().screenSharingConfig.everyoneCanDoSubsequentShare).toBe(true);
+                await room.destroyRoom();
+                await bob.deleteSpace({id: space.id});
+            });
+            it('should join to channel room', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = space.channels[0];
+                const room = await bob.createChannelMeeting({
+                    spaceId: space.id,
+                    channelId: channel.id
+                });
+                const bobPc = new wrtc.RTCPeerConnection();
+                const state = await room.join(bobPc);
+                expect(state.userId).toEqual(TEST_USER_0.username);
+                expect(state.name).toEqual(TEST_USER_0.nickname);
+                await room.destroyRoom();
+                await bob.deleteSpace({id: space.id});
+            });
+            it('second participant should join to channel room', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = space.channels[0];
+                const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+                await alice.joinSpaceByInviteCode(invite.inviteCode);
+                const bobRoom = await bob.createChannelMeeting({
+                    spaceId: space.id,
+                    channelId: channel.id
+                });
+                const bobPc = new wrtc.RTCPeerConnection();
+                const bobState = await bobRoom.join(bobPc);
+                expect(bobState.userId).toEqual(TEST_USER_0.username);
+                expect(bobState.name).toEqual(TEST_USER_0.nickname);
+                const aliceRoom = await alice.roomAvailable({
+                    id: channel.id
+                });
+                expect(aliceRoom).toBeTruthy();
+                const alicePc = new wrtc.RTCPeerConnection();
+                const aliceState = await aliceRoom.join(alicePc);
+                expect(aliceState.userId).toEqual(TEST_USER_1.username);
+                expect(aliceState.name).toEqual(TEST_USER_1.nickname);
+                await bobRoom.destroyRoom();
+                await bob.deleteSpace({id: space.id});
+            });
+        })
     });
 })

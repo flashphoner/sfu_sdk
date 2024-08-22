@@ -117,6 +117,16 @@ import {
     SpaceCreatedEvent,
     UnreadMessagesCountEvent,
     UnreadMessagesCountUpdate,
+    NewMeeting,
+    MeetingSyncEvent,
+    JoinedRoomSync,
+    AddRemoveTracksSync,
+    ParticipantsListSyncEvent,
+    MeetingEndedSync,
+    LeftMeetingSync,
+    MeetingsPreviewEvent,
+    EvictedSync,
+    MeetingNameUpdatedSync,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -126,7 +136,7 @@ import {ResetPasswordHandler} from "./reset-password-handler";
 
 type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace>;
 
-type EventUnion = SfuEvent | SpaceEvent;
+type EventUnion = SfuEvent | SpaceEvent | MeetingSyncEvent;
 
 type MessageWithUploadingAttachmentState = {
     [messageId: string] : MessageWithUploadingAttachments
@@ -360,7 +370,7 @@ export class SfuExtended {
                             this.#notifier.notify(SfuEvent.CHAT_SEARCH_RESULT, messagesEvent);
                         } else if (data[0].type === RoomEvent.CREATED) {
                             const state = data[0] as CreatedRoom;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -389,7 +399,7 @@ export class SfuExtended {
                             promises.resolve(data[0].internalMessageId, room);
                         } else if (data[0].type === RoomEvent.AVAILABLE) {
                             const state = data[0] as RoomAvailable;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -646,6 +656,39 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event.permissionSections)) {
                                 this.#notifier.notify(SpaceEvent.ROLE_PERMISSION_SECTIONS, event);
                             }
+                        } else if (data[0].type === SfuEvent.USER_MEETINGS) {
+                            const event = data[0] as MeetingsPreviewEvent;
+                            this.#notifier.notify(SfuEvent.USER_MEETINGS, event);
+                        } else if (data[0].type === SfuEvent.NEW_MEETING) {
+                            const event = data[0] as NewMeeting;
+                            this.#notifier.notify(SfuEvent.NEW_MEETING, event);
+                        } else if (data[0].type === MeetingSyncEvent.MEETING_ENDED_SYNC) {
+                            const event = data[0] as MeetingEndedSync;
+                            this.#notifier.notify(MeetingSyncEvent.MEETING_ENDED_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.JOINED_MEETING_SYNC) {
+                            const event = data[0] as JoinedRoomSync;
+                            this.#notifier.notify(MeetingSyncEvent.JOINED_MEETING_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.LEFT_MEETING_SYNC) {
+                            const event = data[0] as LeftMeetingSync;
+                            this.#notifier.notify(MeetingSyncEvent.LEFT_MEETING_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.EVICTED_SYNC) {
+                            const event = data[0] as EvictedSync;
+                            this.#notifier.notify(MeetingSyncEvent.EVICTED_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.ADD_TRACKS_SYNC) {
+                            const event = data[0] as AddRemoveTracksSync;
+                            this.#notifier.notify(MeetingSyncEvent.ADD_TRACKS_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.REMOVE_TRACKS_SYNC) {
+                            const event = data[0] as AddRemoveTracksSync;
+                            this.#notifier.notify(MeetingSyncEvent.REMOVE_TRACKS_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.MUTE_TRACKS_SYNC) {
+                            const event = data[0] as AddRemoveTracksSync;
+                            this.#notifier.notify(MeetingSyncEvent.MUTE_TRACKS_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.PARTICIPANT_LIST_SYNC) {
+                            const event = data[0] as ParticipantsListSyncEvent;
+                            this.#notifier.notify(MeetingSyncEvent.PARTICIPANT_LIST_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.MEETING_NAME_UPDATED_SYNC) {
+                            const event = data[0] as MeetingNameUpdatedSync;
+                            this.#notifier.notify(MeetingSyncEvent.MEETING_NAME_UPDATED_SYNC, event);
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -1921,6 +1964,20 @@ export class SfuExtended {
         const self = this;
         return new Promise<Array<SfuSpace>>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_USER_SPACES, {}, resolve, reject);
+        });
+    }
+
+    public createChannelMeeting(options: {
+        spaceId: string,
+        channelId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RoomExtended>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_CHANNEL_MEETING, {
+                spaceId: options.spaceId,
+                channelId: options.channelId
+            }, resolve, reject);
         });
     }
 
