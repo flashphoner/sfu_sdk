@@ -1981,6 +1981,18 @@ export class SfuExtended {
         });
     }
 
+    public createDirectMeeting(options: {
+        directChatId: string;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RoomExtended>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_DIRECT_MEETING, {
+                directChatId: options.directChatId,
+            }, resolve, reject);
+        });
+    }
+
     public createSpace(space: {
         name: string
     }) {

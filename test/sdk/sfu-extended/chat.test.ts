@@ -27,6 +27,7 @@ import {
     ChannelSendPolicy,
     ChatError,
     ChatType,
+    ConferenceType,
     DeliveryStatus,
     Message,
     MessageAttachmentMediaType,
@@ -2459,6 +2460,73 @@ describe("chat", () => {
                         sendPermissionList: [TEST_USER_1.username]
                     });
                 });
+            });
+        });
+        describe("direct meeting", () => {
+            const wrtc = require("wrtc");
+
+            it('should create direct room at server side', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const room = await bob.createDirectMeeting({
+                    directChatId: chat.id
+                });
+                expect(room).toBeTruthy();
+                expect(room.conferenceType()).toEqual(ConferenceType.DIRECT);
+                expect(room.config().locked).toBe(false);
+                expect(room.config().initialAudioMuted).toBe(false);
+                expect(room.config().initialVideoMuted).toBe(true);
+                expect(room.config().initialScreenSharingMuted).toBe(true);
+                expect(room.config().audioMuted).toBe(false);
+                expect(room.config().videoMuted).toBe(false);
+                expect(room.config().screenSharingMuted).toBe(false);
+                expect(room.config().chatMuted).toBe(true);
+                expect(room.config().canChangeNickname).toBe(false);
+                expect(room.config().screenSharingConfig.multipleShares).toBe(true);
+                expect(room.config().screenSharingConfig.everyoneCanShare).toBe(true);
+                expect(room.config().screenSharingConfig.everyoneCanDoSubsequentShare).toBe(true);
+                await bob.deleteChat({id: chat.id});
+            });
+            it('should join to direct room', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const room = await bob.createDirectMeeting({
+                    directChatId: chat.id
+                });
+                const bobPc = new wrtc.RTCPeerConnection();
+                const state = await room.join(bobPc);
+                expect(state.userId).toEqual(TEST_USER_0.username);
+                expect(state.name).toEqual(TEST_USER_0.nickname);
+                await bob.deleteChat({id: chat.id});
+            });
+            it('second participant should join to direct room', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const bobRoom = await bob.createDirectMeeting({
+                    directChatId: chat.id
+                });
+                const bobPc = new wrtc.RTCPeerConnection();
+                const bobState = await bobRoom.join(bobPc);
+                expect(bobState.userId).toEqual(TEST_USER_0.username);
+                expect(bobState.name).toEqual(TEST_USER_0.nickname);
+                const aliceRoom = await alice.roomAvailable({
+                    id: chat.id
+                });
+                expect(aliceRoom).toBeTruthy();
+                const alicePc = new wrtc.RTCPeerConnection();
+                const aliceState = await aliceRoom.join(alicePc);
+                expect(aliceState.userId).toEqual(TEST_USER_1.username);
+                expect(aliceState.name).toEqual(TEST_USER_1.nickname);
+                await bob.deleteChat({id: chat.id});
             });
         });
     });

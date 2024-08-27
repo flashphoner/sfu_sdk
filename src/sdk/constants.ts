@@ -392,6 +392,7 @@ export enum InternalApi {
     REMOVE_ROLE_FROM_MEMBER = "removeRoleFromMember",
     GET_ROLE_PERMISSIONS = "getRolePermissions",
     CREATE_CHANNEL_MEETING = "createChannelMeeting",
+    CREATE_DIRECT_MEETING = "createDirectMeeting",
 }
 
 export enum ContactError {
