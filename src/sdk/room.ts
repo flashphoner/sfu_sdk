@@ -308,6 +308,14 @@ export class Room {
     }
 
     //TODO(naz): safe guard based on state
+    /**
+     * Join the room
+     *
+     * @param pc - peer connection
+     * @param nickname - user nickname
+     * @param config - [track.id] : track content type
+     * @param predefinedTracksCount - Initial number of allocated transceivers.
+     */
     public join(pc: RTCPeerConnection, nickname?: UserNickname, config?: {
         [key: string]: string
     }, predefinedTracksCount?: number): Promise<JoinedRoom> {
@@ -399,6 +407,9 @@ export class Room {
         });
     };
 
+    /**
+     * Used for SDP exchange
+     */
     public updateState(config?: {
         [key: string]: string
     }): Promise<void> {
@@ -440,6 +451,12 @@ export class Room {
         });
     };
 
+    /**
+     * Destroy room
+     *
+     * Participants will receive {@link RoomEvent.ENDED}.
+     * {@link state} will be {@link RoomState.DISPOSED}
+     */
     public destroyRoom(): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -533,6 +550,12 @@ export class Room {
         }
     }
 
+    /**
+     * Leave room
+     *
+     * Participants will receive {@link RoomEvent.LEFT} with {@link LeftRoom}.
+     * {@link state} will be {@link RoomState.DISPOSED}
+     */
     public leaveRoom(): Promise<LeftRoom> {
         const self = this;
         return new Promise<LeftRoom>((resolve, reject) => {
@@ -558,6 +581,11 @@ export class Room {
         });
     };
 
+    /**
+     * Evict participant
+     *
+     * Participants will receive {@link RoomEvent.EVICTED} with {@link EvictedFromRoom}.
+     */
     public evictParticipant(userId: UserId): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -571,6 +599,11 @@ export class Room {
         })
     }
 
+    /**
+     * Rename participant
+     *
+     * Participants will receive {@link RoomEvent.PARTICIPANT_RENAMED} with {@link ParticipantRenamed}.
+     */
     public renameParticipant(userId: UserId, newNickname: UserNickname): Promise<ParticipantRenamed> {
         const self = this;
         return new Promise<ParticipantRenamed>(((resolve, reject) => {
@@ -612,6 +645,9 @@ export class Room {
         });
     };
 
+    /**
+     * Change the quality of the requested track
+     */
     public changeQuality(trackId: string, quality: string, tid: number): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -627,6 +663,11 @@ export class Room {
         });
     };
 
+    /**
+     * Mute track
+     *
+     * Participants will receive {@link RoomEvent.MUTE_TRACKS} with {@link AddRemoveTracks}
+     */
     public muteTrack(trackId: string, mute: boolean): Promise<void> {
         const self = this;
         return new Promise<void>((resolve, reject) => {

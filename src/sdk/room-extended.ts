@@ -73,6 +73,14 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Sending control message inside the room
+     *
+     * Recipients will receive {@link RoomEvent.CONTROL_MESSAGE} with {@link ControlMessageEvent}
+     *
+     * @param broadcast - sending for all room participants, if true
+     * @param to - sending for user. Should use with broadcast = false
+     */
     public sendControlMessage(msg: string, broadcast: boolean, to?: UserId) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -89,6 +97,14 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Authorize or fail authorization for user from waiting List
+     *
+     * Room owner will receive {@link RoomEvent.WAITING_LIST} with {@link WaitingListEvent}
+     *
+     * If authorized = true - user will join to the room and other participants will receive {@link RoomEvent.JOINED} with {@link JoinedRoom}.
+     * If authorized = false - user will receive error {@link RoomError.AUTHORIZATION_FAILED}
+     */
     public authorizeWaitingList(userId: UserId, authorized: boolean) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -103,6 +119,14 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Move user to waiting room
+     *
+     * User will receive {@link RoomEvent.DETACHED}.
+     * Other participants will receive {@link RoomEvent.LEFT} with {@link LeftRoom}
+     *
+     * Room owner will receive {@link RoomEvent.WAITING_LIST} with {@link WaitingListEvent}
+     */
     public moveToWaitingRoom(userId: UserId) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -116,6 +140,15 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Configure waiting room
+     *
+     * Waiting room configuration, on/off switch for now
+     *
+     * Waiting room must be empty
+     *
+     * @param enabled - flag indicates whether it's enabled or not
+     */
     public configureWaitingRoom(enabled: boolean) {
         const self = this;
         return new Promise<WaitingRoomUpdate>((resolve, reject) => {
@@ -129,6 +162,16 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Assign role
+     *
+     * Used to transfer the role. The room owner will have the {@link ParticipantRole.PARTICIPANT} role.
+     *
+     * Participants will receive {@link RoomEvent.ROLE_ASSIGNED} with {@link RoleAssigned}
+     *
+     * New owner will receive {@link RoomEvent.PARTICIPANT_CONFIG} with {@link ParticipantConfigEvent} for each participant.
+     * The previous owner will receive {@link RoomEvent.PARTICIPANT_CONFIG} with {@link ParticipantConfigEvent}.
+     */
     public assignRole(userId: UserId, role: ParticipantRole) {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -143,6 +186,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Reclaim owner rights
+     *
+     * Participants will receive {@link RoomEvent.ROLE_ASSIGNED} with {@link RoleAssigned}
+     */
     public reclaimOwnerRights() {
         const self = this;
         return new Promise<void>((resolve, reject) => {
@@ -155,6 +203,13 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Subscribe to waiting participant
+     *
+     * Used to check waiting participant's tracks.
+     *
+     * Subscriber will receive {@link RoomEvent.ADD_TRACKS} with {@link AddRemoveTracks}
+     */
     public subscribeToWaitingParticipant(userId: UserId) {
         const self = this;
         return new Promise<AddRemoveTracks>((resolve, reject) => {
@@ -168,6 +223,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Unsubscribe from waiting participant
+     *
+     * Subscriber will receive {@link RoomEvent.REMOVE_TRACKS} with {@link AddRemoveTracks}
+     */
     public unsubscribeFromWaitingParticipant(userId: UserId) {
         const self = this;
         return new Promise<AddRemoveTracks>((resolve, reject) => {
@@ -181,6 +241,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room lock
+     *
+     * Participants will receive {@link RoomEvent.ROOM_LOCKED} with boolean value
+     */
     public setLock(locked: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -188,6 +253,13 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room initial audio muted
+     *
+     * Participants will receive {@link RoomEvent.ROOM_INITIAL_AUDIO_MUTED} with boolean value
+     *
+     * Waiting participants will receive {@link RoomEvent.STOP_TRACK} with {@link StopTrackEvent}
+     */
     public setInitialAudioMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -195,6 +267,13 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room initial video muted
+     *
+     * Participants will receive {@link RoomEvent.ROOM_INITIAL_VIDEO_MUTED} with boolean value
+     *
+     * Waiting participants will receive {@link RoomEvent.STOP_TRACK} with {@link StopTrackEvent}
+     */
     public setInitialVideoMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -202,6 +281,9 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room initial screen sharing muted
+     */
     public setInitialScreenSharingMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -209,6 +291,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room audio muted
+     *
+     * Participants will receive {@link RoomEvent.ROOM_AUDIO_MUTED} with boolean value and {@link RoomEvent.PARTICIPANT_CONFIG} with {@link ParticipantConfigEvent}
+     */
     public setAudioMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -216,6 +303,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room audio muted
+     *
+     * Participants will receive {@link RoomEvent.ROOM_VIDEO_MUTED} with boolean value and {@link RoomEvent.PARTICIPANT_CONFIG} with {@link ParticipantConfigEvent}
+     */
     public setVideoMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -223,6 +315,15 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room screen sharing muted
+     *
+     * Participants will receive {@link RoomEvent.ROOM_SCREEN_SHARING_MUTED} with boolean value.
+     *
+     * Participants that started screen sharing will receive {@link RoomEvent.STOP_SCREEN_SHARING} with {@link StopScreenSharingEvent}
+     *
+     * All participants will receive {@link RoomEvent.PARTICIPANT_CONFIG} with {@link ParticipantConfigEvent} and {@link RoomEvent.PARTICIPANT_SCREEN_SHARING_MUTED} with boolean value.
+     */
     public setScreenSharingMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -230,6 +331,15 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room chat muted
+     *
+     * Participants will receive {@link RoomEvent.ROOM_CHAT_MUTED} with boolean value and {@link RoomEvent.PARTICIPANT_CONFIG} with {@link ParticipantConfigEvent}
+     *
+     * Chat receive policy will be {@link ChatReceivePolicy.EVERYONE} or {@link ChatReceivePolicy.NOBODY}.
+     *
+     * Chat members will receive {@link SfuEvent.CHAT_UPDATED} with {@link UpdateChatEvent}
+     */
     public setChatMuted(muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -237,6 +347,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room can change nickname
+     *
+     * Participants will receive {@link RoomEvent.ROOM_CAN_CHANGE_NICKNAME} with boolean value.
+     */
     public setCanChangeNickname(canChange: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -244,6 +359,13 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room screen sharing multiple shares
+     *
+     * Participants will receive {@link RoomEvent.SCREEN_SHARING_CONFIG} with {@link RoomScreenSharingConfigEvent}
+     *
+     * @param multipleShares - if false, participants with screen sharing will receive {@link RoomEvent.STOP_SCREEN_SHARING} with {@link StopScreenSharingEvent}
+     */
     public setScreenSharingMultipleShares(multipleShares: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -251,6 +373,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room screen sharing everyone can share
+     *
+     * Participants will receive {@link RoomEvent.SCREEN_SHARING_CONFIG} with {@link RoomScreenSharingConfigEvent}
+     */
     public setScreenSharingEveryoneCanShare(everyoneCanShare: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -258,6 +385,13 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set room screen sharing everyone can do subsequent share
+     *
+     * Participants will receive {@link RoomEvent.SCREEN_SHARING_CONFIG} with {@link RoomScreenSharingConfigEvent}
+     *
+     * @param canDoSubsequentShare - if false, participants with screen sharing will receive {@link RoomEvent.STOP_SCREEN_SHARING} with {@link StopScreenSharingEvent}
+     */
     public setScreenSharingEveryoneCanDoSubsequentShare(canDoSubsequentShare: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -265,6 +399,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set participant's audio muted
+     *
+     * Participant will receive {@link RoomEvent.PARTICIPANT_AUDIO_MUTED} with {@link ParticipantAVSMutedEvent}
+     */
     public setParticipantAudioMuted(userId: UserId, muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -272,6 +411,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set participant's video muted
+     *
+     * Participant will receive {@link RoomEvent.PARTICIPANT_VIDEO_MUTED} with {@link ParticipantAVSMutedEvent}
+     */
     public setParticipantVideoMuted(userId: UserId, muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -279,6 +423,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Set participant's screen sharing muted
+     *
+     * Participant will receive {@link RoomEvent.PARTICIPANT_SCREEN_SHARING_MUTED} with {@link ParticipantAVSMutedEvent}
+     */
     public setParticipantScreenSharingMuted(userId: UserId, muted: boolean) {
         const self = this;
         return new Promise<boolean>((resolve, reject) => {
@@ -286,6 +435,11 @@ export class RoomExtended extends Room {
         });
     };
 
+    /**
+     * Turn off participant's screen sharing
+     *
+     * Participant(s) will receive {@link RoomEvent.STOP_SCREEN_SHARING} with {@link StopScreenSharingEvent}
+     */
     public turnOffParticipantScreenSharing(userId?: UserId, reason?: string) {
         const self = this;
         return new Promise<void>((resolve, reject) => {

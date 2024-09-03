@@ -11,7 +11,7 @@ export class User {
     #room: RoomExtended;
     #aSender: RTCRtpSender;
     #aTrack: MediaStreamTrack;
-    #interval: NodeJS.Timer;
+    #interval: NodeJS.Timeout;
 
     constructor(userConfig: {
         username: string,

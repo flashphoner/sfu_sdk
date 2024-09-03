@@ -1,0 +1,7 @@
+{
+  "entryPoints": ["src/sdk/*"],
+  "entryPointStrategy": "resolve",
+  "out": "docs",
+  "useTsLinkResolution": true,
+  "tsconfig": "tsconfig.json"
+}

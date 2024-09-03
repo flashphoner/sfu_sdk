@@ -115,8 +115,6 @@ import {
     MessageTargetEntityType,
     MessageTargetEntityId,
     SpaceCreatedEvent,
-    UnreadMessagesCountEvent,
-    UnreadMessagesCountUpdate,
     NewMeeting,
     MeetingSyncEvent,
     JoinedRoomSync,
@@ -127,6 +125,8 @@ import {
     MeetingsPreviewEvent,
     EvictedSync,
     MeetingNameUpdatedSync,
+    UnreadMessagesCountEvent,
+    UnreadMessagesCountUpdate,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -177,6 +177,37 @@ export class SfuExtended {
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
     }
 
+    #emmitAction(action: InternalApi, data: object, resolve: Function, reject: Function) {
+        const id = uuidv4();
+        promises.add(id, resolve, reject);
+        this.#connection.send(action, {
+            ...data,
+            internalMessageId: id
+        });
+    }
+
+    #emmitBinaryAction(data: any) {
+        this.#connection.sendBinaryData(data);
+    }
+
+    #checkAuthenticated() {
+        if (this.#_state !== State.AUTHENTICATED) {
+            throw new Error("User isn't authenticated, current state " + this.#_state);
+        }
+    }
+
+    /**
+     * Connects the user to the server.
+     *
+     * The user can connect using either a username and password or an authToken.
+     *
+     * Once the connection is successful, the {@link state} will change to {@link State.AUTHENTICATED}.
+     * After that, the sfu-sdk will emit the event {@link SfuEvent.CONNECTED}.
+     *
+     * @param options.username - The user's username (optional if `authToken` is provided).
+     * @param options.password - The user's password (optional if `authToken` is provided).
+     * @param options.authToken - The authentication token for direct login (optional if `username` and `password` are provided).
+     */
     public connect(options: {
         url: string,
         username?: UserId,
@@ -617,7 +648,7 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event.role)) {
                                 this.#notifier.notify(SpaceEvent.NEW_SPACE_ROLE, event);
                             }
-                        }  else if (data[0].type === SpaceEvent.SPACE_ROLE_UPDATED) {
+                        } else if (data[0].type === SpaceEvent.SPACE_ROLE_UPDATED) {
                             const event = data[0] as SpaceRoleUpdated;
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.SPACE_ROLE_UPDATED, event);
@@ -761,25 +792,30 @@ export class SfuExtended {
         );
     }
 
-    #emmitAction(action: InternalApi, data: object, resolve: Function, reject: Function) {
-        const id = uuidv4();
-        promises.add(id, resolve, reject);
-        this.#connection.send(action, {
-            ...data,
-            internalMessageId: id
-        });
-    }
-
-    #emmitBinaryAction(data: any) {
-        this.#connection.sendBinaryData(data);
-    }
-
-    #checkAuthenticated() {
-        if (this.#_state !== State.AUTHENTICATED) {
-            throw new Error("User isn't authenticated, current state " + this.#_state);
+    /**
+     * Method to disconnect from the server
+     *
+     * When disconnecting, user leaves all active rooms
+     *
+     * {@link state} changed to {@link State.DISCONNECTED | DISCONNECTED}
+     */
+    public async disconnect() {
+        for (const [key, value] of Object.entries(this.#rooms)) {
+            value.leaveRoom();
         }
-    }
+        this.#_user = undefined;
+        if (this.#_state !== State.DISCONNECTED) {
+            await this.#connection.close();
+            this.#_state = State.DISCONNECTED;
+        }
+        this.#rooms = {};
+    };
 
+    /**
+     * Sign up for new users
+     *
+     * Works in a separate connection
+     */
     public signUp(options: {
         url: string,
         timeout?: number,
@@ -850,6 +886,11 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Reset password
+     *
+     * When calls, returns {@link ResetPasswordHandler} then need to call {@link ResetPasswordHandler.resetPassword} to reset the password
+     */
     public resetPassword(options: {
         url: string,
         timeout?: number,
@@ -949,7 +990,9 @@ export class SfuExtended {
         })
     }
 
-
+    /**
+     * Remove user (internal using)
+     */
     public removeUser(options: {
         url: string,
         timeout?: number,
@@ -1000,6 +1043,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Logout from app
+     */
     public logout() {
         this.#checkAuthenticated();
         const self = this;
@@ -1021,6 +1067,42 @@ export class SfuExtended {
         };
     };
 
+    /**
+     * Load messages for Direct chat | Channel | Thread
+     *
+     * @param params.timeFrame to load by start date to end date. For load all messages used with start = 0, end = -1.
+     * @param params.boundaries to load messages by specifying a particular message using its date,
+     * along with the number of messages above and below it. Upper limit includes message with date dateMark.
+     */
+    public loadMessages(params: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+        timeFrame?: {
+            start: number,
+            end: number,
+            limit?: number
+        },
+        boundaries?: {
+            dateMark: number,
+            lowerLimit: number,
+            upperLimit: number
+        }
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<Array<Message>>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LOAD_MESSAGES, params, resolve, reject);
+        });
+    };
+
+    /**
+     * Send a message to a Direct chat | Channel | Thread
+     *
+     * Members will receive {@link SfuEvent.MESSAGE} with {@link Message}
+     *
+     * @param msg.parentId to send reply message
+     * @param msg.to to send a private message
+     */
     public sendMessage(msg: {
         body?: string,
         to?: string,
@@ -1051,6 +1133,176 @@ export class SfuExtended {
     };
 
     /**
+     * Edit a message in a Direct chat | Channel | Thread
+     *
+     * Members will receive {@link SfuEvent.CHAT_MESSAGE_EDITED} with {@link MessageEdited}
+     *
+     * @param msg.attachmentsToSend to add attachments to sent message
+     * @param msg.attachmentIdsToDelete to send a private message
+     */
+    public editMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+        messageId: string,
+        body: string,
+        attachmentsToSend?: Array<MessageAttachment>,
+        attachmentIdsToDelete?: string[]
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<MessageStatus>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.EDIT_MESSAGE, {
+                id: msg.messageId,
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
+                body: msg.body,
+                attachments: msg.attachmentsToSend,
+                attachmentIdsToDelete: msg.attachmentIdsToDelete
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Delete a message in a Direct chat | Channel | Thread
+     *
+     * The message body will be changed to an empty string.
+     * The {@link Message.status} will be changed to {@link MessageState.DELETED}
+     *
+     * Attachments will be removed.
+     *
+     * Members will receive {@link SfuEvent.CHAT_MESSAGE_DELETED} with {@link MessageDeleted}
+     */
+    public deleteMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+        messageId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.DELETE_MESSAGE, {
+                id: msg.messageId,
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Mark message as read in a Direct chat | Channel | Thread
+     *
+     * In targetEntity will change lastReadMessageId and lastReadMessageDate
+     *
+     * All unread messages with a {@link Message.date} earlier than or equal to the marked one will be marked as read.
+     * The sender of each message will receive {@link SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS}
+     * with {@link UpdateMessagesDeliveryStatusEvent} and {@link Message.deliveryStatus} will be changed at the server side to {@link DeliveryStatus.READ}.
+     */
+    public markMessageRead(msg: {
+        id: string,
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<LastReadMessageUpdated>(function (resolve, reject) {
+            if (!msg) {
+                reject(new Error("Can't mark null message"));
+            } else if (!msg.id || msg.id === "") {
+                reject(new Error("Can't mark message without massage id"));
+            } else {
+                self.#emmitAction(InternalApi.MARK_MESSAGE_READ, {
+                    id: msg.id,
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
+                }, resolve, reject);
+            }
+        });
+    }
+
+    /**
+     * Mark message as unread in a Direct chat | Channel | Thread
+     *
+     * In targetEntity will change lastReadMessageId and lastReadMessageDate. {@link Message.deliveryStatus}
+     *
+     * {@link Message.deliveryStatus} will not be changed at the server side. Senders will not receive events,
+     * however if the previous lastReadMessageDate is earlier than the updated value,
+     * the senders of those messages will receive {@link SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS}
+     * with {@link UpdateMessagesDeliveryStatusEvent} and {@link Message.deliveryStatus} will be changed at the server side to {@link DeliveryStatus.READ}.
+     */
+    public markMessageUnread(msg: {
+        id: string,
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<LastReadMessageUpdated>(function (resolve, reject) {
+            if (!msg) {
+                reject(new Error("Can't mark null message"));
+            } else if (!msg.id || msg.id === "") {
+                reject(new Error("Can't mark message without massage id"));
+            } else {
+                self.#emmitAction(InternalApi.MARK_MESSAGE_UNREAD, {
+                    id: msg.id,
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
+                }, resolve, reject);
+            }
+        });
+    }
+
+    /**
+     * Get messages count in entity from {@link MessageTargetEntityType}
+     */
+    public getMessagesCount(options: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatMessagesCount>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_MESSAGES_COUNT, {
+                targetEntityType: options.targetEntityType,
+                targetEntityId: options.targetEntityId
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Get first message and last message in entity from {@link MessageTargetEntityType}
+     */
+    public getFirstAndLastMessage(options: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<FirstAndLastChatMessage>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_MESSAGE, {
+                targetEntityType: options.targetEntityType,
+                targetEntityId: options.targetEntityId
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Get count of unread messages in entity from {@link MessageTargetEntityType}
+     */
+    public getUnreadMessagesCount(options: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<UnreadMessagesCountEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_UNREAD_MESSAGES_COUNT, {
+                targetEntityType: options.targetEntityType,
+                targetEntityId: options.targetEntityId
+            }, resolve, reject);
+        });
+    }
+
+    /**
      * This method is recommended for using to generate attachment id before sending.
      * Sending and downloading attachments may not work with other generating options.
      * @return string of 36 ASCII characters
@@ -1059,6 +1311,11 @@ export class SfuExtended {
         return uuidv4();
     }
 
+    /**
+     * Get handler for send or cancel sending attachments
+     *
+     * Can't cancel sent attachment
+     */
     public getSendingAttachmentsHandler(attachments: Array<MessageAttachmentData>, messageId: string) {
         const self = this;
         const messageWithAttachmentsState = self.#uploadingAttachmentState[messageId];
@@ -1107,7 +1364,6 @@ export class SfuExtended {
                  * 4th byte - end of file (0 - false, 1 - true)
                  * @type {Uint8Array}
                  */
-
                 const header = new Uint8Array(4);
                 header[0] = 10;
                 header[1] = messageTransferId;
@@ -1175,7 +1431,7 @@ export class SfuExtended {
                     if (!attachmentsIsReady) {
                         const result = await cancelSendAttachment(attachment.id);
                         if (result.uploadedSize !== attachment.size) {
-                            cancelledAttachments[attachment.id] =  {status: result};
+                            cancelledAttachments[attachment.id] = {status: result};
                         }
                         resolve(result);
                     } else {
@@ -1198,6 +1454,11 @@ export class SfuExtended {
         return new SendingAttachmentsHandler(sendAttachments());
     }
 
+    /**
+     * Load attachment from server
+     *
+     * On client side should receive {@link SfuEvent.MESSAGE_ATTACHMENT_STATE} with {@link AttachmentStatus} to show progress
+     */
     public getMessageAttachment(attachment: AttachmentRequest) {
         this.#checkAuthenticated();
         const self = this;
@@ -1236,50 +1497,9 @@ export class SfuExtended {
         this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENT_STATE, status);
     }
 
-    public markMessageRead(msg: {
-        id: string,
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
-            if (!msg) {
-                reject(new Error("Can't mark null message"));
-            } else if (!msg.id || msg.id === "") {
-                reject(new Error("Can't mark message without massage id"));
-            } else {
-                self.#emmitAction(InternalApi.MARK_MESSAGE_READ, {
-                    id: msg.id,
-                    targetEntityType: msg.targetEntityType,
-                    targetEntityId: msg.targetEntityId,
-                }, resolve, reject);
-            }
-        });
-    }
-
-    public markMessageUnread(msg: {
-        id: string,
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
-            if (!msg) {
-                reject(new Error("Can't mark null message"));
-            } else if (!msg.id || msg.id === "") {
-                reject(new Error("Can't mark message without massage id"));
-            } else {
-                self.#emmitAction(InternalApi.MARK_MESSAGE_UNREAD, {
-                    id: msg.id,
-                    targetEntityType: msg.targetEntityType,
-                    targetEntityId: msg.targetEntityId,
-                }, resolve, reject);
-            }
-        });
-    }
-
+    /**
+     * Get all users from server
+     */
     public getUserList() {
         this.#checkAuthenticated();
         const self = this;
@@ -1288,6 +1508,96 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Invite user to contacts
+     *
+     * UserId must be passed if user exist. That user will receive {@link SfuEvent.CONTACT_INVITE} with {@link Invite}
+     *
+     * UserEmail must be passed if there is no such user yet. In this case user will be created at the server side with {@link UserState.PENDING_REGISTRATION} and default parameters
+     */
+    public inviteContact(invite: {
+        to: UserId | UserEmail
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<User>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.INVITE_CONTACT, {from: self.#_user.username, to: invite.to}, resolve, reject);
+        });
+    }
+
+    /**
+     * Add contact to favourites
+     *
+     * {@link User.favourite} will be changed to true at the server side
+     */
+    public addContactToFavourites(contact: {
+        id: UserId
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<User>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_CONTACT_TO_FAVOURITES, {id: contact.id}, resolve, reject);
+        });
+    }
+
+    /**
+     * Remove contact from favourites
+     *
+     * {@link User.favourite} will be changed to false at the server side
+     */
+    public removeContactFromFavourites(contact: {
+        id: UserId
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<User>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_CONTACT_FROM_FAVOURITES, {id: contact.id}, resolve, reject);
+        });
+    }
+
+    /**
+     * Confirm contact
+     *
+     * {@link User.confirmed} will be changed to true for both users.
+     *
+     * @param invite.from - user with that userId will receive {@link SfuEvent.CONTACT_UPDATE} with {@link User}
+     */
+    public confirmContact(invite: {
+        id: string,
+        from: UserId,
+        to: UserId
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<User>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CONFIRM_CONTACT, {
+                from: invite.from,
+                to: invite.to,
+                id: invite.id
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Confirm contact
+     *
+     * {@link User.confirmed} will be changed to true for both users.
+     *
+     * @param contact.id - user with that userId will receive {@link SfuEvent.CONTACT_REMOVED} with {@link User}
+     */
+    public removeContact(contact: {
+        id: UserId
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<User>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_CONTACT, {id: contact.id}, resolve, reject);
+        });
+    }
+
+    /**
+     * Get all user calendar events
+     */
     public getUserCalendar() {
         this.#checkAuthenticated();
         const self = this;
@@ -1296,6 +1606,82 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Add calendar event
+     *
+     * @param event.usePMI - if true then user PMI settings will be updated and user will receive {@link SfuEvent.UPDATE_USER_PMI_SETTINGS} with {@link UserPmiSettings}
+     */
+    public addCalendarEvent(event: {
+        title: string,
+        description: string,
+        start: number,
+        end: number,
+        recurring: boolean,
+        accessCode?: string,
+        waitingRoom: boolean,
+        usePMI: boolean,
+        ownerVideo: boolean,
+        participantVideo: boolean,
+        allowJoinAtAnyTime: boolean,
+        useMuteAudioOnJoin: boolean,
+        useLocalAutoRecord: boolean
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<CalendarEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_CALENDAR_EVENT, {
+                event: event
+            }, resolve, reject);
+        });
+    };
+
+    public removeCalendarEvent(event: {
+        id: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<CalendarEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_CALENDAR_EVENT, {
+                event: event
+            }, resolve, reject);
+        });
+    };
+
+    /**
+     * Update calendar event
+     *
+     * @param event.usePMI - if true then user PMI settings will be updated and user will receive {@link SfuEvent.UPDATE_USER_PMI_SETTINGS} with {@link UserPmiSettings}
+     */
+    public updateCalendarEvent(event: {
+        id: string,
+        title: string,
+        description: string,
+        start: number,
+        end: number,
+        recurring: boolean,
+        accessCode?: string,
+        waitingRoom: boolean,
+        usePMI: boolean,
+        ownerVideo: boolean,
+        participantVideo: boolean,
+        allowJoinAtAnyTime: boolean,
+        useMuteAudioOnJoin: boolean,
+        useLocalAutoRecord: boolean
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<CalendarEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CALENDAR_EVENT, {
+                event: event
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Get user pmi settings
+     *
+     * Used for create meetings
+     */
     public getUserPmiSettings() {
         this.#checkAuthenticated();
         const self = this;
@@ -1304,6 +1690,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Update user pmi settings
+     */
     public updateUserPmiSettings(settings: {
         allowJoinAtAnyTime: boolean,
         useMuteAudioOnJoin: boolean,
@@ -1323,6 +1712,11 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Get user info
+     *
+     * Usually used to display profile info
+     */
     public getUserInfo() {
         this.#checkAuthenticated();
         const self = this;
@@ -1331,6 +1725,11 @@ export class SfuExtended {
         })
     }
 
+    /**
+     * Change user email
+     *
+     * Users will receive {@link SfuEvent.CONTACT_UPDATED} with changed email
+     */
     public changeUserEmail(email: UserEmail) {
         this.#checkAuthenticated();
         const self = this;
@@ -1354,6 +1753,11 @@ export class SfuExtended {
         })
     };
 
+    /**
+     * Change user email
+     *
+     * Users will receive {@link SfuEvent.CONTACT_UPDATED} with changed nickname
+     */
     public changeUserNickname(nickname: UserNickname) {
         this.#checkAuthenticated();
         const self = this;
@@ -1394,75 +1798,9 @@ export class SfuExtended {
         })
     };
 
-    public addCalendarEvent(event: {
-        title: string,
-        description: string,
-        start: number,
-        end: number,
-        recurring: boolean,
-        accessCode?: string,
-        waitingRoom: boolean,
-        usePMI: boolean,
-        ownerVideo: boolean,
-        participantVideo: boolean,
-        allowJoinAtAnyTime: boolean,
-        useMuteAudioOnJoin: boolean,
-        useLocalAutoRecord: boolean
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<CalendarEvent>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.ADD_CALENDAR_EVENT, {
-                event: event
-            }, resolve, reject);
-        });
-    };
-
-    public removeCalendarEvent(event: {
-        id: string
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<CalendarEvent>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.REMOVE_CALENDAR_EVENT, {
-                event: event
-            }, resolve, reject);
-        });
-    };
-
-    public updateCalendarEvent(event: {
-        id: string,
-        title: string,
-        description: string,
-        start: number,
-        end: number,
-        recurring: boolean,
-        accessCode?: string,
-        waitingRoom: boolean,
-        usePMI: boolean,
-        ownerVideo: boolean,
-        participantVideo: boolean,
-        allowJoinAtAnyTime: boolean,
-        useMuteAudioOnJoin: boolean,
-        useLocalAutoRecord: boolean
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<CalendarEvent>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.UPDATE_CALENDAR_EVENT, {
-                event: event
-            }, resolve, reject);
-        });
-    }
-
-    public getUserChats() {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<ChatMap>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_USER_CHATS, {}, resolve, reject);
-        });
-    };
-
+    /**
+     * @deprecated
+     */
     public getPublicChannels() {
         this.#checkAuthenticated();
         const self = this;
@@ -1471,37 +1809,9 @@ export class SfuExtended {
         });
     };
 
-    public loadChat(chat: {
-        id: string
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<Chat>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.LOAD_CHAT, {id: chat.id}, resolve, reject);
-        });
-    };
-
-    public loadMessages(params: {
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-        timeFrame?: {
-            start: number,
-            end: number,
-            limit?: number
-        },
-        boundaries?: {
-            dateMark: number,
-            lowerLimit: number,
-            upperLimit: number
-        }
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<Array<Message>>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.LOAD_MESSAGES, params, resolve, reject);
-        });
-    };
-
+    /**
+     * @deprecated
+     */
     public searchChatMessages(params: {
         chatId: string,
         searchString: string,
@@ -1515,48 +1825,9 @@ export class SfuExtended {
         });
     };
 
-    public getMessagesCount(options: {
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<ChatMessagesCount>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_MESSAGES_COUNT, {
-                targetEntityType: options.targetEntityType,
-                targetEntityId: options.targetEntityId
-            }, resolve, reject);
-        });
-    }
-
-    public getFirstAndLastMessage(options: {
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<FirstAndLastChatMessage>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_MESSAGE, {
-                targetEntityType: options.targetEntityType,
-                targetEntityId: options.targetEntityId
-            }, resolve, reject);
-        });
-    }
-
-    public getUnreadMessagesCount(options: {
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<UnreadMessagesCountEvent>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_UNREAD_MESSAGES_COUNT, {
-                targetEntityType: options.targetEntityType,
-                targetEntityId: options.targetEntityId
-            }, resolve, reject);
-        });
-    }
-
+    /**
+     * @deprecated
+     */
     public searchMessageAttachments(params: {
         chatId?: string,
         attachmentsType?: MessageAttachmentMediaType,
@@ -1589,6 +1860,9 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * @deprecated
+     */
     public loadMessagesWithMentions(params: {
         chatId?: string,
         userTag: string,
@@ -1617,6 +1891,38 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Get chats.
+     *
+     * To work with messages in the chat, you need to use {@link MessageTargetEntityType.CHAT}
+     */
+    public getUserChats() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatMap>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_USER_CHATS, {}, resolve, reject);
+        });
+    };
+
+    public loadChat(chat: {
+        id: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<Chat>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LOAD_CHAT, {id: chat.id}, resolve, reject);
+        });
+    };
+
+    /**
+     * Create chat
+     *
+     * @param chat.members - these members will receive {@link SfuEvent.NEW_CHAT} with {@link UserSpecificChatInfo}
+     * @param chat.type - @deprecated
+     * @param chat.channelSendPolicy - @deprecated
+     * @param chat.sendPermissionList - @deprecated
+     * @param chat.allowedToAddExternalUser - @deprecated
+     */
     public createChat(chat: {
         id?: string,
         name?: string,
@@ -1645,6 +1951,13 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Delete chat
+     *
+     * Chat members will receive {@link SfuEvent.CHAT_DELETED} with {@link UserSpecificChatInfo}
+     *
+     * If a direct meeting was started, it will end, and chat participants will receive {@link MeetingSyncEvent.MEETING_ENDED_SYNC} with {@link MeetingEndedSync}.
+     */
     public deleteChat(chat: {
         id: string
     }) {
@@ -1655,6 +1968,11 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Update chat
+     *
+     * Chat members will receive {@link SfuEvent.CHAT_UPDATED} with {@link UserSpecificChatInfo}
+     */
     public renameChat(chat: {
         id: string,
         name: string
@@ -1666,44 +1984,15 @@ export class SfuExtended {
         });
     };
 
-    public editMessage(msg: {
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-        messageId: string,
-        body: string,
-        attachmentsToSend?: Array<MessageAttachment>,
-        attachmentIdsToDelete?: string[]
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<MessageStatus>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.EDIT_MESSAGE, {
-                id: msg.messageId,
-                targetEntityType: msg.targetEntityType,
-                targetEntityId: msg.targetEntityId,
-                body: msg.body,
-                attachments: msg.attachmentsToSend,
-                attachmentIdsToDelete: msg.attachmentIdsToDelete
-            }, resolve, reject);
-        });
-    }
-
-    public deleteMessage(msg: {
-        targetEntityType: MessageTargetEntityType,
-        targetEntityId: MessageTargetEntityId,
-        messageId: string
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<void>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.DELETE_MESSAGE, {
-                id: msg.messageId,
-                targetEntityType: msg.targetEntityType,
-                targetEntityId: msg.targetEntityId,
-            }, resolve, reject);
-        });
-    }
-
+    /**
+     *  Add a member to chat
+     *
+     * Chat members will receive {@link SfuEvent.CHAT_UPDATED} with {@link UserSpecificChatInfo}
+     *
+     * If a direct meeting was started, user will receive {@link SfuEvent.NEW_MEETING} with {@link NewMeeting}.
+     *
+     * @param chat.member - user will receive {@link SfuEvent.NEW_CHAT} with {@link UserSpecificChatInfo}.
+     */
     public addMemberToChat(chat: {
         id: string,
         member: UserId
@@ -1715,6 +2004,16 @@ export class SfuExtended {
         });
     };
 
+    /**
+     *  Remove a member to chat
+     *
+     * Chat members will receive {@link SfuEvent.CHAT_UPDATED} with {@link UserSpecificChatInfo}
+     *
+     * If a direct meeting was started and user was , user will receive {@link MeetingSyncEvent.MEETING_ENDED_SYNC} with {@link MeetingEndedSync}.
+     * If the user was a participant in the meeting, users will receive {@link RoomEvent.EVICTED} with {@link EvictedFromRoom}.
+     *
+     * @param chat.member - user will receive {@link SfuEvent.CHAT_DELETED} with {@link UserSpecificChatInfo}.
+     */
     public removeMemberFromChat(chat: {
         id: string,
         member: UserId
@@ -1726,62 +2025,9 @@ export class SfuExtended {
         });
     };
 
-    public inviteContact(invite: {
-        to: UserId | UserEmail
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.INVITE_CONTACT, {from: self.#_user.username, to: invite.to}, resolve, reject);
-        });
-    }
-
-    public addContactToFavourites(contact: {
-        id: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.ADD_CONTACT_TO_FAVOURITES, {id: contact.id}, resolve, reject);
-        });
-    }
-
-    public removeContactFromFavourites(contact: {
-        id: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.REMOVE_CONTACT_FROM_FAVOURITES, {id: contact.id}, resolve, reject);
-        });
-    }
-
-    public confirmContact(invite: {
-        id: string,
-        from: UserId,
-        to: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.CONFIRM_CONTACT, {
-                from: invite.from,
-                to: invite.to,
-                id: invite.id
-            }, resolve, reject);
-        });
-    }
-
-    public removeContact(contact: {
-        id: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.REMOVE_CONTACT, {id: contact.id}, resolve, reject);
-        });
-    }
-
+    /**
+     * @deprecated
+     */
     public updateChannelSendPolicy(channel: {
         id: string,
         channelSendPolicy: ChannelSendPolicy
@@ -1810,6 +2056,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * @deprecated
+     */
     public addChannelSendPermissionListMember(channel: {
         id: string,
         member: UserId
@@ -1824,6 +2073,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * @deprecated
+     */
     public removeChannelSendPermissionListMember(channel: {
         id: string,
         member: UserId
@@ -1838,6 +2090,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * @deprecated
+     */
     public updateChatConfiguration(chat: {
         id: string,
         type?: ChatType,
@@ -1852,6 +2107,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Used to change {@link UserSpecificChatInfo.favourite} to true
+     */
     public addChatToFavourites(chat: {
         id: string
     }) {
@@ -1862,6 +2120,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Used to change {@link UserSpecificChatInfo.favourite} to false
+     */
     public removeChatFromFavourites(chat: {
         id: string
     }) {
@@ -1872,6 +2133,15 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Create room
+     *
+     * To create with PMI settings, PMI must be specified as the ID.
+     *
+     * To join, you need to use room.join.
+     *
+     * @return {@link RoomExtended} with {@link RoomExtended.conferenceType()} that equal {@link ConferenceType.GLOBAL}
+     */
     public createRoom(options: {
         name?: string,
         pin?: string,
@@ -1888,6 +2158,51 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Create channel meeting
+     *
+     * {@link Room.id()} will be equal channelId
+     *
+     * @return {@link RoomExtended} with {@link RoomExtended.conferenceType()} that equal {@link ConferenceType.CHANNEL}
+     */
+    public createChannelMeeting(options: {
+        spaceId: string,
+        channelId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RoomExtended>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_CHANNEL_MEETING, {
+                spaceId: options.spaceId,
+                channelId: options.channelId
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Create channel meeting
+     *
+     * {@link Room.id()} will be equal directChatId
+     *
+     * @return {@link RoomExtended} with {@link RoomExtended.conferenceType()} that equal {@link ConferenceType.DIRECT}
+     */
+    public createDirectMeeting(options: {
+        directChatId: string;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RoomExtended>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.CREATE_DIRECT_MEETING, {
+                directChatId: options.directChatId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Creating a room based on a calendar event created using {@link addCalendarEvent}.
+     *
+     * To join, you need to use room.join()
+     */
     public createRoomFromEvent(event: {
         id: string,
         title: string,
@@ -1913,6 +2228,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Get running rooms
+     */
     public loadActiveRooms() {
         const self = this;
         return new Promise<Array<RoomInfo>>((resolve, reject) => {
@@ -1920,6 +2238,11 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Check and get an available room.
+     *
+     * To join, you need to use room.join()
+     */
     public roomAvailable(options: {
         id: string,
         pin?: string
@@ -1935,6 +2258,9 @@ export class SfuExtended {
         });
     };
 
+    /**
+     * Checks for the existence of a running room.
+     */
     public roomExists(options: {
         id: string,
         pin?: string
@@ -1959,6 +2285,11 @@ export class SfuExtended {
         return this.#rooms[options.id];
     }
 
+    /**
+     * Get user spaces
+     *
+     * If channel meetings were started, user will receive {@link SfuEvent.USER_MEETINGS} with {@link MeetingsPreviewEvent}.
+     */
     public getUserSpaces() {
         this.#checkAuthenticated();
         const self = this;
@@ -1967,32 +2298,9 @@ export class SfuExtended {
         });
     }
 
-    public createChannelMeeting(options: {
-        spaceId: string,
-        channelId: string
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<RoomExtended>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.CREATE_CHANNEL_MEETING, {
-                spaceId: options.spaceId,
-                channelId: options.channelId
-            }, resolve, reject);
-        });
-    }
-
-    public createDirectMeeting(options: {
-        directChatId: string;
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<RoomExtended>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.CREATE_DIRECT_MEETING, {
-                directChatId: options.directChatId,
-            }, resolve, reject);
-        });
-    }
-
+    /**
+     * The space is created with the default category Category1, default channel Channel1 and default role "@everyone".
+     */
     public createSpace(space: {
         name: string
     }) {
@@ -2005,6 +2313,11 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Update space overview
+     *
+     * Space members will receive {@link SpaceEvent.SPACE_OVERVIEW_UPDATED} with {@link SpaceOverviewUpdated}
+     */
     public updateSpaceOverview(space: {
         id: string;
         name: string;
@@ -2019,6 +2332,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Delete space
+     *
+     * Space members will receive {@link SpaceEvent.SPACE_DELETED} with {@link SpaceDeletedEvent}
+     *
+     * If channel meetings were started, users will receive {@link MeetingSyncEvent.MEETING_ENDED_SYNC} with {@link MeetingEndedSync}.
+     */
     public deleteSpace(space: {
         id: string
     }) {
@@ -2031,6 +2351,16 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Leave space
+     *
+     * Space members will receive {@link SpaceEvent.USER_LEFT_SPACE} with {@link UserLeftSpace}
+     *
+     * After receiving the event, it is necessary to remove the user from the list of members in the space and channels/threads.
+     *
+     * If channel meetings were started, user will receive {@link MeetingSyncEvent.MEETING_ENDED_SYNC} with {@link MeetingEndedSync}.
+     * If the user was a participant in the meeting, users will receive {@link RoomEvent.EVICTED} with {@link EvictedFromRoom}.
+     */
     public leaveSpace(space: {
         id: string
     }) {
@@ -2043,6 +2373,12 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Generate space invite
+     *
+     * If user has permission to create a space invite - generating invite code with 8 symbols.
+     * To create invite link - use 'ws:{serverUrl}:{port}/join-space/inviteCode'
+     */
     public generateNewSpaceInvite(options: {
         spaceId: string,
         lifespan: number
@@ -2057,6 +2393,9 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Removing the space invite
+     */
     public revokeSpaceInvite(options: {
         spaceId: string,
         inviteCode: string
@@ -2071,6 +2410,14 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Join space by invite code
+     *
+     * Space members will receive {@link SpaceEvent.USER_JOINED_TO_SPACE} with {@link UserJoinedToSpaceEvent}.
+     * On the client side, this user should be added to the list of participants in public channels and threads.
+     *
+     * If channel meetings were started, user will receive {@link SfuEvent.USER_MEETINGS} with {@link MeetingsPreviewEvent}.
+     */
     public joinSpaceByInviteCode(inviteCode: string) {
         this.#checkAuthenticated();
         const self = this;
@@ -2081,6 +2428,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Create space category
+     *
+     * For space owner/user that has permission to manage categories
+     *
+     * Space members will receive {@link SpaceEvent.NEW_SPACE_CATEGORY} with {@link NewSpaceCategoryEvent}
+     */
     public createSpaceCategory(category: {
         spaceId: string,
         name: string,
@@ -2095,6 +2449,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Delete space category
+     *
+     * For space owner/category creator/user that has permission to manage categories
+     *
+     * Space members will receive {@link SpaceEvent.SPACE_CATEGORY_DELETED} with {@link SpaceCategoryDeleted}
+     */
     public deleteSpaceCategory(options: {
         spaceId: string,
         categoryId: string
@@ -2109,6 +2470,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Delete space category
+     *
+     * For space owner/category creator/user that has permission to manage categories
+     *
+     * Space members will receive {@link SpaceEvent.SPACE_CATEGORY_UPDATED} with {@link SpaceCategoryUpdated}
+     */
     public updateSpaceCategory(options: {
         spaceId: string,
         categoryId: string,
@@ -2125,6 +2493,16 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Create space channel
+     *
+     * For space owner/user that has permission to manage channels
+     *
+     * Channel members will receive {@link SpaceEvent.NEW_SPACE_CHANNEL} with {@link NewSpaceChannelEvent}
+     *
+     * @param channel.roles - used to create a private channel. Array of role ids or empty array.
+     * @param channel.members - used to create a private channel. Array of member ids or empty array.
+     */
     public createSpaceChannel(channel: {
         spaceId: string,
         categoryId?: string,
@@ -2147,6 +2525,22 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Update space channel
+     *
+     * For space owner/user that has permission to manage channels
+     *
+     * Channel members will receive {@link SpaceEvent.SPACE_CHANNEL_UPDATED} with {@link SpaceChannelUpdated}
+     * In the private channel added members will receive {@link SpaceEvent.NEW_SPACE_CHANNEL} with {@link NewSpaceChannelEvent}.
+     * If the channel meeting was started, added members will receive {@link SfuEvent.NEW_MEETING} with {@link NewMeeting}.
+     *
+     * In the private channel deleted members will receive {@link SpaceEvent.SPACE_CHANNEL_DELETED} with {@link SpaceChannelDeleted}
+     * If the channel meeting was started, deleted members will receive {@link MeetingSyncEvent.MEETING_ENDED_SYNC} with {@link MeetingEndedSync}.
+     * If the deleted user was a participant in the meeting, users will receive {@link RoomEvent.EVICTED} with {@link EvictedFromRoom}.
+     *
+     * @param channel.roles - used to create a private channel. Array of role ids or empty array.
+     * @param channel.members - used to create a private channel. Array of member ids or empty array.
+     */
     public updateSpaceChannel(channel: {
         spaceId: string,
         channelId: string,
@@ -2169,6 +2563,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Move space channel
+     *
+     * Channel members will receive {@link SpaceEvent.SPACE_CHANNEL_MOVED} with {@link SpaceChannelMoved}
+     *
+     * @param channel.categoryId - Specify the identifier of the category to which you want to move the channel, or an empty string to leave the channel uncategorized.
+     */
     public moveSpaceChannel(channel: {
         spaceId: string,
         categoryId: string,
@@ -2185,6 +2586,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Delete space channel
+     *
+     * Channel members will receive {@link SpaceEvent.SPACE_CHANNEL_DELETED} with {@link SpaceChannelDeleted}
+     *
+     * If the channel meeting was started, members will receive {@link MeetingSyncEvent.MEETING_ENDED_SYNC} with {@link MeetingEndedSync}.
+     */
     public deleteSpaceChannel(options: {
         spaceId: string,
         channelId: string
@@ -2199,6 +2607,11 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Create space thread
+     *
+     * Thread members will receive {@link SpaceEvent.NEW_SPACE_THREAD} with {@link NewSpaceThreadEvent}
+     */
     public createSpaceThread(thread: {
         spaceId: string,
         channelId: string,
@@ -2217,6 +2630,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Update space thread
+     *
+     * For space owner/thread creator
+     *
+     * Thread members will receive {@link SpaceEvent.SPACE_THREAD_UPDATED} with {@link SpaceThreadUpdated}
+     */
     public updateSpaceThread(options: {
         spaceId: string,
         channelId: string,
@@ -2235,6 +2655,13 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Delete space thread
+     *
+     * For space owner/thread creator
+     *
+     * Thread members will receive {@link SpaceEvent.SPACE_THREAD_DELETED} with {@link SpaceThreadDeleted}
+     */
     public deleteSpaceThread(options: {
         spaceId: string,
         channelId: string,
@@ -2251,6 +2678,15 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Add space role
+     *
+     * For space owner/user that has permission to manage roles
+     *
+     * Space members will receive {@link SpaceEvent.NEW_SPACE_ROLE} with {@link NewSpaceRoleAdded}
+     *
+     * On the client side, a new role must be added to the participants listed in the {@link NewSpaceRoleAdded.members}
+     */
     public addSpaceRole(role: {
         spaceId: string,
         name: string,
@@ -2271,6 +2707,22 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Update space role
+     *
+     * For space owner/user that has permission to manage roles
+     *
+     * Space members will receive {@link SpaceEvent.SPACE_ROLE_UPDATED} with {@link SpaceRoleUpdated}
+     *
+     * On the client side, a new role must be added to the participants listed in the {@link SpaceRoleUpdated.membersForAddRole}
+     * and must be removed from participants listed in the {@link SpaceRoleUpdated.membersForDeleteRole}
+     *
+     * Participants from whom this role will be removed will receive {@link SpaceEvent.SPACE_CHANNEL_DELETED} with {@link SpaceChannelDeleted} for each channel they were part of because of this role.
+     *
+     * Participants who are assigned this role will receive {@link SpaceEvent.NEW_SPACE_CHANNEL} with {@link NewSpaceChannelEvent} for each channel that has this role in its access rights.
+     *
+     * Participants who had the role before the update and still have it afterward will receive {@link SpaceEvent.SPACE_CHANNEL_UPDATED} with {@link SpaceChannelUpdated} for each channel that has this role in its access rights.
+     */
     public updateSpaceRole(role: {
         spaceId: string,
         roleId: string,
@@ -2293,6 +2745,15 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Delete space role
+     *
+     * For space owner/user that has permission to manage roles
+     *
+     * Space members will receive {@link SpaceEvent.SPACE_ROLE_DELETED} with {@link SpaceRoleDeleted}
+     *
+     * On the client side, should remove this role from channel's access rights and update channel members list
+     */
     public deleteSpaceRole(options: {
         spaceId: string,
         roleId: string,
@@ -2307,6 +2768,16 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Add space role to member
+     *
+     * For space owner/user that has permission to manage roles
+     *
+     * Space members will receive {@link SpaceEvent.ADDED_ROLE_TO_MEMBER} with {@link AddedRoleToMember}
+     *
+     * Member who are assigned this role will receive {@link SpaceEvent.NEW_SPACE_CHANNEL} with {@link NewSpaceChannelEvent} for each channel that has this role in its access rights.
+     * Other members of these channels will receive {@link SpaceEvent.SPACE_CHANNEL_UPDATED} with {@link SpaceChannelUpdated}.
+     */
     public addRoleToMember(options: {
         spaceId: string,
         roleId: string,
@@ -2323,6 +2794,16 @@ export class SfuExtended {
         });
     }
 
+    /**
+     * Remove space role from member
+     *
+     * For space owner/user that has permission to manage roles
+     *
+     * Space members will receive {@link SpaceEvent.REMOVED_ROLE_FROM_MEMBER} with {@link RemovedRoleFromMember}
+     *
+     * Participant from whom this role will be removed will receive {@link SpaceEvent.SPACE_CHANNEL_DELETED} with {@link SpaceChannelDeleted} for each channel they were part of because of this role.
+     * Other members of these channels will receive {@link SpaceEvent.SPACE_CHANNEL_UPDATED} with {@link SpaceChannelUpdated}.
+     */
     public removeRoleFromMember(options: {
         spaceId: string,
         roleId: string,
@@ -2346,18 +2827,6 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.GET_ROLE_PERMISSIONS, {}, resolve, reject);
         });
     }
-
-    public async disconnect() {
-        for (const [key, value] of Object.entries(this.#rooms)) {
-            value.leaveRoom();
-        }
-        this.#_user = undefined;
-        if (this.#_state !== State.DISCONNECTED) {
-            await this.#connection.close();
-            this.#_state = State.DISCONNECTED;
-        }
-        this.#rooms = {};
-    };
 
     public user() {
         return this.#_user;

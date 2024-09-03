@@ -1,140 +1,275 @@
+/**
+ * SfuEvent
+ * Used to receive events from the server with SfuExtended.on()
+ */
 export enum SfuEvent {
+    /** Used without callback event */
     CONNECTED = "CONNECTED",
+    /** Used to receive {@link OperationFailed} */
     FAILED = "FAILED",
+    /** Used to receive {@link ConnectionFailedEvent} */
     CONNECTION_FAILED = "CONNECTION_FAILED",
+    /** Used without callback event */
     DISCONNECTED = "DISCONNECTED",
+    /** Used to receive {@link Message} */
     MESSAGE = "MESSAGE",
+    /** Used to receive {@link UserListEvent} */
     USER_LIST = "USER_LIST",
+    /** Used to receive {@link ChatsEvent} */
     USER_CHATS = "USER_CHATS",
+    /** Used to receive {@link Chat} */
     CHAT_LOADED = "CHAT_LOADED",
+    /** Used to receive {@link ChatMessagesEvent} */
     CHAT_MESSAGES = "CHAT_MESSAGES",
+    /** Used to receive {@link ChatSearchResultEvent} */
     CHAT_SEARCH_RESULT = "CHAT_SEARCH_RESULT",
+    /** Used to receive {@link UserSpecificChatInfo} */
     NEW_CHAT = "NEW_CHAT",
+    /** Used to receive {@link UserSpecificChatInfo} */
     CHAT_DELETED = "CHAT_DELETED",
+    /** Used to receive {@link UserSpecificChatInfo} */
     CHAT_UPDATED = "CHAT_UPDATED",
+    /** Used to receive {@link MessageStatus} */
     MESSAGE_STATE = "MESSAGE_STATE",
+    /** Used to receive {@link AttachmentStatus} */
     MESSAGE_ATTACHMENT_STATE = "MESSAGE_ATTACHMENT_STATE",
+    /** Used to receive {@link LastReadMessageUpdated} */
     LAST_READ_MESSAGE_UPDATED = "LAST_READ_MESSAGE_UPDATED",
+    /** Used to receive {@link UpdateMessagesDeliveryStatusEvent} */
     UPDATE_MESSAGES_DELIVERY_STATUS = "UPDATE_MESSAGES_DELIVERY_STATUS",
+    /** Used to receive {@link User} */
     CONTACT_UPDATE = "CONTACT_UPDATE",
+    /** Used to receive {@link User} */
     CONTACT_REMOVED = "CONTACT_REMOVED",
+    /** Used to receive {@link Invite} */
     CONTACT_INVITE = "CONTACT_INVITE",
+    /** @deprecated */
     PUBLIC_CHANNELS = "PUBLIC_CHANNELS",
+    /** Used to receive {@link Calendar} */
     USER_CALENDAR = "USER_CALENDAR",
+    /** Used to receive {@link CalendarEvent} */
     NEW_CALENDAR_ENTRY = "NEW_CALENDAR_ENTRY",
+    /** Used to receive {@link CalendarEvent} */
     REMOVE_CALENDAR_ENTRY = "REMOVE_CALENDAR_ENTRY",
+    /** Used to receive {@link CalendarEvent} */
     UPDATE_CALENDAR_EVENT = "UPDATE_CALENDAR_EVENT",
+    /** Used without callback event */
     ACK = "ACK",
     ATTACHMENT_DATA = "ATTACHMENT_DATA",
     USER_ROOMS = "USER_ROOMS",
     ATTACHMENT = "ATTACHMENT",
+    /** Used to receive {@link UserPmiSettings} */
     SFU_USER_PMI_SETTINGS = "SFU_USER_PMI_SETTINGS",
+    /** Used to receive {@link UserPmiSettings} */
     UPDATE_USER_PMI_SETTINGS = "UPDATE_USER_PMI_SETTINGS",
+    /** Used to receive {@link UserInfo} */
     USER_INFO = "USER_INFO",
+    /** Used to receive {@link UserInfoChangedEvent} */
     USER_INFO_CHANGED = "USER_INFO_CHANGED",
+    /** Used to receive {@link MessageEdited} */
     CHAT_MESSAGE_EDITED = "CHAT_MESSAGE_EDITED",
+    /** Used to receive {@link MessageDeleted} */
     CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
+    /** Used to receive {@link SignUpStatus} */
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
+    /** Used to receive {@link ResetPasswordRequestStatus} */
     RESET_PASSWORD_REQUEST_STATUS = "RESET_PASSWORD_REQUEST_STATUS",
+    /** Used to receive {@link ChatMessagesCount} */
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
+    /** Used to receive {@link FirstAndLastChatMessage} */
     FIRST_AND_LAST_CHAT_MESSAGE = "FIRST_AND_LAST_CHAT_MESSAGE",
+    /** Used to receive {@link UnreadMessagesCountEvent} */
     UNREAD_MESSAGES_COUNT = "UNREAD_MESSAGES_COUNT",
+    /** Used to receive {@link UnreadMessagesCountUpdate} */
     UNREAD_MESSAGES_COUNT_UPDATE = "UNREAD_MESSAGES_COUNT_UPDATE",
+    /** Used to receive {@link MessageAttachmentsSearchResult} */
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
+    /** Used to receive {@link LoadMessagesWithMentionsResult} */
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
+    /** Used to receive {@link Message} */
     SEND_MESSAGE_SYNC = "SEND_MESSAGE_SYNC",
+    /** Used to receive {@link AuthenticationStatusEvent} */
     AUTHENTICATION_STATUS = "AUTHENTICATION_STATUS",
+    /** Used to receive {@link NewMeeting} */
     NEW_MEETING = "NEW_MEETING",
+    /** Used to receive {@link MeetingsPreviewEvent} */
     USER_MEETINGS = "USER_MEETINGS"
 }
 
+/**
+ * RoomEvent
+ * Used to receive events from the server with room.on()
+ */
 export enum RoomEvent {
     CREATED = "CREATED",
     ENDED = "ENDED",
     AVAILABLE = "AVAILABLE",
     FAILED = "FAILED",
+    /** Used to receive {@link AddRemoveTracks} */
     ADD_TRACKS = "ADD_TRACKS",
+    /** Used to receive {@link AddRemoveTracks} */
     REMOVE_TRACKS = "REMOVE_TRACKS",
     MESSAGE = "MESSAGE",
+    /** Used to receive {@link ControlMessageEvent} */
     CONTROL_MESSAGE = "CONTROL_MESSAGE",
+    /** Used to receive {@link JoinedRoom} */
     JOINED = "JOINED",
+    /** Used to receive {@link LeftRoom} */
     LEFT = "LEFT",
+    /** Used to receive {@link PlacedInLobbyEvent} */
     PLACED_IN_LOBBY = "PLACED_IN_LOBBY",
+    /** Used without callback event */
     PLACED_IN_WAITING_ROOM = "PLACED_IN_WAITING_ROOM",
+    /** Used without callback event */
     DETACHED = "DETACHED",
+    /** Used to receive {@link EvictedFromRoom} */
     EVICTED = "EVICTED",
+    /** Used without callback event */
     DROPPED = "DROPPED",
     REMOTE_SDP = "REMOTE_SDP",
+    /** Used to receive {@link TracksQualityState} */
     TRACK_QUALITY_STATE = "TRACK_QUALITY_STATE",
+    /** Used to receive {@link OperationFailedEvent} */
     OPERATION_FAILED = "OPERATION_FAILED",
+    /** Used to receive {@link WaitingListEvent} */
     WAITING_LIST = "SFU_WAITING_LIST",
+    /** Used to receive {@link WaitingRoomUpdate} */
     WAITING_ROOM_UPDATE = "SFU_WAITING_ROOM_UPDATE",
+    /** Used to receive {@link AddRemoveTracks} */
     MUTE_TRACKS = "MUTE_TRACKS",
+    /** Used to receive {@link ParticipantsListEvent} */
     PARTICIPANT_LIST = "PARTICIPANT_LIST",
+    /** Used to receive {@link RoleAssigned} */
     ROLE_ASSIGNED = "ROLE_ASSIGNED",
+    /** Used to receive {@link RolesListEvent} */
     ROLES_LIST = "ROLES_LIST",
+    /** Used to receive {@link RoomConfigEvent} */
     ROOM_CONFIG = "ROOM_CONFIG",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_LOCKED = "ROOM_LOCKED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_INITIAL_AUDIO_MUTED = "ROOM_INITIAL_AUDIO_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_INITIAL_VIDEO_MUTED = "ROOM_INITIAL_VIDEO_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_INITIAL_SCREEN_SHARING_MUTED = "ROOM_INITIAL_SCREEN_SHARING_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_AUDIO_MUTED = "ROOM_AUDIO_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_VIDEO_MUTED = "ROOM_VIDEO_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_SCREEN_SHARING_MUTED = "ROOM_SCREEN_SHARING_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_CHAT_MUTED = "ROOM_CHAT_MUTED",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_CAN_CHANGE_NICKNAME = "ROOM_CAN_CHANGE_NICKNAME",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_SCREEN_SHARING_MULTIPLE_SHARES = "ROOM_SCREEN_SHARING_MULTIPLE_SHARES",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_SCREEN_SHARING_EVERYONE_CAN_SHARE = "ROOM_SCREEN_SHARING_EVERYONE_CAN_SHARE",
+    /** Used to receive {@link BooleanEvent} */
     ROOM_SCREEN_SHARING_EVERYONE_CAN_DO_SUBSEQUENT_SHARE = "ROOM_SCREEN_SHARING_EVERYONE_CAN_DO_SUBSEQUENT_SHARE",
+    /** Used to receive {@link ParticipantConfigEvent} */
     PARTICIPANT_CONFIG = "PARTICIPANT_CONFIG",
+    /** Used to receive {@link RoomScreenSharingConfigEvent} */
     SCREEN_SHARING_CONFIG = "SCREEN_SHARING_CONFIG",
+    /** Used to receive {@link ParticipantAVSMutedEvent} */
     PARTICIPANT_AUDIO_MUTED = "PARTICIPANT_AUDIO_MUTED",
+    /** Used to receive {@link ParticipantAVSMutedEvent} */
     PARTICIPANT_VIDEO_MUTED = "PARTICIPANT_VIDEO_MUTED",
+    /** Used to receive {@link ParticipantAVSMutedEvent} */
     PARTICIPANT_SCREEN_SHARING_MUTED = "PARTICIPANT_SCREEN_SHARING_MUTED",
+    /** Used to receive {@link ParticipantRenamed} */
     PARTICIPANT_RENAMED = "PARTICIPANT_RENAMED",
+    /** Used to receive {@link StopScreenSharingEvent} */
     STOP_SCREEN_SHARING = "STOP_SCREEN_SHARING",
+    /** Used to receive {@link StopTrackEvent} */
     STOP_TRACK = "STOP_TRACK",
+    /** Used to receive {@link BitrateTestStatus} */
     BITRATE_TEST_STATUS = "BITRATE_TEST_STATUS",
+    /** Used to receive {@link RoomNameUpdated} */
     ROOM_NAME_UPDATED = "ROOM_NAME_UPDATED",
 }
 
+/**
+ * SpaceEvent
+ * Used to receive events from the server with SfuExtended.on()
+ */
 export enum SpaceEvent {
+    /** Used to receive {@link SfuSpace[]} */
     USER_SPACES = "USER_SPACES",
+    /** Used to receive {@link SpaceCreatedEvent} */
     SPACE_CREATED = "SPACE_CREATED",
+    /** Used to receive {@link NewSpaceEvent} */
     NEW_SPACE = "NEW_SPACE",
+    /** Used to receive {@link SpaceDeletedEvent} */
     SPACE_DELETED = "SPACE_DELETED",
+    /** Used to receive {@link SpaceOverviewUpdated} */
     SPACE_OVERVIEW_UPDATED = "SPACE_OVERVIEW_UPDATED",
+    /** Used to receive {@link NewSpaceCategoryEvent} */
     NEW_SPACE_CATEGORY = "NEW_SPACE_CATEGORY",
+    /** Used to receive {@link SpaceCategoryDeleted} */
     SPACE_CATEGORY_DELETED = "SPACE_CATEGORY_DELETED",
+    /** Used to receive {@link SpaceCategoryUpdated} */
     SPACE_CATEGORY_UPDATED = "SPACE_CATEGORY_UPDATED",
+    /** Used to receive {@link NewSpaceChannelEvent} */
     NEW_SPACE_CHANNEL = "NEW_SPACE_CHANNEL",
+    /** Used to receive {@link SpaceChannelUpdated} */
     SPACE_CHANNEL_UPDATED = "SPACE_CHANNEL_UPDATED",
+    /** Used to receive {@link SpaceChannelDeleted} */
     SPACE_CHANNEL_DELETED = "SPACE_CHANNEL_DELETED",
+    /** Used to receive {@link SpaceChannelMoved} */
     SPACE_CHANNEL_MOVED = "SPACE_CHANNEL_MOVED",
+    /** Used to receive {@link NewSpaceThreadEvent} */
     NEW_SPACE_THREAD = "NEW_SPACE_THREAD",
+    /** Used to receive {@link SpaceThreadDeleted} */
     SPACE_THREAD_DELETED = "SPACE_THREAD_DELETED",
+    /** Used to receive {@link SpaceThreadUpdated} */
     SPACE_THREAD_UPDATED = "SPACE_THREAD_UPDATED",
+    /** Used to receive {@link SpaceInviteCreated} */
     SPACE_INVITE_CREATED = "SPACE_INVITE_CREATED",
+    /** Used to receive {@link SpaceInviteRevoked} */
     SPACE_INVITE_REVOKED = "SPACE_INVITE_REVOKED",
+    /** Used to receive {@link NewSpaceRoleAdded} */
     NEW_SPACE_ROLE = "NEW_SPACE_ROLE",
+    /** Used to receive {@link SpaceRoleUpdated} */
     SPACE_ROLE_UPDATED = "SPACE_ROLE_UPDATED",
+    /** Used to receive {@link SpaceRoleDeleted} */
     SPACE_ROLE_DELETED = "SPACE_ROLE_DELETED",
+    /** Used to receive {@link UserJoinedToSpaceEvent} */
     USER_JOINED_TO_SPACE = "USER_JOINED_TO_SPACE",
+    /** Used to receive {@link UserLeftSpace} */
     USER_LEFT_SPACE = "USER_LEFT_SPACE",
+    /** Used to receive {@link AddedRoleToMember} */
     ADDED_ROLE_TO_MEMBER = "ADDED_ROLE_TO_MEMBER",
+    /** Used to receive {@link RemovedRoleFromMember} */
     REMOVED_ROLE_FROM_MEMBER = "REMOVED_ROLE_FROM_MEMBER",
-    ROLE_PERMISSION_SECTIONS = "ROLE_PERMISSION_SECTIONS"
+    /** Used to receive {@link RolePermissionSectionsEvent} */
+    ROLE_PERMISSION_SECTIONS = "ROLE_PERMISSION_SECTIONS",
 }
 
+/**
+ * MeetingSyncEvent
+ * Used to receive meeting sync events from the server with SfuExtended.on()
+ */
 export enum MeetingSyncEvent {
+    /** Used to receive {@link MeetingEndedSync} */
     MEETING_ENDED_SYNC = "MEETING_ENDED_SYNC",
+    /** Used to receive {@link JoinedRoomSync} */
     JOINED_MEETING_SYNC = "JOINED_MEETING_SYNC",
+    /** Used to receive {@link LeftMeetingSync} */
     LEFT_MEETING_SYNC = "LEFT_MEETING_SYNC",
+    /** Used to receive {@link EvictedSync} */
     EVICTED_SYNC = "EVICTED_SYNC",
+    /** Used to receive {@link AddRemoveTracksSync} */
     ADD_TRACKS_SYNC = "ADD_TRACKS_SYNC",
+    /** Used to receive {@link AddRemoveTracksSync} */
     REMOVE_TRACKS_SYNC = "REMOVE_TRACKS_SYNC",
+    /** Used to receive {@link AddRemoveTracksSync} */
     MUTE_TRACKS_SYNC = "MUTE_TRACKS_SYNC",
+    /** Used to receive {@link ParticipantsListSyncEvent} */
     PARTICIPANT_LIST_SYNC = "PARTICIPANT_LIST_SYNC",
+    /** Used to receive {@link MeetingNameUpdatedSync} */
     MEETING_NAME_UPDATED_SYNC = "MEETING_NAME_UPDATED_SYNC",
 }
 
