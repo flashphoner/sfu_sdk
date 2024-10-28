@@ -28,14 +28,10 @@ import {
     ChatType,
     ConnectionDetails,
     ConnectionFailedEvent,
-    ContactInviteEvent,
-    ContactRemovedEvent,
-    ContactUpdateEvent,
     CreatedRoom,
     FirstAndLastChatMessage,
     InternalApi,
     InternalMessage,
-    Invite,
     LastReadMessageUpdated,
     LeftRoom,
     LoadMessagesWithMentionsResult,
@@ -70,7 +66,6 @@ import {
     State,
     UpdateChatEvent,
     UpdateMessagesDeliveryStatusEvent,
-    User,
     UserCalendarEvent,
     UserEmail,
     UserHostKey,
@@ -78,7 +73,6 @@ import {
     UserInfo,
     UserInfoChangedEvent,
     UserInfoEvent,
-    UserListEvent,
     UserManagementError,
     UserNickname,
     UserPassword,
@@ -127,6 +121,16 @@ import {
     MeetingNameUpdatedSync,
     UnreadMessagesCountEvent,
     UnreadMessagesCountUpdate,
+    FriendInviteDeleted,
+    NewFriendInvite,
+    UserContactsEvent,
+    UserContacts,
+    UserPresenceStatusUpdated,
+    PresenceStatus,
+    NewContact,
+    ContactDeleted,
+    Contact,
+    ContactUpdated,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -134,7 +138,7 @@ import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 
-type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Array<User> | Calendar | UserSpecificChatInfo | Invite | User | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace>;
+type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact;
 
 type EventUnion = SfuEvent | SpaceEvent | MeetingSyncEvent;
 
@@ -207,6 +211,8 @@ export class SfuExtended {
      * @param options.username - The user's username (optional if `authToken` is provided).
      * @param options.password - The user's password (optional if `authToken` is provided).
      * @param options.authToken - The authentication token for direct login (optional if `username` and `password` are provided).
+     *
+     * After successfully connection user contacts will receive an {@link SfuEvent.USER_PRESENCE_STATUS_UPDATED} with {@link UserPresenceStatusUpdated}
      */
     public connect(options: {
         url: string,
@@ -315,10 +321,6 @@ export class SfuExtended {
                                     internalMessageId: ack.internalMessageId
                                 })
                             }
-                        } else if (data[0].type === InternalApi.USER_LIST) {
-                            const userList = data[0] as UserListEvent;
-                            promises.resolve(data[0].internalMessageId, userList.list);
-                            this.#notifier.notify(SfuEvent.USER_LIST, userList.list);
                         } else if (data[0].type === InternalApi.USER_CALENDAR) {
                             const calendar = data[0] as UserCalendarEvent;
                             promises.resolve(data[0].internalMessageId, calendar.calendar);
@@ -352,21 +354,6 @@ export class SfuExtended {
                             const chatInfo = data[0] as NewChatEvent;
                             if (!promises.resolve(data[0].internalMessageId, chatInfo.info)) {
                                 this.#notifier.notify(SfuEvent.NEW_CHAT, chatInfo.info);
-                            }
-                        } else if (data[0].type === InternalApi.CONTACT_INVITE) {
-                            const invite = data[0] as ContactInviteEvent;
-                            if (!promises.resolve(data[0].internalMessageId, invite.invite)) {
-                                this.#notifier.notify(SfuEvent.CONTACT_INVITE, invite.invite);
-                            }
-                        } else if (data[0].type === InternalApi.CONTACT_UPDATED) {
-                            const contact = data[0] as ContactUpdateEvent;
-                            if (!promises.resolve(data[0].internalMessageId, contact.contact)) {
-                                this.#notifier.notify(SfuEvent.CONTACT_UPDATE, contact.contact);
-                            }
-                        } else if (data[0].type === InternalApi.CONTACT_REMOVED) {
-                            const contact = data[0] as ContactRemovedEvent;
-                            if (!promises.resolve(data[0].internalMessageId, contact.contact)) {
-                                this.#notifier.notify(SfuEvent.CONTACT_REMOVED, contact.contact);
                             }
                         } else if (data[0].type === InternalApi.CHAT_DELETED) {
                             const chat = data[0] as RemovedChatEvent;
@@ -720,6 +707,51 @@ export class SfuExtended {
                         } else if (data[0].type === MeetingSyncEvent.MEETING_NAME_UPDATED_SYNC) {
                             const event = data[0] as MeetingNameUpdatedSync;
                             this.#notifier.notify(MeetingSyncEvent.MEETING_NAME_UPDATED_SYNC, event);
+                        } else if (data[0].type === SfuEvent.USER_CONTACTS) {
+                            const event = data[0] as UserContactsEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.contacts)) {
+                                this.#notifier.notify(SfuEvent.USER_CONTACTS, event);
+                            }
+                        } else if (data[0].type === SfuEvent.NEW_CONTACT) {
+                            const event = data[0] as NewContact;
+                            if (!promises.resolve(data[0].internalMessageId, event.contact)) {
+                                this.#notifier.notify(SfuEvent.NEW_CONTACT, event);
+                            }
+                        } else if (data[0].type === SfuEvent.CONTACT_UPDATED) {
+                            const event = data[0] as ContactUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event.contact)) {
+                                this.#notifier.notify(SfuEvent.CONTACT_UPDATED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.CONTACT_DELETED) {
+                            const event = data[0] as ContactDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CONTACT_DELETED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.NEW_INCOMING_FRIEND_INVITE) {
+                            const event = data[0] as NewFriendInvite;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.NEW_INCOMING_FRIEND_INVITE, event);
+                            }
+                        } else if (data[0].type === SfuEvent.NEW_OUTGOING_FRIEND_INVITE) {
+                            const event = data[0] as NewFriendInvite;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.NEW_OUTGOING_FRIEND_INVITE, event);
+                            }
+                        } else if (data[0].type === SfuEvent.INCOMING_FRIEND_INVITE_DELETED) {
+                            const event = data[0] as FriendInviteDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.INCOMING_FRIEND_INVITE_DELETED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.OUTGOING_FRIEND_INVITE_DELETED) {
+                            const event = data[0] as FriendInviteDeleted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.OUTGOING_FRIEND_INVITE_DELETED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.USER_PRESENCE_STATUS_UPDATED) {
+                            const event = data[0] as UserPresenceStatusUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.USER_PRESENCE_STATUS_UPDATED, event);
+                            }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -798,6 +830,8 @@ export class SfuExtended {
      * When disconnecting, user leaves all active rooms
      *
      * {@link state} changed to {@link State.DISCONNECTED | DISCONNECTED}
+     *
+     * After disconnection user contacts will receive an {@link SfuEvent.USER_PRESENCE_STATUS_UPDATED} with {@link UserPresenceStatusUpdated}
      */
     public async disconnect() {
         for (const [key, value] of Object.entries(this.#rooms)) {
@@ -1498,100 +1532,114 @@ export class SfuExtended {
     }
 
     /**
-     * Get all users from server
+     * Get user contacts.
+     *
+     * Returns users who are friends or with whom there are mutual space channels or direct chats, incoming and outgoing friend invites, banned users.
      */
-    public getUserList() {
+    public getContacts() {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<Array<User>>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_USER_LIST, {}, resolve, reject);
+        return new Promise<UserContacts>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_CONTACTS, {}, resolve, reject);
         });
     };
 
     /**
-     * Invite user to contacts
+     * Add a friend
      *
-     * UserId must be passed if user exist. That user will receive {@link SfuEvent.CONTACT_INVITE} with {@link Invite}
+     * Sends a friend invite.
+     * Users will receive {@link SfuEvent.NEW_OUTGOING_FRIEND_INVITE} and {@link SfuEvent.NEW_INCOMING_FRIEND_INVITE} with {@link NewFriendInvite}.
      *
-     * UserEmail must be passed if there is no such user yet. In this case user will be created at the server side with {@link UserState.PENDING_REGISTRATION} and default parameters
+     * If an invite was sent to this user previously, it will be replaced with a new one.
+     * Users will receive {@link SfuEvent.OUTGOING_FRIEND_INVITE_DELETED} and {@link SfuEvent.INCOMING_FRIEND_INVITE_DELETED} with {@link FriendInviteDeleted} for previously invite.
+     * Users will receive {@link SfuEvent.NEW_OUTGOING_FRIEND_INVITE} and {@link SfuEvent.NEW_INCOMING_FRIEND_INVITE} with {@link NewFriendInvite} for new friend invite.
+     *
+     * If the user that you are trying to add as a friend has already sent you an invite, sending a counter-invite will automatically add you as friends.
+     * Users will receive {@link SfuEvent.OUTGOING_FRIEND_INVITE_DELETED} and {@link SfuEvent.INCOMING_FRIEND_INVITE_DELETED} with {@link FriendInviteDeleted} for invites.
+     * Users will receive {@link SfuEvent.CONTACT_UPDATED} with {@link ContactUpdated} if they have mutual space channels or direct chats.
+     * Will receive {@link SfuEvent.NEW_CONTACT} with {@link NewContact} if haven't.
      */
-    public inviteContact(invite: {
-        to: UserId | UserEmail
+    public addFriend(user: {
+        userId: UserId
     }) {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.INVITE_CONTACT, {from: self.#_user.username, to: invite.to}, resolve, reject);
-        });
-    }
-
-    /**
-     * Add contact to favourites
-     *
-     * {@link User.favourite} will be changed to true at the server side
-     */
-    public addContactToFavourites(contact: {
-        id: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.ADD_CONTACT_TO_FAVOURITES, {id: contact.id}, resolve, reject);
-        });
-    }
-
-    /**
-     * Remove contact from favourites
-     *
-     * {@link User.favourite} will be changed to false at the server side
-     */
-    public removeContactFromFavourites(contact: {
-        id: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.REMOVE_CONTACT_FROM_FAVOURITES, {id: contact.id}, resolve, reject);
-        });
-    }
-
-    /**
-     * Confirm contact
-     *
-     * {@link User.confirmed} will be changed to true for both users.
-     *
-     * @param invite.from - user with that userId will receive {@link SfuEvent.CONTACT_UPDATE} with {@link User}
-     */
-    public confirmContact(invite: {
-        id: string,
-        from: UserId,
-        to: UserId
-    }) {
-        this.#checkAuthenticated();
-        const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.CONFIRM_CONTACT, {
-                from: invite.from,
-                to: invite.to,
-                id: invite.id
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_FRIEND, {
+                userId: user.userId,
             }, resolve, reject);
         });
     }
 
     /**
-     * Confirm contact
+     * Remove friend
      *
-     * {@link User.confirmed} will be changed to true for both users.
-     *
-     * @param contact.id - user with that userId will receive {@link SfuEvent.CONTACT_REMOVED} with {@link User}
+     * Users will receive {@link SfuEvent.CONTACT_UPDATED} with {@link ContactUpdated} if they have mutual space channels or direct chats.
+     * Will receive {@link SfuEvent.CONTACT_DELETED} with {@link ContactDeleted} if haven't.
      */
-    public removeContact(contact: {
-        id: UserId
+    public removeFriend(friend: {
+        userId: UserId
     }) {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<User>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.REMOVE_CONTACT, {id: contact.id}, resolve, reject);
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_FRIEND, {
+                userId: friend.userId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Revoke friend invite
+     *
+     * Users will receive {@link SfuEvent.OUTGOING_FRIEND_INVITE_DELETED} and {@link SfuEvent.INCOMING_FRIEND_INVITE_DELETED} with {@link FriendInviteDeleted}.
+     */
+    public revokeFriendInvite(invite: {
+        inviteId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<FriendInviteDeleted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REVOKE_FRIEND_INVITE, {
+                inviteId: invite.inviteId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Accept friend invite
+     *
+     * Users will receive {@link SfuEvent.OUTGOING_FRIEND_INVITE_DELETED} and {@link SfuEvent.INCOMING_FRIEND_INVITE_DELETED} with {@link FriendInviteDeleted} for invites.
+     * Users will receive {@link SfuEvent.CONTACT_UPDATED} with {@link ContactUpdated} if they have mutual space channels or direct chats.
+     * Will receive {@link SfuEvent.NEW_CONTACT} with {@link NewContact} if haven't.
+     */
+    public acceptFriendInvite(invite: {
+        inviteId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<Contact>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ACCEPT_FRIEND_INVITE, {
+                inviteId: invite.inviteId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Reject friend invite
+     *
+     * Promise will resolve with {@link SfuEvent.INCOMING_FRIEND_INVITE_DELETED} with {@link FriendInviteDeleted}.
+     * Outgoing friend invite will not delete.
+     */
+    public rejectFriendInvite(invite: {
+        inviteId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<FriendInviteDeleted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REJECT_FRIEND_INVITE, {
+                inviteId: invite.inviteId,
+            }, resolve, reject);
         });
     }
 
@@ -1796,6 +1844,22 @@ export class SfuExtended {
                 timezone: timezone
             }, resolve, reject);
         })
+    };
+
+    /**
+     * Update presence status
+     *
+     * Friends and users with whom there are mutual space channels or direct chats will receive {@link SfuEvent.USER_PRESENCE_STATUS_UPDATED} with {@link UserPresenceStatusUpdated}.
+     * The selected status is saved and will persist across subsequent connects. It can be retrieved using the {@link getUserInfo}.
+     */
+    public updatePresenceStatus(status: PresenceStatus) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_PRESENCE_STATUS, {
+                status: status
+            }, resolve, reject);
+        });
     };
 
     /**

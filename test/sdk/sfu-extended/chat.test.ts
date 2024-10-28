@@ -2354,21 +2354,39 @@ describe("chat", () => {
                     expect(pChannels1[channel0.id]).toBeUndefined();
                     await bob.deleteChat(channel0);
                 });
-                it("send policy EVERYONE", async (done) => {
+                it("send policy EVERYONE", async () => {
                     const channel0 = await bob.createChat({
                         ...TEST_PUBLIC_CHANNEL,
                         channelSendPolicy: ChannelSendPolicy.EVERYONE,
                         members: [TEST_USER_1.username]
                     });
-                    bob.on(SfuEvent.MESSAGE, async (msg) => {
-                        await bob.deleteChat(channel0);
-                        done();
-                    });
+
+                    let messageReceived = false;
+                    const onMessageHandler = async (msg) => {
+                        messageReceived = true;
+                        bob.off(SfuEvent.MESSAGE, onMessageHandler);
+                    }
+
+                    bob.on(SfuEvent.MESSAGE, onMessageHandler);
                     await alice.sendMessage({
                         targetEntityType: MessageTargetEntityType.CHAT,
                         targetEntityId: {chatId: channel0.id},
                         body: MESSAGE_BODY
                     });
+                    const waitMessage = async () => {
+                        return new Promise<void>((resolve) => {
+                            const bobHandler = (msg) => {
+                                bob.off(SfuEvent.MESSAGE, bobHandler);
+                                resolve();
+                            }
+
+                            bob.on(SfuEvent.MESSAGE, bobHandler);
+                        });
+                    };
+                    if (!messageReceived) {
+                        await waitMessage();
+                    }
+                    await bob.deleteChat(channel0);
                 });
                 it("send policy ADMIN should fail for non admin", async () => {
                     const channel0 = await bob.createChat({

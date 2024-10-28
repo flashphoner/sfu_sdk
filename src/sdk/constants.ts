@@ -13,8 +13,6 @@ export enum SfuEvent {
     DISCONNECTED = "DISCONNECTED",
     /** Used to receive {@link Message} */
     MESSAGE = "MESSAGE",
-    /** Used to receive {@link UserListEvent} */
-    USER_LIST = "USER_LIST",
     /** Used to receive {@link ChatsEvent} */
     USER_CHATS = "USER_CHATS",
     /** Used to receive {@link Chat} */
@@ -37,12 +35,6 @@ export enum SfuEvent {
     LAST_READ_MESSAGE_UPDATED = "LAST_READ_MESSAGE_UPDATED",
     /** Used to receive {@link UpdateMessagesDeliveryStatusEvent} */
     UPDATE_MESSAGES_DELIVERY_STATUS = "UPDATE_MESSAGES_DELIVERY_STATUS",
-    /** Used to receive {@link User} */
-    CONTACT_UPDATE = "CONTACT_UPDATE",
-    /** Used to receive {@link User} */
-    CONTACT_REMOVED = "CONTACT_REMOVED",
-    /** Used to receive {@link Invite} */
-    CONTACT_INVITE = "CONTACT_INVITE",
     /** @deprecated */
     PUBLIC_CHANNELS = "PUBLIC_CHANNELS",
     /** Used to receive {@link Calendar} */
@@ -93,7 +85,25 @@ export enum SfuEvent {
     /** Used to receive {@link NewMeeting} */
     NEW_MEETING = "NEW_MEETING",
     /** Used to receive {@link MeetingsPreviewEvent} */
-    USER_MEETINGS = "USER_MEETINGS"
+    USER_MEETINGS = "USER_MEETINGS",
+    /** Used to receive {@link UserContacts} */
+    USER_CONTACTS = "USER_CONTACTS",
+    /** Used to receive {@link NewFriendInvite} */
+    NEW_INCOMING_FRIEND_INVITE = "NEW_INCOMING_FRIEND_INVITE",
+    /** Used to receive {@link NewFriendInvite} */
+    NEW_OUTGOING_FRIEND_INVITE = "NEW_OUTGOING_FRIEND_INVITE",
+    /** Used to receive {@link FriendInviteDeleted} */
+    INCOMING_FRIEND_INVITE_DELETED = "INCOMING_FRIEND_INVITE_DELETED",
+    /** Used to receive {@link FriendInviteDeleted} */
+    OUTGOING_FRIEND_INVITE_DELETED = "OUTGOING_FRIEND_INVITE_DELETED",
+    /** Used to receive {@link UserPresenceStatusUpdated} */
+    USER_PRESENCE_STATUS_UPDATED = "USER_PRESENCE_STATUS_UPDATED",
+    /** Used to receive {@link NewContact} */
+    NEW_CONTACT = "NEW_CONTACT",
+    /** Used to receive {@link ContactUpdated} */
+    CONTACT_UPDATED = "CONTACT_UPDATED",
+    /** Used to receive {@link ContactDeleted} */
+    CONTACT_DELETED = "CONTACT_DELETED",
 }
 
 /**
@@ -431,9 +441,6 @@ export enum InternalApi {
     SEND_CONTROL_MESSAGE = "sendControlMessage",
     MARK_MESSAGE_READ = "markMessageRead",
     MARK_MESSAGE_UNREAD = "markMessageUnread",
-    INVITE_CONTACT = "inviteContact",
-    REMOVE_CONTACT = "removeContact",
-    CONFIRM_CONTACT = "confirmContact",
     ASSIGN_ROLE = "assignRole",
     SUBSCRIBE_TO_WAITING_PARTICIPANT = "subscribeToWaitingParticipant",
     UNSUBSCRIBE_FROM_WAITING_PARTICIPANT = "unsubscribeFromWaitingParticipant",
@@ -528,6 +535,13 @@ export enum InternalApi {
     GET_ROLE_PERMISSIONS = "getRolePermissions",
     CREATE_CHANNEL_MEETING = "createChannelMeeting",
     CREATE_DIRECT_MEETING = "createDirectMeeting",
+    GET_CONTACTS = "getContacts",
+    ADD_FRIEND = "addFriend",
+    REMOVE_FRIEND = "removeFriend",
+    REVOKE_FRIEND_INVITE = "revokeFriendInvite",
+    ACCEPT_FRIEND_INVITE = "acceptFriendInvite",
+    REJECT_FRIEND_INVITE = "rejectFriendInvite",
+    UPDATE_PRESENCE_STATUS = "updatePresenceStatus"
 }
 
 export enum ContactError {
@@ -1124,24 +1138,11 @@ export type ControlMessageEvent = InternalMessage & {
     message: ControlMessage
 }
 
-export enum UserState {
-    OFFLINE = "OFFLINE",
+export enum PresenceStatus {
     ONLINE = "ONLINE",
-    PENDING_REGISTRATION = "PENDING_REGISTRATION"
-}
-export type Invite = InternalMessage & {
-    id: string;
-    from: UserId;
-    to: UserId | UserEmail;
-}
-export type User = {
-    state: UserState;
-    id: UserId;
-    email: UserEmail;
-    nickname: UserNickname;
-    confirmed: boolean;
-    favourite: boolean;
-    invite: Invite;
+    IDLE = "IDLE",
+    DO_NOT_DISTURB = "DO_NOT_DISTURB",
+    OFFLINE = "OFFLINE"
 }
 
 export type UserInfo = {
@@ -1150,23 +1151,8 @@ export type UserInfo = {
     nickname: UserNickname,
     phoneNumber: UserPhoneNumber,
     hostKey: UserHostKey,
-    timezone: UserTimezone
-}
-
-export type UserListEvent = InternalMessage & {
-    list: Array<User>
-}
-
-export type ContactInviteEvent = InternalMessage & {
-    invite: Invite
-}
-
-export type ContactUpdateEvent = InternalMessage & {
-    contact: User
-}
-
-export type ContactRemovedEvent = InternalMessage & {
-    contact: User
+    timezone: UserTimezone,
+    status: PresenceStatus
 }
 
 export type CalendarEvent = {
@@ -1655,6 +1641,63 @@ export type RemovedRoleFromMember = InternalMessage & {
 
 export type RolePermissionSectionsEvent = InternalMessage & {
     permissionSections: Array<SfuSpaceRolePermissionSection>;
+}
+
+export type FriendInvite = {
+    userId: string;
+    nickname: string;
+    inviteId: string;
+}
+
+export type BannedContact = {
+    userId: string;
+    nickname: string;
+    bannedAt: number;
+}
+
+export type Contact = {
+    userId: string;
+    nickname: string;
+    friend: boolean;
+    status: PresenceStatus;
+}
+
+export type UserContacts = {
+    contacts: Array<Contact>;
+    incomingFriendInvites: Array<FriendInvite>;
+    outgoingFriendInvites: Array<FriendInvite>;
+    bans: Array<BannedContact>;
+}
+
+export type UserContactsEvent = InternalMessage & {
+    contacts: UserContacts;
+}
+
+export type NewFriendInvite = InternalMessage & {
+    userId: string;
+    nickname: string;
+    inviteId: string;
+}
+
+export type FriendInviteDeleted = InternalMessage & {
+    inviteId: string;
+}
+
+export type UserPresenceStatusUpdated = InternalMessage & {
+    userId: string;
+    status: PresenceStatus;
+}
+
+export type NewContact = InternalMessage & {
+    contact: Contact;
+}
+
+export type ContactUpdated = InternalMessage & {
+    contact: Contact;
+}
+
+export type ContactDeleted = InternalMessage & {
+    userId: string;
 }
 
 export enum SortOrder {

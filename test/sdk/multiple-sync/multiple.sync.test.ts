@@ -11,16 +11,15 @@ import {
     CalendarEvent,
     ChannelSendPolicy,
     ChatType,
-    Invite,
     MessageEdited,
-    User,
     UserInfoChangedEvent,
     UserPmiSettings,
     UserSpecificChatInfo,
     LastReadMessageUpdated,
     UpdateMessagesDeliveryStatusEvent,
     DeliveryStatus,
-    MessageTargetEntityType
+    MessageTargetEntityType,
+    ContactUpdated
 } from "../../../src/sdk/constants";
 
 const MESSAGE_BODY = "test message";
@@ -37,178 +36,6 @@ describe("multiple-sync", () => {
         await bobFirstInstance.disconnect();
         await bobSecondInstance.disconnect();
     })
-
-
-    describe("contacts", () => {
-        let aliceFirstInstance: SfuExtended;
-        let aliceSecondInstance: SfuExtended;
-        beforeEach(async () => {
-            aliceFirstInstance = await connect(TEST_USER_1);
-            aliceSecondInstance = await connect(TEST_USER_1);
-        })
-        afterEach(async () => {
-            await aliceFirstInstance.disconnect();
-            await aliceSecondInstance.disconnect();
-        })
-
-        it('should invite contact', async () => {
-            const waitEvents = async () => {
-                return new Promise<void>((resolve) => {
-                    let eventsCount = 0;
-                    const checkInviteAndResolve = (invite: Invite) => {
-                        expect(invite.from).toEqual(TEST_USER_0.username);
-                        expect(invite.to).toEqual(TEST_USER_1.username);
-                        eventsCount++;
-                        if (eventsCount === 3) {
-                            resolve();
-                        }
-                    }
-
-                    bobSecondInstance.on(SfuEvent.CONTACT_UPDATE, (msg) => {
-                        const user = msg as User;
-                        expect(user.id).toEqual(TEST_USER_1.username);
-                        checkInviteAndResolve(user.invite);
-                    });
-                    aliceFirstInstance.on(SfuEvent.CONTACT_INVITE, (msg) => {
-                        const invite = msg as Invite;
-                        checkInviteAndResolve(invite);
-                    });
-                    aliceSecondInstance.on(SfuEvent.CONTACT_INVITE, (msg) => {
-                        const invite = msg as Invite;
-                        checkInviteAndResolve(invite);
-                    });
-                })
-            }
-
-
-            bobFirstInstance.inviteContact({to: TEST_USER_1.username});
-            await waitEvents();
-            await bobFirstInstance.removeContact({id: TEST_USER_1.username});
-        });
-        it('should confirm invite', async () => {
-            const waitEvents = async () => {
-                return new Promise<void>((resolve) => {
-                    let eventsCount = 0;
-                    const checkUserAndResolve = (user: User, username: string) => {
-                        expect(user.id).toEqual(username);
-                        eventsCount++;
-                        if (eventsCount === 3 && user.confirmed) {
-                            resolve();
-                        }
-                    }
-                    aliceSecondInstance.on(SfuEvent.CONTACT_UPDATE, (msg) => {
-                        const user = msg as User;
-                        checkUserAndResolve(user, TEST_USER_0.username);
-                    });
-                    bobFirstInstance.on(SfuEvent.CONTACT_UPDATE, (msg) => {
-                        const user = msg as User;
-                        checkUserAndResolve(user, TEST_USER_1.username);
-                    });
-                    bobSecondInstance.on(SfuEvent.CONTACT_UPDATE, (msg) => {
-                        const user = msg as User;
-                        checkUserAndResolve(user, TEST_USER_1.username);
-                    });
-                })
-            }
-
-
-            const invite = await bobFirstInstance.inviteContact({to: TEST_USER_1.username});
-            aliceFirstInstance.confirmContact({
-                id: invite.id,
-                from: TEST_USER_0.username,
-                to: TEST_USER_1.username
-            })
-            await waitEvents();
-            await bobFirstInstance.removeContact({id: TEST_USER_1.username});
-        });
-        it('should remove contact', async () => {
-            const waitEvents = async () => {
-                return new Promise<void>((resolve) => {
-                    let eventsCount = 0;
-                    const checkUserAndResolve = (user: User, username: string) => {
-                        expect(user.id).toEqual(username);
-                        eventsCount++;
-                        if (eventsCount === 3 && !user.confirmed) {
-                            resolve();
-                        }
-                    }
-
-                    aliceSecondInstance.on(SfuEvent.CONTACT_REMOVED, (msg) => {
-                        const user = msg as User;
-                        checkUserAndResolve(user, TEST_USER_0.username);
-                    });
-                    bobFirstInstance.on(SfuEvent.CONTACT_REMOVED, (msg) => {
-                        const user = msg as User;
-                        checkUserAndResolve(user, TEST_USER_1.username);
-                    });
-                    bobSecondInstance.on(SfuEvent.CONTACT_REMOVED, (msg) => {
-                        const user = msg as User;
-                        checkUserAndResolve(user, TEST_USER_1.username);
-                    });
-                })
-            }
-
-
-            const invite = await bobFirstInstance.inviteContact({to: TEST_USER_1.username});
-            await aliceFirstInstance.confirmContact({
-                id: invite.id,
-                from: TEST_USER_0.username,
-                to: TEST_USER_1.username
-            })
-            aliceFirstInstance.removeContact({id: TEST_USER_0.username});
-            await waitEvents();
-        });
-        it('should add contact to favorites', async () => {
-            const waitEvent = async () => {
-                return new Promise<void>((resolve) => {
-                    bobSecondInstance.on(SfuEvent.CONTACT_UPDATE, (msg) => {
-                        const user = msg as User;
-                        expect(user.id).toEqual(TEST_USER_1.username);
-                        if (user.confirmed && user.favourite) {
-                            resolve();
-                        }
-                    });
-                })
-            }
-
-
-            const invite = await bobFirstInstance.inviteContact({to: TEST_USER_1.username});
-            await aliceFirstInstance.confirmContact({
-                id: invite.id,
-                from: TEST_USER_0.username,
-                to: TEST_USER_1.username
-            })
-            bobFirstInstance.addContactToFavourites({id: TEST_USER_1.username});
-            await waitEvent();
-            await bobFirstInstance.removeContact({id: TEST_USER_1.username});
-        });
-        it('should remove contact from favorites', async () => {
-            const waitEvent = async () => {
-                return new Promise<void>((resolve) => {
-                    bobSecondInstance.on(SfuEvent.CONTACT_UPDATE, (msg) => {
-                        const user = msg as User;
-                        expect(user.id).toEqual(TEST_USER_1.username);
-                        if (user.confirmed && !user.favourite) {
-                            resolve();
-                        }
-                    });
-                })
-            }
-
-
-            const invite = await bobFirstInstance.inviteContact({to: TEST_USER_1.username});
-            await aliceFirstInstance.confirmContact({
-                id: invite.id,
-                from: TEST_USER_0.username,
-                to: TEST_USER_1.username
-            })
-            await bobFirstInstance.addContactToFavourites({id: TEST_USER_1.username});
-            bobFirstInstance.removeContactFromFavourites({id: TEST_USER_1.username});
-            await waitEvent();
-            await bobFirstInstance.removeContact({id: TEST_USER_1.username});
-        });
-    });
-
     describe("calendar", () => {
         it('should add calendar event', async () => {
             const waitEvent = async () => {
@@ -287,43 +114,14 @@ describe("multiple-sync", () => {
 
             const waitEvents = async () => {
                 return new Promise<void>((resolve) => {
-                    let eventsCount = 0;
                     const userEmailChangedEventHandler = (msg) => {
                         bobSecondInstance.off(SfuEvent.USER_INFO_CHANGED, userEmailChangedEventHandler);
                         const event = msg as UserInfoChangedEvent;
                         expect(event.userId).toEqual(TEST_USER_0.username);
                         expect(event.info.email).toEqual(newEmail);
-                        eventsCount++;
-                        if (eventsCount === 3) {
-                            resolve();
-                        }
+                        resolve();
                     };
-
                     bobSecondInstance.on(SfuEvent.USER_INFO_CHANGED, userEmailChangedEventHandler);
-
-                    const checkEventAndResolve = (msg) => {
-                        const user = msg as User;
-                        expect(user.id).toEqual(TEST_USER_0.username);
-                        expect(user.email).toEqual(newEmail);
-                        eventsCount++;
-                        if (eventsCount === 3) {
-                            resolve();
-                        }
-                    }
-
-                    const contactUpdateEventHandlerForFirstAlice = (msg) => {
-                        aliceFirstInstance.off(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForFirstAlice);
-                        checkEventAndResolve(msg);
-                    };
-
-                    const contactUpdateEventHandlerForSecondAlice = (msg) => {
-                        aliceSecondInstance.off(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForSecondAlice);
-                        checkEventAndResolve(msg);
-                    };
-
-
-                    aliceFirstInstance.on(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForFirstAlice);
-                    aliceSecondInstance.on(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForSecondAlice);
                 })
             }
 
@@ -351,9 +149,9 @@ describe("multiple-sync", () => {
                     bobSecondInstance.on(SfuEvent.USER_INFO_CHANGED, userNicknameChangedEventHandler);
 
                     const checkEventAndResolve = (msg) => {
-                        const user = msg as User;
-                        expect(user.id).toEqual(TEST_USER_0.username);
-                        expect(user.nickname).toEqual(newNickname);
+                        const event = msg as ContactUpdated;
+                        expect(event.contact.userId).toEqual(TEST_USER_0.username);
+                        expect(event.contact.nickname).toEqual(newNickname);
                         eventsCount++;
                         if (eventsCount === 3) {
                             resolve();
@@ -361,24 +159,31 @@ describe("multiple-sync", () => {
                     }
 
                     const contactUpdateEventHandlerForFirstAlice = (msg) => {
-                        aliceFirstInstance.off(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForFirstAlice);
+                        aliceFirstInstance.off(SfuEvent.CONTACT_UPDATED, contactUpdateEventHandlerForFirstAlice);
                         checkEventAndResolve(msg);
                     };
 
                     const contactUpdateEventHandlerForSecondAlice = (msg) => {
-                        aliceSecondInstance.off(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForSecondAlice);
+                        aliceSecondInstance.off(SfuEvent.CONTACT_UPDATED, contactUpdateEventHandlerForSecondAlice);
                         checkEventAndResolve(msg);
                     };
 
 
-                    aliceFirstInstance.on(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForFirstAlice);
-                    aliceSecondInstance.on(SfuEvent.CONTACT_UPDATE, contactUpdateEventHandlerForSecondAlice);
+                    aliceFirstInstance.on(SfuEvent.CONTACT_UPDATED, contactUpdateEventHandlerForFirstAlice);
+                    aliceSecondInstance.on(SfuEvent.CONTACT_UPDATED, contactUpdateEventHandlerForSecondAlice);
                 })
             }
+
+            await bobFirstInstance.addFriend({userId: TEST_USER_1.username});
+            const aliceContacts = await aliceFirstInstance.getContacts();
+            expect(aliceContacts.incomingFriendInvites.length).toBe(1);
+            const incomingInvite = aliceContacts.incomingFriendInvites[0];
+            await aliceFirstInstance.acceptFriendInvite({inviteId: incomingInvite.inviteId});
 
             bobFirstInstance.changeUserNickname(newNickname);
             await waitEvents();
             await bobFirstInstance.changeUserNickname(TEST_USER_0.nickname);
+            await bobFirstInstance.removeFriend({userId: TEST_USER_1.username});
         });
         it('should change hostKey', async () => {
             const newHostKey = "123123";

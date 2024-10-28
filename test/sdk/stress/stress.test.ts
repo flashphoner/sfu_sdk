@@ -25,7 +25,8 @@ beforeAll(async () => {
         const nickname = "user" + i;
         const username = "user" + i + "@example.com";
         users.push(new User({username: username, password: "123456", nickname: nickname}));
-        await bob.inviteContact({to: username});
+        //TODO: replace method
+        // await bob.inviteContact({to: username});
     }
     const room = await bob.createRoom({
         name: ROOM_NAME,

@@ -1,7 +1,7 @@
 import {TEST_USER_0, TEST_USER_1, UPDATED_PMI_SETTINGS, url} from "../../../util/constants";
 import {connect, waitForUser} from "../../../util/utils";
-import {SfuEvent, SfuExtended} from "../../../../src";
-import {User, UserInfoError, SignUpStatus} from "../../../../src/sdk/constants";
+import {SfuExtended} from "../../../../src";
+import {UserInfoError} from "../../../../src/sdk/constants";
 
 describe("user", () => {
     let bob: SfuExtended;
@@ -110,77 +110,5 @@ describe("user", () => {
         await bob.changeUserPhoneNumber("");
         await bob.changeUserHostKey("");
         await bob.changeUserTimezone("");
-    });
-    describe("secondUser", () => {
-        it("Second user should get user list with updated email of first user", async () => {
-            const newEmail = "newEmail@flashphoner.com";
-            await bob.changeUserEmail(newEmail);
-
-            const alice = await connect(TEST_USER_1);
-            const userList = await alice.getUserList();
-            const bobUser = userList.find((user) => user.id === TEST_USER_0.username);
-            expect(bobUser).toBeTruthy();
-            expect(bobUser.email).toEqual(newEmail);
-            await bob.changeUserEmail(TEST_USER_0.username);
-            await alice.disconnect();
-        });
-        it("Second user should be notified after first user changed email", async () => {
-            const newEmail = "newEmail@flashphoner.com";
-            const alice = await connect(TEST_USER_1);
-
-            function waitForSfuEvent(event: SfuEvent, sfu: SfuExtended) {
-                return new Promise((resolve, reject) => {
-                    sfu.on(event, function(msg) {
-                        const user = msg as User;
-                        if (user && user.id === TEST_USER_0.username && user.email === newEmail) {
-                            resolve(event);
-                        }
-                    });
-                });
-            }
-
-            const changePromise = bob.changeUserEmail(newEmail);
-            await waitForSfuEvent(SfuEvent.CONTACT_UPDATE, alice);
-            await changePromise;
-            expect(bob.user().email).toEqual(newEmail);
-
-            await bob.changeUserEmail(TEST_USER_0.username);
-            await alice.disconnect();
-        });
-        it("Second user should get user list with updated nickname of first user", async () => {
-            const newNickname = "newNickname";
-            await bob.changeUserNickname(newNickname);
-
-            const alice = await connect(TEST_USER_1);
-            const userList = await alice.getUserList();
-            const bobUser = userList.find((user) => user.id === TEST_USER_0.username);
-            expect(bobUser).toBeTruthy();
-            expect(bobUser.nickname).toEqual(newNickname);
-            await bob.changeUserNickname(TEST_USER_0.nickname);
-            await alice.disconnect();
-        });
-        it("Second user should be notified after first user changed nickname", async () => {
-            const newNickname = "newNickname";
-            const alice = await connect(TEST_USER_1);
-
-            function waitForSfuEvent(event: SfuEvent, sfu: SfuExtended) {
-                return new Promise((resolve, reject) => {
-                    sfu.on(event, function(msg) {
-                        const user = msg as User;
-                        if (user.id === TEST_USER_0.username && user.nickname === newNickname) {
-                            resolve(event);
-                        }
-                    });
-                });
-            }
-
-            const changePromise = bob.changeUserNickname(newNickname);
-            await waitForSfuEvent(SfuEvent.CONTACT_UPDATE, alice);
-            await changePromise;
-            expect(bob.user().nickname).toEqual(newNickname);
-
-            await bob.changeUserNickname(TEST_USER_0.nickname);
-            await alice.disconnect();
-        });
     });
 });
