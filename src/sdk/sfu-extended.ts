@@ -1863,6 +1863,33 @@ export class SfuExtended {
     };
 
     /**
+     * Update user activity
+     *
+     * Working with selected {@link PresenceStatus.ONLINE} by {@link updatePresenceStatus}.
+     * Does not work with other statuses.
+     *
+     * The user client that called this method will receive {@link UserInfoChangedEvent} with {@link PresenceStatus.ONLINE} or {@link PresenceStatus.IDLE}.
+     * Other user clients will not receive events.
+     *
+     * {@param isActive} = false:
+     * If the user hasn't other connected active clients then user contacts will receive {@link UserPresenceStatusUpdated} with {@link PresenceStatus.IDLE}.
+     * If the user has other connected active clients then user contacts will not receive events.
+     *
+     * {@param isActive} = true:
+     * If all user clients was inactive then user contacts will receive {@link UserPresenceStatusUpdated} with {@link PresenceStatus.ONLINE}.
+     * If the user has at least one active connected client, then the contacts will not receive any events.
+     */
+    public updateActivityStatus(isActive: boolean) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_ACTIVITY_STATUS, {
+                isActive
+            }, resolve, reject);
+        });
+    };
+
+    /**
      * @deprecated
      */
     public getPublicChannels() {

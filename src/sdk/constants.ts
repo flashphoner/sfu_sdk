@@ -541,7 +541,8 @@ export enum InternalApi {
     REVOKE_FRIEND_INVITE = "revokeFriendInvite",
     ACCEPT_FRIEND_INVITE = "acceptFriendInvite",
     REJECT_FRIEND_INVITE = "rejectFriendInvite",
-    UPDATE_PRESENCE_STATUS = "updatePresenceStatus"
+    UPDATE_PRESENCE_STATUS = "updatePresenceStatus",
+    UPDATE_ACTIVITY_STATUS = "updateActivityStatus"
 }
 
 export enum ContactError {
