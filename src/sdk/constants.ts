@@ -283,6 +283,10 @@ export enum MeetingSyncEvent {
     MEETING_NAME_UPDATED_SYNC = "MEETING_NAME_UPDATED_SYNC",
 }
 
+export enum ExamplesEvent {
+    FREE_EXAMPLES_USER = "FREE_EXAMPLES_USER"
+}
+
 export enum State {
     NEW = "NEW",
     PENDING = "PENDING",
@@ -396,6 +400,7 @@ export enum InternalApi {
     Z_APP = "sfuZClientApp",
     P_APP = "sfuApp",
     Z_USER_MANAGEMENT_APP = "sfuZUserManagementApp",
+    Z_EXAMPLES_MANAGEMENT_APP = "sfuZExamplesManagementApp",
     DEFAULT_METHOD = "sfuCallback",
     BINARY_DATA = "binaryData",
     JOIN_ROOM = "joinRoom",
@@ -542,7 +547,8 @@ export enum InternalApi {
     ACCEPT_FRIEND_INVITE = "acceptFriendInvite",
     REJECT_FRIEND_INVITE = "rejectFriendInvite",
     UPDATE_PRESENCE_STATUS = "updatePresenceStatus",
-    UPDATE_ACTIVITY_STATUS = "updateActivityStatus"
+    UPDATE_ACTIVITY_STATUS = "updateActivityStatus",
+    GET_EXAMPLES_FREE_USER = "getFreeUser",
 }
 
 export enum ContactError {
@@ -612,10 +618,16 @@ export enum SpaceError {
     RESTRICTED_ACCESS = "Restricted access"
 }
 
+export enum ExamplesError {
+    OPERATION_FAILED_BY_DISCONNECT = "Operation failed by disconnect",
+    CONNECTION_ERROR = "Connection error",
+    CONNECTION_FAILED = "Connection failed",
+}
+
 export const ATTACHMENT_CHUNK_SIZE = 100000;
 
 export type InternalMessage = {
-    type: SfuEvent | RoomEvent | SpaceEvent | MeetingSyncEvent | InternalApi,
+    type: SfuEvent | RoomEvent | SpaceEvent | MeetingSyncEvent | InternalApi | ExamplesEvent,
     roomId: string,
     internalMessageId: string
 }
@@ -1739,6 +1751,15 @@ export enum AuthenticationStatus {
 
 export type AuthenticationStatusEvent = InternalMessage & {
     status: AuthenticationStatus
+}
+
+export type ExamplesUser = {
+    userId: string;
+    password: string;
+}
+
+export type ExamplesUserEvent = InternalMessage & {
+    user: ExamplesUser;
 }
 
 export type UserId = string;

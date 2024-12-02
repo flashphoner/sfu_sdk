@@ -131,6 +131,10 @@ import {
     ContactDeleted,
     Contact,
     ContactUpdated,
+    ExamplesEvent,
+    ExamplesUserEvent,
+    ExamplesUser,
+    ExamplesError,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -2940,6 +2944,70 @@ export class SfuExtended {
         this.#notifier.remove(event, callback);
         return this;
     };
+
+    #getConnectionConfigForExamples(url: string, timeout?: number) {
+        return {
+            url: url,
+            appName: InternalApi.Z_EXAMPLES_MANAGEMENT_APP,
+            timeout: timeout ? timeout : 10000,
+            custom: {
+                username: "",
+                password: "",
+                nickname: ""
+            }
+        };
+    };
+
+    public getExamplesFreeUser(options: {
+        url: string,
+        timeout?: number
+    }) {
+        const connectionConfig = this.#getConnectionConfigForExamples(options.url, options.timeout);
+        const self = this;
+        const internalMessageId = uuidv4();
+        return new Promise<ExamplesUser>(async (resolve, reject) => {
+            if (self.#_state === State.CONNECTED) {
+                await self.disconnect();
+            }
+            self.#connection = new Connection(
+                (name: string, data: InternalMessage[]) => {
+                    if (name === InternalApi.DEFAULT_METHOD) {
+                        if (data[0].type === ExamplesEvent.FREE_EXAMPLES_USER) {
+                            const event = data[0] as ExamplesUserEvent;
+                            promises.resolve(data[0].internalMessageId, event.user);
+                            self.disconnect();
+                        } else if (data[0].type === RoomEvent.OPERATION_FAILED && promises.promised(data[0].internalMessageId)) {
+                            promises.reject(data[0].internalMessageId, data[0] as OperationFailedEvent);
+                            self.disconnect();
+                        }
+                    }
+                },
+                () => {
+                },
+                (e) => {
+                    reject(new Error(ExamplesError.CONNECTION_FAILED));
+                    self.#_state = State.FAILED;
+                },
+                (e) => {
+                    if (e.reason === 'Normal disconnect') {
+                        promises.reject(internalMessageId, new Error(ExamplesError.OPERATION_FAILED_BY_DISCONNECT));
+                        self.#_state = State.DISCONNECTED;
+                        self.disconnect();
+                    } else {
+                        promises.reject(internalMessageId, new Error(ExamplesError.CONNECTION_FAILED));
+                        self.#_state = State.DISCONNECTED;
+                        self.disconnect();
+                    }
+                },
+                this.#logger);
+            await self.#connection.connect(connectionConfig);
+            self.#_state = State.CONNECTED;
+            promises.add(internalMessageId, resolve, reject);
+            self.#connection.send(InternalApi.GET_EXAMPLES_FREE_USER, {
+                internalMessageId
+            });
+        });
+    }
 
     public static strToUTF8Array(str: string): Array<number> {
         let utf8Arr: Array<number> = [];
