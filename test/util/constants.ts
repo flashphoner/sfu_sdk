@@ -188,3 +188,6 @@ export const UPDATED_PMI_SETTINGS = {
     useParticipantsVideo: true,
     accessCode: 'NEW_ACCESS_CODE'
 }
+
+export const MASTER_PASSWORD = "master-password-encryption";
+export const MASTER_PASSWORD_HASH = "6b42857320f232c514058458e8fbe0a380ed7ef25a32712b24e09ba116e7953e";

@@ -104,6 +104,10 @@ export enum SfuEvent {
     CONTACT_UPDATED = "CONTACT_UPDATED",
     /** Used to receive {@link ContactDeleted} */
     CONTACT_DELETED = "CONTACT_DELETED",
+    /** Used to receive {@link UserEncryptionInfoEvent} */
+    USER_ENCRYPTION_INFO_ADDED = "USER_ENCRYPTION_INFO_ADDED",
+    /** Used to receive {@link UserEncryptionInfoEvent} */
+    USER_ENCRYPTION_INFO = "USER_ENCRYPTION_INFO"
 }
 
 /**
@@ -549,6 +553,8 @@ export enum InternalApi {
     UPDATE_PRESENCE_STATUS = "updatePresenceStatus",
     UPDATE_ACTIVITY_STATUS = "updateActivityStatus",
     GET_EXAMPLES_FREE_USER = "getFreeUser",
+    ADD_USER_ENCRYPTION_INFO = "addUserEncryptionInfo",
+    GET_USER_ENCRYPTION_INFO = "getUserEncryptionInfo"
 }
 
 export enum ContactError {
@@ -570,6 +576,7 @@ export enum ChatError {
     CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT = "Adding a member to the private chat is not allowed",
     CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
     CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed",
+    INCORRECT_CHAT_ENCRYPTION_SETTINGS = "Incorrect chat encryption settings"
 }
 
 export enum ChatSectionsError {
@@ -1165,7 +1172,7 @@ export type UserInfo = {
     phoneNumber: UserPhoneNumber,
     hostKey: UserHostKey,
     timezone: UserTimezone,
-    status: PresenceStatus
+    status: PresenceStatus,
 }
 
 export type CalendarEvent = {
@@ -1213,6 +1220,10 @@ export type UserSpecificChatInfo = {
     chatReceivePolicy: ChatReceivePolicy;
     sendPermissionList: Array<string>;
     allowedToAddExternalUser: boolean;
+    encryptionEnabled: boolean;
+    encryptedPrivateKey: string;
+    publicKey: string;
+    encryptedChatPassword: string;
 }
 export enum ChatType {
     PUBLIC = "PUBLIC",
@@ -1673,6 +1684,8 @@ export type Contact = {
     nickname: string;
     friend: boolean;
     status: PresenceStatus;
+    publicKey: string;
+    encryptionEnabled: boolean;
 }
 
 export type UserContacts = {
@@ -1711,6 +1724,24 @@ export type ContactUpdated = InternalMessage & {
 
 export type ContactDeleted = InternalMessage & {
     userId: string;
+}
+
+export type UserChatEncryptedPassword = {
+    userId: string;
+    password: string;
+}
+
+export type UserEncryptionInfo = {
+    privateKey: string;
+    publicKey: string;
+    encryptionEnabled: boolean;
+    verificationHash: string;
+    salt: string;
+    iv: string;
+}
+
+export type UserEncryptionInfoEvent = InternalMessage & {
+    info: UserEncryptionInfo;
 }
 
 export enum SortOrder {

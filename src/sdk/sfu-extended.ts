@@ -135,6 +135,9 @@ import {
     ExamplesUserEvent,
     ExamplesUser,
     ExamplesError,
+    UserEncryptionInfoEvent,
+    UserEncryptionInfo,
+    UserChatEncryptedPassword,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -756,6 +759,14 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SfuEvent.USER_PRESENCE_STATUS_UPDATED, event);
                             }
+                        } else if (data[0].type === SfuEvent.USER_ENCRYPTION_INFO_ADDED) {
+                            const event = data[0] as UserEncryptionInfoEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event.info)) {
+                                this.#notifier.notify(SfuEvent.USER_ENCRYPTION_INFO_ADDED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.USER_ENCRYPTION_INFO) {
+                            const event = data[0] as UserEncryptionInfoEvent;
+                            promises.resolve(data[0].internalMessageId, event.info)
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -1894,6 +1905,46 @@ export class SfuExtended {
     };
 
     /**
+     * After adding:
+     *
+     * User's contacts will see {@link Contact.encryptionEnabled} and {@link Contact.publicKey}.
+     * The remaining information is not used on the server and is only stored; it can be requested using {@link getUserEncryptionInfo}.
+     *
+     * verificationHash, salt, and iv are optional; the client chooses the private key encryption method.
+     *
+     * salt - Cryptographic Salt
+     *
+     * iv - Initialization Vector for Encryption
+     */
+    public addUserEncryptionInfo(info: {
+        privateKey: string,
+        publicKey: string,
+        verificationHash?: string,
+        salt?: string,
+        iv?: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<UserEncryptionInfo>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_USER_ENCRYPTION_INFO, {
+                privateKey: info.privateKey,
+                publicKey: info.publicKey,
+                verificationHash: info.verificationHash,
+                salt: info.salt,
+                iv: info.iv
+            }, resolve, reject);
+        });
+    };
+
+    public getUserEncryptionInfo() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<UserEncryptionInfo>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_USER_ENCRYPTION_INFO, {}, resolve, reject);
+        });
+    };
+
+    /**
      * @deprecated
      */
     public getPublicChannels() {
@@ -2017,6 +2068,12 @@ export class SfuExtended {
      * @param chat.channelSendPolicy - @deprecated
      * @param chat.sendPermissionList - @deprecated
      * @param chat.allowedToAddExternalUser - @deprecated
+     *
+     * Creating a Secure Chat with Encryption:
+     * @param chat.isEncryptionEnabled must be true for a Secure Chat
+     * @param chat.publicKey - the public key of the chat used to encrypt messages
+     * @param chat.encryptedPrivateKey - the private key of the chat, encrypted with a chat password, used to decrypt messages
+     * @param chat.encryptedChatPasswords - an array of chat passwords for each member encrypted with the member's public keys, which must be decrypted using the user's private key.
      */
     public createChat(chat: {
         id?: string,
@@ -2027,7 +2084,11 @@ export class SfuExtended {
         type?: ChatType,
         channelSendPolicy?: ChannelSendPolicy,
         sendPermissionList?: Array<string>,
-        allowedToAddExternalUser?: boolean
+        allowedToAddExternalUser?: boolean,
+        isEncryptionEnabled?: boolean,
+        encryptedPrivateKey?: string,
+        publicKey?: string,
+        encryptedChatPasswords?: Array<UserChatEncryptedPassword>
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -2041,7 +2102,11 @@ export class SfuExtended {
                 type: chat.type,
                 channelSendPolicy: chat.channelSendPolicy,
                 sendPermissionList: chat.sendPermissionList,
-                allowedToAddExternalUser: chat.allowedToAddExternalUser
+                allowedToAddExternalUser: chat.allowedToAddExternalUser,
+                encryptionEnabled: chat.isEncryptionEnabled,
+                encryptedPrivateKey: chat.encryptedPrivateKey,
+                publicKey: chat.publicKey,
+                encryptedChatPasswords: chat.encryptedChatPasswords
             }, resolve, reject);
         });
     };
@@ -2087,15 +2152,22 @@ export class SfuExtended {
      * If a direct meeting was started, user will receive {@link SfuEvent.NEW_MEETING} with {@link NewMeeting}.
      *
      * @param chat.member - user will receive {@link SfuEvent.NEW_CHAT} with {@link UserSpecificChatInfo}.
+     * @param chat.encryptedChatPassword - required for adding to a secure encrypted chat.
+     * chat password encrypted with the member's public key, which must be decrypted using the user's private key.
      */
     public addMemberToChat(chat: {
         id: string,
-        member: UserId
+        member: UserId,
+        encryptedChatPassword?: string
     }) {
         this.#checkAuthenticated();
         const self = this;
         return new Promise<UserSpecificChatInfo>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.ADD_MEMBER_TO_CHAT, {id: chat.id, member: chat.member}, resolve, reject);
+            self.#emmitAction(InternalApi.ADD_MEMBER_TO_CHAT, {
+                id: chat.id,
+                member: chat.member,
+                encryptedChatPassword: chat.encryptedChatPassword
+            }, resolve, reject);
         });
     };
 
