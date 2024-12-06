@@ -138,6 +138,7 @@ import {
     UserEncryptionInfoEvent,
     UserEncryptionInfo,
     UserChatEncryptedPassword,
+    AddedRemovedReactionOnMessage,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -521,6 +522,16 @@ export class SfuExtended {
                             const message = data[0] as MessageDeleted;
                             if (!promises.resolve(data[0].internalMessageId, message)) {
                                 this.#notifier.notify(SfuEvent.CHAT_MESSAGE_DELETED, message);
+                            }
+                        } else if (data[0].type === SfuEvent.REACTION_ON_MESSAGE_ADDED) {
+                            const event = data[0] as AddedRemovedReactionOnMessage;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.REACTION_ON_MESSAGE_ADDED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.REACTION_ON_MESSAGE_REMOVED) {
+                            const event = data[0] as AddedRemovedReactionOnMessage;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.REACTION_ON_MESSAGE_REMOVED, event);
                             }
                         } else if (data[0].type === SfuEvent.CHAT_MESSAGES_COUNT) {
                             const messagesCount = data[0] as ChatMessagesCount;
@@ -1233,6 +1244,52 @@ export class SfuExtended {
                 id: msg.messageId,
                 targetEntityType: msg.targetEntityType,
                 targetEntityId: msg.targetEntityId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Add reaction on message in a Direct chat | Channel | Thread
+     *
+     * Members will receive {@link SfuEvent.REACTION_ON_MESSAGE_ADDED} with {@link AddedRemovedReactionOnMessage}
+     */
+    public addReactionOnMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+        messageId: string,
+        reaction: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AddedRemovedReactionOnMessage>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_REACTION_ON_MESSAGE, {
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
+                messageId: msg.messageId,
+                reaction: msg.reaction
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Remove reaction on message in a Direct chat | Channel | Thread
+     *
+     * Members will receive {@link SfuEvent.REACTION_ON_MESSAGE_REMOVED} with {@link AddedRemovedReactionOnMessage}
+     */
+    public removeReactionOnMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+        messageId: string,
+        reaction: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AddedRemovedReactionOnMessage>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_REACTION_ON_MESSAGE, {
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
+                messageId: msg.messageId,
+                reaction: msg.reaction
             }, resolve, reject);
         });
     }

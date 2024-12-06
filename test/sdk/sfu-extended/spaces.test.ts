@@ -20,6 +20,7 @@ import {
     NAME_OF_DEFAULT_ROLE,
     ALLOWS_TO_VIEW_CHANNELS,
     ALLOWS_TO_CREATE_INVITE,
+    MESSAGE_REACTION,
 } from "../../util/constants";
 import {
     AddedRoleToMember,
@@ -41,6 +42,7 @@ import {
     UserLeftSpace,
     SfuEvent,
     ConferenceType,
+    AddedRemovedReactionOnMessage,
 } from "../../../src/sdk/constants";
 
 describe("spaces", () => {
@@ -519,6 +521,293 @@ describe("spaces", () => {
                     messageId: msg.id
                 });
                 await bob.deleteSpace({id: space.id});
+            });
+            describe("reactions", () => {
+                it('should add reaction on channel message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const msg = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHANNEL,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id},
+                        body: "body"
+                    });
+                    const reaction = await bob.addReactionOnMessage({
+                        targetEntityType: msg.targetEntityType,
+                        targetEntityId: msg.targetEntityId,
+                        messageId: msg.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    expect(reaction.targetEntityType).toEqual(msg.targetEntityType);
+                    expect(reaction.targetEntityId).toEqual(msg.targetEntityId);
+                    expect(reaction.messageId).toEqual(msg.id);
+                    expect(reaction.reaction).toEqual(MESSAGE_REACTION);
+                    expect(reaction.reactedUser).toEqual(TEST_USER_0.username);
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('should add reaction on thread message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: false
+                    });
+                    expect(thread).toBeTruthy();
+                    const msg = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.THREAD,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id, threadId: thread.id},
+                        body: "body"
+                    });
+                    const reaction = await bob.addReactionOnMessage({
+                        targetEntityType: msg.targetEntityType,
+                        targetEntityId: msg.targetEntityId,
+                        messageId: msg.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    expect(reaction.targetEntityType).toEqual(msg.targetEntityType);
+                    expect(reaction.targetEntityId).toEqual(msg.targetEntityId);
+                    expect(reaction.messageId).toEqual(msg.id);
+                    expect(reaction.reaction).toEqual(MESSAGE_REACTION);
+                    expect(reaction.reactedUser).toEqual(TEST_USER_0.username);
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('should remove reaction on channel message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const msg = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHANNEL,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id},
+                        body: "body"
+                    });
+                    await bob.addReactionOnMessage({
+                        targetEntityType: msg.targetEntityType,
+                        targetEntityId: msg.targetEntityId,
+                        messageId: msg.id,
+                        reaction: MESSAGE_REACTION
+                    });
+
+                    const reaction = await bob.removeReactionOnMessage({
+                        targetEntityType: msg.targetEntityType,
+                        targetEntityId: msg.targetEntityId,
+                        messageId: msg.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    expect(reaction.targetEntityType).toEqual(msg.targetEntityType);
+                    expect(reaction.targetEntityId).toEqual(msg.targetEntityId);
+                    expect(reaction.messageId).toEqual(msg.id);
+                    expect(reaction.reaction).toEqual(MESSAGE_REACTION);
+                    expect(reaction.reactedUser).toEqual(TEST_USER_0.username);
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('should remove reaction on thread message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: false
+                    });
+                    expect(thread).toBeTruthy();
+                    const msg = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.THREAD,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id, threadId: thread.id},
+                        body: "body"
+                    });
+                    await bob.addReactionOnMessage({
+                        targetEntityType: msg.targetEntityType,
+                        targetEntityId: msg.targetEntityId,
+                        messageId: msg.id,
+                        reaction: MESSAGE_REACTION
+                    });
+
+                    const reaction = await bob.removeReactionOnMessage({
+                        targetEntityType: msg.targetEntityType,
+                        targetEntityId: msg.targetEntityId,
+                        messageId: msg.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    expect(reaction.targetEntityType).toEqual(msg.targetEntityType);
+                    expect(reaction.targetEntityId).toEqual(msg.targetEntityId);
+                    expect(reaction.messageId).toEqual(msg.id);
+                    expect(reaction.reaction).toEqual(MESSAGE_REACTION);
+                    expect(reaction.reactedUser).toEqual(TEST_USER_0.username);
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('second user should be notified when first user added reaction on channel message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const message = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHANNEL,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id},
+                        body: "body"
+                    });
+
+                    const waitEvent = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            alice.on(SfuEvent.REACTION_ON_MESSAGE_ADDED, (msg) => {
+                                const event = msg as AddedRemovedReactionOnMessage;
+                                expect(event.targetEntityType).toEqual(message.targetEntityType);
+                                expect(event.targetEntityId).toEqual(message.targetEntityId);
+                                expect(event.messageId).toEqual(message.id);
+                                expect(event.reaction).toEqual(MESSAGE_REACTION);
+                                expect(event.reactedUser).toEqual(TEST_USER_0.username);
+                                resolve();
+                            });
+                        });
+                    }
+                    bob.addReactionOnMessage({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: message.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    await waitEvent();
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('second user should be notified when first user added reaction on thread message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: false
+                    });
+                    expect(thread).toBeTruthy();
+                    const message = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.THREAD,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id, threadId: thread.id},
+                        body: "body"
+                    });
+                    const waitEvent = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            alice.on(SfuEvent.REACTION_ON_MESSAGE_ADDED, (msg) => {
+                                const event = msg as AddedRemovedReactionOnMessage;
+                                expect(event.targetEntityType).toEqual(message.targetEntityType);
+                                expect(event.targetEntityId).toEqual(message.targetEntityId);
+                                expect(event.messageId).toEqual(message.id);
+                                expect(event.reaction).toEqual(MESSAGE_REACTION);
+                                expect(event.reactedUser).toEqual(TEST_USER_0.username);
+                                resolve();
+                            });
+                        });
+                    }
+                    bob.addReactionOnMessage({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: message.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    await waitEvent();
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('second user should be notified when first user removed reaction on channel message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const message = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.CHANNEL,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id},
+                        body: "body"
+                    });
+                    await bob.addReactionOnMessage({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: message.id,
+                        reaction: MESSAGE_REACTION
+                    });
+
+                    const waitEvent = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            alice.on(SfuEvent.REACTION_ON_MESSAGE_REMOVED, (msg) => {
+                                const event = msg as AddedRemovedReactionOnMessage;
+                                expect(event.targetEntityType).toEqual(message.targetEntityType);
+                                expect(event.targetEntityId).toEqual(message.targetEntityId);
+                                expect(event.messageId).toEqual(message.id);
+                                expect(event.reaction).toEqual(MESSAGE_REACTION);
+                                expect(event.reactedUser).toEqual(TEST_USER_0.username);
+                                resolve();
+                            });
+                        });
+                    }
+                    bob.removeReactionOnMessage({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: message.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    await waitEvent();
+
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('second user should be notified when first user removed reaction on thread message', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    const channel = space.channels[0];
+                    expect(channel).toBeTruthy();
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: false
+                    });
+                    expect(thread).toBeTruthy();
+                    const message = await bob.sendMessage({
+                        targetEntityType: MessageTargetEntityType.THREAD,
+                        targetEntityId: {spaceId: space.id, channelId: channel.id, threadId: thread.id},
+                        body: "body"
+                    });
+                    await bob.addReactionOnMessage({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: message.id,
+                        reaction: MESSAGE_REACTION
+                    });
+
+                    const waitEvent = (): Promise<void> => {
+                        return new Promise<void>((resolve) => {
+                            alice.on(SfuEvent.REACTION_ON_MESSAGE_REMOVED, (msg) => {
+                                const event = msg as AddedRemovedReactionOnMessage;
+                                expect(event.targetEntityType).toEqual(message.targetEntityType);
+                                expect(event.targetEntityId).toEqual(message.targetEntityId);
+                                expect(event.messageId).toEqual(message.id);
+                                expect(event.reaction).toEqual(MESSAGE_REACTION);
+                                expect(event.reactedUser).toEqual(TEST_USER_0.username);
+                                resolve();
+                            });
+                        });
+                    }
+                    bob.removeReactionOnMessage({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: message.id,
+                        reaction: MESSAGE_REACTION
+                    });
+                    await waitEvent();
+
+                    await bob.deleteSpace({id: space.id});
+                });
             });
         });
         describe("participants", () => {

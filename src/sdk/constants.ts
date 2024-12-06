@@ -62,6 +62,10 @@ export enum SfuEvent {
     CHAT_MESSAGE_EDITED = "CHAT_MESSAGE_EDITED",
     /** Used to receive {@link MessageDeleted} */
     CHAT_MESSAGE_DELETED = "CHAT_MESSAGE_DELETED",
+    /** Used to receive {@link AddedRemovedReactionOnMessage} */
+    REACTION_ON_MESSAGE_ADDED = "REACTION_ON_MESSAGE_ADDED",
+    /** Used to receive {@link AddedRemovedReactionOnMessage} */
+    REACTION_ON_MESSAGE_REMOVED = "REACTION_ON_MESSAGE_REMOVED",
     /** Used to receive {@link SignUpStatus} */
     SIGN_UP_STATUS = "SIGN_UP_STATUS",
     /** Used to receive {@link ResetPasswordRequestStatus} */
@@ -507,6 +511,8 @@ export enum InternalApi {
     CHANGE_USER_TIMEZONE = "changeUserTimezone",
     EDIT_MESSAGE = "editMessage",
     DELETE_MESSAGE = "deleteMessage",
+    ADD_REACTION_ON_MESSAGE = "addReactionOnMessage",
+    REMOVE_REACTION_ON_MESSAGE = "removeReactionOnMessage",
     SIGN_UP = "signUp",
     REMOVE_USER = "removeUser",
     RESET_PASSWORD_REQUEST = "resetPasswordRequest",
@@ -1020,7 +1026,8 @@ export type MessageStatus = {
     attachments: Array<MessageAttachment>;
     deliveryStatus: MessageDeliveryStatus;
     edited: boolean,
-    dateOfEdit: number
+    dateOfEdit: number,
+    reactions: Array<string>
 }
 
 export type AttachmentStatus = {
@@ -1084,6 +1091,11 @@ export type MessageTargetEntityId = {
     threadId?: string;
 }
 
+export type MessageReaction = {
+    reaction: string;
+    reactedUsers: Array<string>
+}
+
 export type Message = {
     id: string;
     parentMessage?: Message;
@@ -1099,6 +1111,7 @@ export type Message = {
     privateMessage: boolean;
     edited: boolean;
     dateOfEdit: number;
+    reactions: Array<MessageReaction>;
 }
 
 export type SfuMessageEvent = InternalMessage & {
@@ -1145,6 +1158,14 @@ export type LastReadMessageUpdate = {
     oldLastReadMessageDate: number,
     lastReadMessageDate: number,
     lastReadMessageId: string
+}
+
+export type AddedRemovedReactionOnMessage = InternalMessage & {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    messageId: string;
+    reactedUser: string;
+    reaction: string;
 }
 
 export type ControlMessage = {

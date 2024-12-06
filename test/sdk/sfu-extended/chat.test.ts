@@ -4,6 +4,7 @@ import {
     ATTACHMENTS_PAYLOAD,
     DOWNLOAD_PATH,
     EVERYONE_TAG,
+    MESSAGE_REACTION,
     PDF_FILE_NAME,
     PICTURE_FILE_NAME,
     TEST_BIG_PICTURE_ATTACHMENT,
@@ -38,7 +39,8 @@ import {
     SfuEvent,
     SortOrder,
     UpdateMessagesDeliveryStatusEvent,
-    UserSpecificChatInfo
+    UserSpecificChatInfo,
+    AddedRemovedReactionOnMessage,
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -2544,6 +2546,148 @@ describe("chat", () => {
                 const aliceState = await aliceRoom.join(alicePc);
                 expect(aliceState.userId).toEqual(TEST_USER_1.username);
                 expect(aliceState.name).toEqual(TEST_USER_1.nickname);
+                await bob.deleteChat({id: chat.id});
+            });
+        });
+        describe("reactions", () => {
+            it('should add reaction on message', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const msg = await alice.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {
+                        chatId: chat.id
+                    },
+                    body: MESSAGE_BODY
+                });
+                const reaction = await bob.addReactionOnMessage({
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
+                    messageId: msg.id,
+                    reaction: MESSAGE_REACTION
+                });
+                expect(reaction.targetEntityType).toEqual(msg.targetEntityType);
+                expect(reaction.targetEntityId).toEqual(msg.targetEntityId);
+                expect(reaction.messageId).toEqual(msg.id);
+                expect(reaction.reaction).toEqual(MESSAGE_REACTION);
+                expect(reaction.reactedUser).toEqual(TEST_USER_0.username);
+                await bob.deleteChat({id: chat.id});
+            });
+            it('should remove reaction on message', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const msg = await alice.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {
+                        chatId: chat.id
+                    },
+                    body: MESSAGE_BODY
+                });
+                await bob.addReactionOnMessage({
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
+                    messageId: msg.id,
+                    reaction: MESSAGE_REACTION
+                });
+
+                const reaction = await bob.removeReactionOnMessage({
+                    targetEntityType: msg.targetEntityType,
+                    targetEntityId: msg.targetEntityId,
+                    messageId: msg.id,
+                    reaction: MESSAGE_REACTION
+                });
+                expect(reaction.targetEntityType).toEqual(msg.targetEntityType);
+                expect(reaction.targetEntityId).toEqual(msg.targetEntityId);
+                expect(reaction.messageId).toEqual(msg.id);
+                expect(reaction.reaction).toEqual(MESSAGE_REACTION);
+                expect(reaction.reactedUser).toEqual(TEST_USER_0.username);
+                await bob.deleteChat({id: chat.id});
+            });
+            it('second user should be notified when first user added reaction on message', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const message = await alice.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {
+                        chatId: chat.id
+                    },
+                    body: MESSAGE_BODY
+                });
+
+                const waitEvent = (): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        alice.on(SfuEvent.REACTION_ON_MESSAGE_ADDED, (msg) => {
+                            const event = msg as AddedRemovedReactionOnMessage;
+                            expect(event.targetEntityType).toEqual(message.targetEntityType);
+                            expect(event.targetEntityId).toEqual(message.targetEntityId);
+                            expect(event.messageId).toEqual(message.id);
+                            expect(event.reaction).toEqual(MESSAGE_REACTION);
+                            expect(event.reactedUser).toEqual(TEST_USER_0.username);
+                            resolve();
+                        });
+                    });
+                }
+                bob.addReactionOnMessage({
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    messageId: message.id,
+                    reaction: MESSAGE_REACTION
+                });
+                await waitEvent();
+
+                await bob.deleteChat({id: chat.id});
+            });
+            it('second user should be notified when first user removed reaction on message', async () => {
+                const chat = await bob.createChat({
+                    channel: false,
+                    members: [TEST_USER_1.username, TEST_USER_2.username],
+                    type: ChatType.PUBLIC
+                });
+                const message = await alice.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {
+                        chatId: chat.id
+                    },
+                    body: MESSAGE_BODY
+                });
+
+                await bob.addReactionOnMessage({
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    messageId: message.id,
+                    reaction: MESSAGE_REACTION
+                });
+
+                const waitEvent = (): Promise<void> => {
+                    return new Promise<void>((resolve) => {
+                        alice.on(SfuEvent.REACTION_ON_MESSAGE_REMOVED, (msg) => {
+                            const event = msg as AddedRemovedReactionOnMessage;
+                            expect(event.targetEntityType).toEqual(message.targetEntityType);
+                            expect(event.targetEntityId).toEqual(message.targetEntityId);
+                            expect(event.messageId).toEqual(message.id);
+                            expect(event.reaction).toEqual(MESSAGE_REACTION);
+                            expect(event.reactedUser).toEqual(TEST_USER_0.username);
+                            resolve();
+                        });
+                    });
+                }
+                bob.removeReactionOnMessage({
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    messageId: message.id,
+                    reaction: MESSAGE_REACTION
+                });
+                await waitEvent();
+
                 await bob.deleteChat({id: chat.id});
             });
         });
