@@ -207,6 +207,11 @@ export enum RoomEvent {
     BITRATE_TEST_STATUS = "BITRATE_TEST_STATUS",
     /** Used to receive {@link RoomNameUpdated} */
     ROOM_NAME_UPDATED = "ROOM_NAME_UPDATED",
+    // Todo (Igor): add docs
+    ROOM_RECORD_STARTED = "ROOM_RECORD_STARTED",
+    ROOM_RECORD_STOPPED = "ROOM_RECORD_STOPPED",
+    ROOM_RECORD_PAUSED = "ROOM_RECORD_PAUSED",
+    ROOM_RECORD_FAILED = "ROOM_RECORD_FAILED"
 }
 
 /**
@@ -289,6 +294,7 @@ export enum MeetingSyncEvent {
     PARTICIPANT_LIST_SYNC = "PARTICIPANT_LIST_SYNC",
     /** Used to receive {@link MeetingNameUpdatedSync} */
     MEETING_NAME_UPDATED_SYNC = "MEETING_NAME_UPDATED_SYNC",
+
 }
 
 export enum ExamplesEvent {
@@ -418,6 +424,8 @@ export enum InternalApi {
     UPDATE_ROOM_STATE = "updateRoomState",
     DESTROY_ROOM = "destroyRoom",
     LEAVE_ROOM = "leaveRoom",
+    START_ROOM_RECORD = "startRoomRecord",
+    STOP_ROOM_RECORD = "stopRoomRecord",
     EVICT_PARTICIPANT = "evictParticipant",
     RENAME_PARTICIPANT = "renameParticipant",
     CHANGE_QUALITY = "changeQuality",

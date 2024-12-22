@@ -447,6 +447,30 @@ export class RoomExtended extends Room {
         });
     }
 
+    public startRecord(): Promise<void> {
+        const self = this;
+        return new Promise<void>((resolve, reject) => {
+            const id = uuidv4();
+            promises.add(id, resolve, reject);
+            self.connection.send(InternalApi.START_ROOM_RECORD, {
+                id: self._id,
+                internalMessageId: id
+            })
+        })
+    }
+
+    public stopRecord(): Promise<void> {
+        const self = this;
+        return new Promise<void>((resolve, reject) => {
+            const id = uuidv4();
+            promises.add(id, resolve, reject);
+            self.connection.send(InternalApi.STOP_ROOM_RECORD, {
+                id: self._id,
+                internalMessageId: id
+            })
+        })
+    }
+
     public async processEvent(e: InternalMessage) {
         if (e.type === RoomEvent.ROOM_CONFIG) {
             const roomConfigEvent = (e as RoomConfigEvent);
