@@ -879,6 +879,7 @@ export class SfuExtended {
     public signUp(options: {
         url: string,
         timeout?: number,
+        username: string,
         email: string,
         password: string
     }) {
@@ -940,8 +941,66 @@ export class SfuExtended {
             promises.add(id, resolve, reject);
             self.#connection.send(InternalApi.SIGN_UP, {
                 email: options.email,
+                username: options.username,
                 password: options.password,
                 internalMessageId: id
+            });
+        });
+    }
+
+    /**
+     * Ensure username available
+     *
+     * If the username is not taken, the promise will resolve with `void`.
+     *
+     * If the username is taken, the promise will reject with {@link UserManagementError.USERNAME_ALREADY_IN_USE}.
+     */
+    public ensureUsernameAvailable(options: {
+        url: string,
+        timeout?: number,
+        username: string
+    }) {
+        const connectionConfig = this.#getConnectionConfigForAnonymousUser(options.url, options.timeout);
+        const internalMessageId = uuidv4();
+        const self = this;
+        return new Promise<void>(async (resolve, reject) => {
+            if (self.#_state === State.CONNECTED) {
+                await self.disconnect();
+            }
+            self.#connection = new Connection(
+                (name: string, data: InternalMessage[]) => {
+                    if (name === InternalApi.DEFAULT_METHOD) {
+                        if (data[0].type === SfuEvent.ACK && promises.promised(data[0].internalMessageId)) {
+                            promises.resolve(data[0].internalMessageId);
+                        } else if (data[0].type === RoomEvent.OPERATION_FAILED && promises.promised(data[0].internalMessageId)) {
+                            promises.reject(data[0].internalMessageId, data[0] as OperationFailedEvent);
+                        }
+                        self.disconnect();
+                    }
+                },
+                () => {
+                },
+                (e) => {
+                    reject(new Error(UserManagementError.CONNECTION_ERROR));
+                    self.#_state = State.FAILED;
+                },
+                (e) => {
+                    if (e.reason === 'Normal disconnect') {
+                        promises.reject(internalMessageId, new Error(UserManagementError.OPERATION_FAILED_BY_DISCONNECT));
+                        self.#_state = State.DISCONNECTED;
+                    } else {
+                        promises.reject(internalMessageId, new Error(UserManagementError.CONNECTION_FAILED));
+                        self.#_state = State.DISCONNECTED;
+                    }
+                    self.disconnect();
+                },
+                this.#logger);
+            await self.#connection.connect(connectionConfig);
+            self.#_state = State.CONNECTED;
+            promises.add(internalMessageId, resolve, reject);
+            self.#connection.send(InternalApi.ENSURE_USERNAME_AVAILABLE, {
+                username: options.username,
+                internalMessageId: internalMessageId
             });
         });
     }
@@ -1847,8 +1906,6 @@ export class SfuExtended {
 
     /**
      * Change user email
-     *
-     * Users will receive {@link SfuEvent.CONTACT_UPDATED} with changed email
      */
     public changeUserEmail(email: UserEmail) {
         this.#checkAuthenticated();

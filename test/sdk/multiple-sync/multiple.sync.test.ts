@@ -127,7 +127,7 @@ describe("multiple-sync", () => {
 
             bobFirstInstance.changeUserEmail(newEmail);
             await waitEvents();
-            await bobFirstInstance.changeUserEmail(TEST_USER_0.username);
+            await bobFirstInstance.changeUserEmail(TEST_USER_0.email);
         });
         it('should change nickname', async () => {
             const newNickname = "newNickname";

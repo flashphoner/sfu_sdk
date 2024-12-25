@@ -25,14 +25,16 @@ const logger = (msg: string, obj?: any) => {
 }
 
 export async function connect(userConfig: {
-    username: string,
+    username?: string,
+    email: string,
     password: string,
     nickname: string
 }) {
     const sfu = new SfuExtended(Verbosity.DEBUG, () => "[" + userConfig.username + " | " + expect.getState().currentTestName + "]");
     await sfu.connect({
         url: url,
-        ...userConfig
+        ...userConfig,
+        username: userConfig.email
     });
     return sfu;
 }
@@ -44,6 +46,5 @@ export async function waitForUsers() {
 }
 
 export async function waitForUser() {
-    const bob = await connect(TEST_USER_0);
-    return bob;
+    return await connect(TEST_USER_0);
 }

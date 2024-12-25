@@ -15,6 +15,7 @@ export class User {
 
     constructor(userConfig: {
         username: string,
+        email: string,
         password: string,
         nickname: string
     }) {

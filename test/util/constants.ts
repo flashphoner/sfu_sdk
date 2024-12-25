@@ -4,12 +4,14 @@ import {ChannelSendPolicy, ChatType, MessageAttachmentType} from "../../src/sdk/
 export const url = "ws://127.0.0.1:8080/";
 export const wrongWsUrl = "ws://127.0.0.1:8081/";
 export const TEST_USER_0 = {
-    username: "bob@flashphoner.com",
+    username: "bob",
+    email: "bob@flashphoner.com",
     password: "123456",
     nickname: "bob"
 }
 export const TEST_USER_1 = {
-    username: "alice@flashphoner.com",
+    username: "alice",
+    email: "alice@flashphoner.com",
     password: "123456",
     nickname: "alice"
 }
@@ -20,17 +22,20 @@ export const TEST_USER_0_TAG = `<@${TEST_USER_0.username}>`;
 export const TEST_USER_1_TAG = `<@${TEST_USER_1.username}>`;
 
 export const TEST_USER_2 = {
-    username: "kiri@flashphoner.com",
+    username: "kiri",
+    email: "kiri@flashphoner.com",
     password: "123456",
     nickname: "kiri"
 }
 
 export const TEST_SIGN_UP_USER_1 = {
+    username: "testovbob",
     email: "testovbob@gmail.com",
     password: "123456"
 }
 
 export const TEST_SIGN_UP_USER_2 = {
+    username: "bot123",
     email: "bot@flashphoner.com",
     password: "123456"
 }

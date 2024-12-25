@@ -31,8 +31,8 @@ describe("user", () => {
         const newEmail = "newEmail@flashphoner.com";
         await bob.changeUserEmail(newEmail);
         expect(bob.user().email).toEqual(newEmail);
-        await bob.changeUserEmail(TEST_USER_0.username);
-        expect(bob.user().email).toEqual(TEST_USER_0.username);
+        await bob.changeUserEmail(TEST_USER_0.email);
+        expect(bob.user().email).toEqual(TEST_USER_0.email);
     });
     it("Should reject when user is trying to use for changing email that already taken", async () => {
         await expect(bob.changeUserEmail(TEST_USER_1.username)).rejects.toHaveProperty("error", UserInfoError.EMAIL_ADDRESS_ALREADY_TAKEN)
@@ -42,7 +42,7 @@ describe("user", () => {
         await bob.changeUserPassword(TEST_USER_0.password, newPassword);
         await bob.disconnect();
 
-        const bobWithNewPass = await connect({username: TEST_USER_0.username, password: newPassword, nickname: TEST_USER_0.nickname});
+        const bobWithNewPass = await connect({username: TEST_USER_0.username, email: TEST_USER_0.email, password: newPassword, nickname: TEST_USER_0.nickname});
         expect(bobWithNewPass.user().username).toEqual(TEST_USER_0.username);
         await bobWithNewPass.changeUserPassword(newPassword, TEST_USER_0.password);
         await bobWithNewPass.disconnect();
@@ -97,7 +97,11 @@ describe("user", () => {
         await bob.changeUserTimezone(newTimezone);
         await bob.disconnect();
 
-        bob = await waitForUser();
+        bob = await connect({
+            email: newEmail,
+            password: TEST_USER_0.password,
+            nickname: TEST_USER_0.nickname
+        });
         const userInfo = await bob.getUserInfo();
         expect(userInfo.email).toEqual(newEmail);
         expect(userInfo.nickname).toEqual(newNickname);
@@ -105,7 +109,7 @@ describe("user", () => {
         expect(userInfo.hostKey).toEqual(newHostKey);
         expect(userInfo.timezone).toEqual(newTimezone);
 
-        await bob.changeUserEmail(TEST_USER_0.username);
+        await bob.changeUserEmail(TEST_USER_0.email);
         await bob.changeUserNickname(TEST_USER_0.nickname);
         await bob.changeUserPhoneNumber("");
         await bob.changeUserHostKey("");

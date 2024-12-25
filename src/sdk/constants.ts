@@ -522,6 +522,7 @@ export enum InternalApi {
     ADD_REACTION_ON_MESSAGE = "addReactionOnMessage",
     REMOVE_REACTION_ON_MESSAGE = "removeReactionOnMessage",
     SIGN_UP = "signUp",
+    ENSURE_USERNAME_AVAILABLE = "ensureUsernameAvailable",
     REMOVE_USER = "removeUser",
     RESET_PASSWORD_REQUEST = "resetPasswordRequest",
     RESET_PASSWORD = "resetPassword",
@@ -623,6 +624,7 @@ export enum UserInfoError {
 
 export enum UserManagementError {
     EMAIL_ADDRESS_ALREADY_TAKEN = "User with this email already exists",
+    USERNAME_ALREADY_IN_USE = "Username is already in use",
     USER_NOT_FOUND = "User not found",
     USER_IS_NOT_REMOVED = "Failed to remove user",
     EMAIL_IS_NOT_VERIFIED = "Email is not verified",
@@ -1382,6 +1384,7 @@ export type MessageDeleted = InternalMessage & {
 
 export type SignUpStatus = InternalMessage & {
     id: UserId,
+    email: UserEmail,
     nickname: UserNickname,
     verified: boolean
 }
@@ -1815,6 +1818,7 @@ export type AuthenticationStatusEvent = InternalMessage & {
 
 export type ExamplesUser = {
     userId: string;
+    email: string;
     password: string;
 }
 

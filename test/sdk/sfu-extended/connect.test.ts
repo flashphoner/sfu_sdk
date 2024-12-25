@@ -24,7 +24,8 @@ describe("connect", () => {
         });
         sfu.connect({
             url: url,
-            ...TEST_USER_0
+            ...TEST_USER_0,
+            username: TEST_USER_0.email
         });
     });
     it("Should disconnect", (done) => {
@@ -35,19 +36,22 @@ describe("connect", () => {
         });
         sfu.connect({
             url: url,
-            ...TEST_USER_0
+            ...TEST_USER_0,
+            username: TEST_USER_0.email
         });
     });
     it("Should reconnect after disconnect", async () => {
         await sfu.connect({
             url: url,
-            ...TEST_USER_0
+            ...TEST_USER_0,
+            username: TEST_USER_0.email
         });
         await sfu.disconnect();
         expect(sfu.state()).toEqual(State.DISCONNECTED);
         const user = await sfu.connect({
             url: url,
-            ...TEST_USER_0
+            ...TEST_USER_0,
+            username: TEST_USER_0.email
         });
         expect(user).toBeTruthy();
         expect(user.username).toEqual(TEST_USER_0.username);
@@ -64,7 +68,8 @@ describe("connect", () => {
             url: url,
             failedProbesThreshold: 2,
             pingInterval: 100,
-            ...TEST_USER_0
+            ...TEST_USER_0,
+            username: TEST_USER_0.email
         });
     });
 })

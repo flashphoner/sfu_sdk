@@ -464,7 +464,8 @@ describe("contacts", () => {
 
                 await alice.connect({
                     url: url,
-                    ...TEST_USER_1
+                    ...TEST_USER_1,
+                    username: TEST_USER_1.email
                 });
                 await bob.deleteSpace({id: space.id});
             });
@@ -490,7 +491,8 @@ describe("contacts", () => {
                 await waitEvent(PresenceStatus.OFFLINE);
                 alice.connect({
                     url: url,
-                    ...TEST_USER_1
+                    ...TEST_USER_1,
+                    username: TEST_USER_1.email
                 });
                 await waitEvent(PresenceStatus.ONLINE);
 
@@ -775,7 +777,8 @@ describe("contacts", () => {
 
                 await alice.connect({
                     url: url,
-                    ...TEST_USER_1
+                    ...TEST_USER_1,
+                    username: TEST_USER_1.email
                 });
                 await bob.deleteChat({id: chat.id});
             });
@@ -801,7 +804,8 @@ describe("contacts", () => {
                 await waitEvent(PresenceStatus.OFFLINE);
                 alice.connect({
                     url: url,
-                    ...TEST_USER_1
+                    ...TEST_USER_1,
+                    username: TEST_USER_1.email
                 });
                 await waitEvent(PresenceStatus.ONLINE);
 
@@ -1017,7 +1021,8 @@ describe("contacts", () => {
 
                     await alice.connect({
                         url: url,
-                        ...TEST_USER_1
+                        ...TEST_USER_1,
+                        username: TEST_USER_1.email
                     });
                     await bob.removeFriend({userId: TEST_USER_1.username});
                 });
@@ -1045,7 +1050,8 @@ describe("contacts", () => {
                     await waitEvent(PresenceStatus.OFFLINE);
                     alice.connect({
                         url: url,
-                        ...TEST_USER_1
+                        ...TEST_USER_1,
+                        username: TEST_USER_1.email
                     });
                     await waitEvent(PresenceStatus.ONLINE);
 
