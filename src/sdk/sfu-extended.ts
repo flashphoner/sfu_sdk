@@ -139,16 +139,19 @@ import {
     UserEncryptionInfo,
     UserChatEncryptedPassword,
     AddedRemovedReactionOnMessage,
+    AddedMembersToThread,
+    RemovedMemberFromThread,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
+import {AttachmentsTransferManager} from "./attachments-transfer-manager";
 
-type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact;
+export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact;
 
-type EventUnion = SfuEvent | SpaceEvent | MeetingSyncEvent;
+export type EventUnion = SfuEvent | SpaceEvent | MeetingSyncEvent;
 
 type MessageWithUploadingAttachmentState = {
     [messageId: string] : MessageWithUploadingAttachments
@@ -165,12 +168,13 @@ export class SfuExtended {
         pmi: string
     }
     #_server: string;
+    #_url: string;
     #_state: State = State.NEW;
     #rooms: { [key: string]: RoomExtended } = {};
     //TODO(naz): Provide union instead of InternalMessage
     #notifier: Notifier<EventUnion, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
     #uploadingAttachmentState: MessageWithUploadingAttachmentState = {}
-    #downloadingAttachmentState: Array<Attachment> = [];
+    #attachmentsTransferManager: AttachmentsTransferManager = new AttachmentsTransferManager(this.#notifier);
     #binaryChunkSize: number;
     #logger: Logger = new Logger();
     #loggerPrefix: PrefixFunction;
@@ -256,6 +260,7 @@ export class SfuExtended {
         const self = this;
         this.#createConnection();
         this.#_server = new URL(options.url).hostname;
+        this.#_url = options.url;
         this.#binaryChunkSize = options.binaryChunkSize ? options.binaryChunkSize : ATTACHMENT_CHUNK_SIZE;
         return new Promise<{
             username: UserId,
@@ -321,14 +326,12 @@ export class SfuExtended {
                         } else if (data[0].type === InternalApi.SFU_ATTACHMENT_REQUEST_ACK) {
                             const ack = data[0] as AttachmentRequestAck;
                             const request = ack.attachmentRequest as AttachmentRequest;
-                            const state = this.#downloadingAttachmentState.find(s => s.messageId === ack.attachmentRequest.messageId);
-                            if (!state) {
-                                this.#downloadingAttachmentState.push({
-                                    ...request,
-                                    payload: null,
-                                    internalMessageId: ack.internalMessageId
-                                })
-                            }
+                            promises.resolve(data[0].internalMessageId, {
+                                ...request,
+                                payload: null,
+                                sessionId: ack.sessionId,
+                                internalMessageId: ack.internalMessageId
+                            });
                         } else if (data[0].type === InternalApi.USER_CALENDAR) {
                             const calendar = data[0] as UserCalendarEvent;
                             promises.resolve(data[0].internalMessageId, calendar.calendar);
@@ -633,6 +636,16 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.SPACE_THREAD_UPDATED, event);
                             }
+                        } else if (data[0].type === SpaceEvent.ADDED_MEMBERS_TO_THREAD) {
+                            const event = data[0] as AddedMembersToThread;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.ADDED_MEMBERS_TO_THREAD, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.REMOVED_MEMBER_FROM_THREAD) {
+                            const event = data[0] as RemovedMemberFromThread;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.REMOVED_MEMBER_FROM_THREAD, event);
+                            }
                         } else if (data[0].type === SpaceEvent.SPACE_THREAD_DELETED) {
                             const event = data[0] as SpaceThreadDeleted;
                             if (!promises.resolve(data[0].internalMessageId, event)) {
@@ -787,41 +800,7 @@ export class SfuExtended {
                         break;
                 }
             },
-            (name: string, data: ArrayBuffer) => {
-                switch (name) {
-                    case InternalApi.BINARY_DATA:
-                        const headerSize = 4;
-                        const buffer = new Uint8Array(data);
-                        const messageTransferId = buffer[1];
-                        const attachmentTransferId = buffer[2];
-                        const eof = buffer[headerSize - 1];
-                        const attachment = this.#downloadingAttachmentState.find((attachment) => attachment.attachmentTransferId === attachmentTransferId && attachment.messageTransferId === messageTransferId);
-                        if (attachment) {
-                            if (!attachment.payload) {
-                                attachment.payload = data.slice(headerSize, data.byteLength);
-                            } else {
-                                //ToDo (igor): optimize ArrayBuffer merging
-                                const newData = new Uint8Array(attachment.payload.byteLength + (data.byteLength - headerSize));
-                                newData.set(new Uint8Array(attachment.payload), 0);
-                                newData.set(new Uint8Array(data.slice(headerSize, data.byteLength)), attachment.payload.byteLength);
-                                attachment.payload = newData.buffer;
-                            }
-                            if (eof === 1) {
-                                this.#notifyMessageAttachmentState(attachment, AttachmentState.DOWNLOADED);
-                                const index = this.#downloadingAttachmentState.indexOf(attachment);
-                                this.#downloadingAttachmentState.splice(index, 1);
-                                // ToDo (igor): need to resolve or reject in any case
-                                promises.resolve(attachment.internalMessageId, attachment);
-                            } else {
-                                this.#notifyMessageAttachmentState(attachment, AttachmentState.PENDING);
-                            }
-                        } else {
-                            this.#logger.info("Unable to find attachment with messageTransferId " + messageTransferId + " attachmentTransferId " + attachmentTransferId);
-                        }
-                        break;
-                    default:
-                        console.error("Unknown binary data type " + name);
-                }
+            () => {
             },
             (e) => {
                 self.#_state = State.FAILED;
@@ -830,7 +809,6 @@ export class SfuExtended {
             (e) => {
                 self.#_state = State.DISCONNECTED;
                 self.disconnect();
-                self.#downloadingAttachmentState.length = 0;
                 self.#uploadingAttachmentState = {};
                 const event: ConnectionFailedEvent = {
                     reason: e.reason,
@@ -1624,7 +1602,17 @@ export class SfuExtended {
      *
      * On client side should receive {@link SfuEvent.MESSAGE_ATTACHMENT_STATE} with {@link AttachmentStatus} to show progress
      */
-    public getMessageAttachment(attachment: AttachmentRequest) {
+    public async getMessageAttachment(attachment: AttachmentRequest) {
+        let result;
+        try {
+            result = await this.downloadAttachment(attachment);
+        } catch (e) {
+            throw e;
+        }
+        return await this.#attachmentsTransferManager.download(result, this.#_url);
+    }
+
+    private downloadAttachment(attachment: AttachmentRequest) {
         this.#checkAuthenticated();
         const self = this;
         const {targetEntityType, targetEntityId, messageId, attachmentId, name} = attachment;
@@ -1647,19 +1635,6 @@ export class SfuExtended {
                 size: self.#binaryChunkSize
             }, resolve, reject);
         })
-    }
-
-    #notifyMessageAttachmentState(attachment: Attachment, state: AttachmentState) {
-        const status: AttachmentStatus = {
-            targetEntityType: attachment.targetEntityType,
-            targetEntityId: attachment.targetEntityId,
-            messageId: attachment.messageId,
-            id: attachment.attachmentId,
-            name: attachment.name,
-            state: state,
-            downloadedSize: attachment.payload.byteLength
-        };
-        this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENT_STATE, status);
     }
 
     /**
@@ -2932,6 +2907,59 @@ export class SfuExtended {
                 channelId: options.channelId,
                 threadId: options.threadId,
                 name: options.name
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Add members to thread
+     *
+     * Thread members will receive {@link SpaceEvent.ADDED_MEMBERS_TO_THREAD} with {@link AddedMembersToThread}
+     *
+     * New members will receive {@link NEW_SPACE_THREAD} with {@link NewSpaceThreadEvent}
+     *
+     */
+    public addMembersToThread(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string,
+        members: Array<string>
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AddedMembersToThread>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ADD_MEMBERS_TO_THREAD, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId,
+                members: options.members
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Remove member from thread
+     *
+     * For space owner/thread creator only
+     *
+     * Thread members will receive {@link SpaceEvent.REMOVED_MEMBER_FROM_THREAD} with {@link RemovedMemberFromThread}
+     *
+     * The removed member will receive {@link SpaceEvent.SPACE_THREAD_DELETED} with {@link SpaceThreadDeleted}
+     */
+    public removeMemberFromThread(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string,
+        member: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RemovedMemberFromThread>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_MEMBER_FROM_THREAD, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId,
+                member: options.member
             }, resolve, reject);
         });
     }

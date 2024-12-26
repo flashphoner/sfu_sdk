@@ -249,6 +249,10 @@ export enum SpaceEvent {
     SPACE_THREAD_DELETED = "SPACE_THREAD_DELETED",
     /** Used to receive {@link SpaceThreadUpdated} */
     SPACE_THREAD_UPDATED = "SPACE_THREAD_UPDATED",
+    /** Used to receive {@link AddedMembersToThread} */
+    ADDED_MEMBERS_TO_THREAD = "ADDED_MEMBERS_TO_THREAD",
+    /** Used to receive {@link RemovedMemberFromThread} */
+    REMOVED_MEMBER_FROM_THREAD = "REMOVED_MEMBER_FROM_THREAD",
     /** Used to receive {@link SpaceInviteCreated} */
     SPACE_INVITE_CREATED = "SPACE_INVITE_CREATED",
     /** Used to receive {@link SpaceInviteRevoked} */
@@ -294,7 +298,6 @@ export enum MeetingSyncEvent {
     PARTICIPANT_LIST_SYNC = "PARTICIPANT_LIST_SYNC",
     /** Used to receive {@link MeetingNameUpdatedSync} */
     MEETING_NAME_UPDATED_SYNC = "MEETING_NAME_UPDATED_SYNC",
-
 }
 
 export enum ExamplesEvent {
@@ -415,6 +418,7 @@ export enum InternalApi {
     P_APP = "sfuApp",
     Z_USER_MANAGEMENT_APP = "sfuZUserManagementApp",
     Z_EXAMPLES_MANAGEMENT_APP = "sfuZExamplesManagementApp",
+    Z_ATTACHMENTS_TRANSFER_APP = "sfuZAttachmentsTransferHandler",
     DEFAULT_METHOD = "sfuCallback",
     BINARY_DATA = "binaryData",
     JOIN_ROOM = "joinRoom",
@@ -547,6 +551,8 @@ export enum InternalApi {
     DELETE_SPACE_CHANNEL = "deleteSpaceChannel",
     CREATE_SPACE_THREAD = "createSpaceThread",
     UPDATE_SPACE_THREAD = "updateSpaceThread",
+    ADD_MEMBERS_TO_THREAD = "addMembersToThread",
+    REMOVE_MEMBER_FROM_THREAD = "removeMemberFromThread",
     DELETE_SPACE_THREAD = "deleteSpaceThread",
     GENERATE_SPACE_INVITE =  "generateNewSpaceInvite",
     REVOKE_SPACE_INVITE = "revokeSpaceInvite",
@@ -591,7 +597,8 @@ export enum ChatError {
     CAN_NOT_ADD_MEMBER_TO_PRIVATE_CHAT = "Adding a member to the private chat is not allowed",
     CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
     CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed",
-    INCORRECT_CHAT_ENCRYPTION_SETTINGS = "Incorrect chat encryption settings"
+    INCORRECT_CHAT_ENCRYPTION_SETTINGS = "Incorrect chat encryption settings",
+    DOWNLOADING_ATTACHMENT_FAILED = "Downloading failed"
 }
 
 export enum ChatSectionsError {
@@ -1073,19 +1080,19 @@ export type AttachmentRequest = {
     targetEntityType: MessageTargetEntityType;
     targetEntityId: MessageTargetEntityId;
     messageId: string;
-    messageTransferId?: number;
     attachmentId: string;
-    attachmentTransferId?: number;
     name: string;
 }
 
 export type Attachment = AttachmentRequest & {
     internalMessageId: string;
+    sessionId?: string;
     payload: ArrayBuffer
 }
 
 export type AttachmentRequestAck = InternalMessage & {
-    attachmentRequest: AttachmentRequest
+    sessionId: string;
+    attachmentRequest: AttachmentRequest;
 }
 
 export enum MessageTargetEntityType {
@@ -1627,6 +1634,20 @@ export type SpaceThreadUpdated = InternalMessage & {
     channelId: string;
     threadId: string;
     name: string;
+}
+
+export type AddedMembersToThread = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
+    members: Array<string>;
+}
+
+export type RemovedMemberFromThread = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
+    member: string;
 }
 
 export type SpaceThreadDeleted = InternalMessage & {

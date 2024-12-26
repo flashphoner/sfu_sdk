@@ -43,6 +43,9 @@ import {
     SfuEvent,
     ConferenceType,
     AddedRemovedReactionOnMessage,
+    NewSpaceThreadEvent,
+    RemovedMemberFromThread,
+    SpaceThreadDeleted,
 } from "../../../src/sdk/constants";
 
 describe("spaces", () => {
@@ -298,6 +301,23 @@ describe("spaces", () => {
                 expect(thread.members.length).toBe(1);
                 expect(thread.members).toContain(TEST_USER_0.username);
                 expect(thread.creator).toEqual(TEST_USER_0.username);
+                await bob.deleteSpace({id: space.id});
+            });
+            it('should create a private thread', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+                const thread = await bob.createSpaceThread({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    name: TEST_THREAD_NAME,
+                    isPrivate: true
+                });
+                expect(thread.name).toEqual(TEST_THREAD_NAME);
+                expect(thread.private).toBeTruthy();
                 await bob.deleteSpace({id: space.id});
             });
             it('should update thread', async () => {
@@ -1701,6 +1721,159 @@ describe("spaces", () => {
                     expect(kiriSpace).toBeTruthy();
                     kiriChannel = kiriSpace.channels.find((currentChannel) => currentChannel.id === channel.id);
                     expect(kiriChannel).toBeFalsy();
+                    await bob.deleteSpace({id: space.id});
+                });
+            });
+            describe("threads", () => {
+                it('should create private thread', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    await kiri.joinSpaceByInviteCode(invite.inviteCode);
+
+                    const channel = await bob.createSpaceChannel({
+                        spaceId: space.id,
+                        name: TEST_CHANNEL_NAME,
+                        isPrivate: false,
+                    });
+
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: true
+                    });
+                    expect(thread.members.length).toBe(1);
+
+                    const aliceSpaces = await alice.getUserSpaces();
+                    const aliceSpace = aliceSpaces.find((userSpace) => userSpace.id === space.id);
+                    expect(aliceSpace).toBeTruthy();
+                    const aliceChannel = aliceSpace.channels.find((currentChannel) => currentChannel.id === channel.id);
+                    expect(aliceChannel).toBeTruthy();
+                    const aliceThread = aliceChannel.threads.find((item) => item.id === thread.id);
+                    expect(aliceThread).toBeFalsy();
+                    const kiriSpaces = await kiri.getUserSpaces();
+                    const kiriSpace = kiriSpaces.find((userSpace) => userSpace.id === space.id);
+                    expect(kiriSpace).toBeTruthy();
+                    const kiriChannel = kiriSpace.channels.find((currentChannel) => currentChannel.id === channel.id);
+                    expect(kiriChannel).toBeTruthy();
+                    const kiriThread = kiriChannel.threads.find((item) => item.id === thread.id);
+                    expect(kiriThread).toBeFalsy();
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('should add members to private thread', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    await kiri.joinSpaceByInviteCode(invite.inviteCode);
+
+                    const channel = await bob.createSpaceChannel({
+                        spaceId: space.id,
+                        name: TEST_CHANNEL_NAME,
+                        isPrivate: false,
+                    });
+
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: true
+                    });
+                    expect(thread.members.length).toBe(1);
+
+                    const waitEvents = async () => {
+                        let eventsCount = 0;
+                        return new Promise<void>((resolve) => {
+                            const checkEvents = () => {
+                                if (eventsCount == 2) {
+                                    resolve();
+                                }
+                            }
+                            alice.on(SpaceEvent.NEW_SPACE_THREAD, (msg) => {
+                                const event = msg as NewSpaceThreadEvent;
+                                if (event.thread.id === thread.id && event.thread.members.length === 3) {
+                                    eventsCount++;
+                                    checkEvents();
+                                }
+                            });
+                            kiri.on(SpaceEvent.NEW_SPACE_THREAD, (msg) => {
+                                const event = msg as NewSpaceThreadEvent;
+                                if (event.thread.id === thread.id && event.thread.members.length === 3) {
+                                    eventsCount++;
+                                    checkEvents();
+                                }
+                            });
+                        });
+                    }
+                    bob.addMembersToThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        threadId: thread.id,
+                        members: [TEST_USER_1.username, TEST_USER_2.username]
+                    })
+                    await waitEvents();
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('should remove member from private thread', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    await kiri.joinSpaceByInviteCode(invite.inviteCode);
+
+                    const channel = await bob.createSpaceChannel({
+                        spaceId: space.id,
+                        name: TEST_CHANNEL_NAME,
+                        isPrivate: false,
+                    });
+
+                    const thread = await bob.createSpaceThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        name: TEST_THREAD_NAME,
+                        isPrivate: true
+                    });
+                    expect(thread.members.length).toBe(1);
+
+                    await bob.addMembersToThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        threadId: thread.id,
+                        members: [TEST_USER_1.username, TEST_USER_2.username]
+                    })
+                    const waitEvents = async () => {
+                        let eventsCount = 0;
+                        return new Promise<void>((resolve) => {
+                            const checkEvents = () => {
+                                if (eventsCount == 2) {
+                                    resolve();
+                                }
+                            }
+                            alice.on(SpaceEvent.REMOVED_MEMBER_FROM_THREAD, (msg) => {
+                                const event = msg as RemovedMemberFromThread;
+                                if (event.threadId === thread.id && event.member === TEST_USER_2.username) {
+                                    eventsCount++;
+                                    checkEvents();
+                                }
+                            });
+                            kiri.on(SpaceEvent.SPACE_THREAD_DELETED, (msg) => {
+                                const event = msg as SpaceThreadDeleted;
+                                if (event.threadId === thread.id) {
+                                    eventsCount++;
+                                    checkEvents();
+                                }
+                            });
+                        });
+                    }
+                    bob.removeMemberFromThread({
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        threadId: thread.id,
+                        member: TEST_USER_2.username
+                    })
+                    await waitEvents();
                     await bob.deleteSpace({id: space.id});
                 });
             });
