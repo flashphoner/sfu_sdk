@@ -182,9 +182,6 @@ export class Connection {
                 switch (name) {
                     case "ping":
                         that.send("pong", null);
-                        if (that.pingChecker) {
-                            that.pingChecker.success();
-                        }
                         break;
                     case "getUserData":
                         that.connected = true;
@@ -196,6 +193,7 @@ export class Connection {
                     default:
                         that.onMessage(name, msg);
                 }
+                that.resetPingChecker(name);
             };
         });
     }
@@ -240,6 +238,13 @@ export class Connection {
                 }
                 self.ws.close();
             });
+        }
+    }
+
+    private resetPingChecker(eventName: string) {
+        if (this.pingChecker) {
+            this.logger.debug("Reset pings checker by event:", eventName);
+            this.pingChecker.success();
         }
     }
 }
