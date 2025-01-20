@@ -23,6 +23,17 @@ export async function generateKeyPair(): Promise<{ publicKey: string; privateKey
     });
 }
 
+export async function generateAESKey(): Promise<string> {
+    return new Promise((resolve, reject) => {
+        try {
+            const key = crypto.randomBytes(32);
+            resolve(key.toString('base64'));
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
 export function privateKeyToString(privateKey: crypto.KeyObject): string {
     return privateKey.export({ type: 'pkcs8', format: 'pem' }).toString('utf8');
 }

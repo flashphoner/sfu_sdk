@@ -2163,6 +2163,7 @@ export class SfuExtended {
      * @param chat.publicKey - the public key of the chat used to encrypt messages
      * @param chat.encryptedPrivateKey - the private key of the chat, encrypted with a chat password, used to decrypt messages
      * @param chat.encryptedChatPasswords - an array of chat passwords for each member encrypted with the member's public keys, which must be decrypted using the user's private key.
+     * @param chat.encryptedAttachmentsSecretKey - encrypted key for encrypting attachments.
      */
     public createChat(chat: {
         id?: string,
@@ -2177,7 +2178,8 @@ export class SfuExtended {
         isEncryptionEnabled?: boolean,
         encryptedPrivateKey?: string,
         publicKey?: string,
-        encryptedChatPasswords?: Array<UserChatEncryptedPassword>
+        encryptedChatPasswords?: Array<UserChatEncryptedPassword>,
+        encryptedAttachmentsSecretKey?: string
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -2195,7 +2197,8 @@ export class SfuExtended {
                 encryptionEnabled: chat.isEncryptionEnabled,
                 encryptedPrivateKey: chat.encryptedPrivateKey,
                 publicKey: chat.publicKey,
-                encryptedChatPasswords: chat.encryptedChatPasswords
+                encryptedChatPasswords: chat.encryptedChatPasswords,
+                encryptedAttachmentsSecretKey: chat.encryptedAttachmentsSecretKey
             }, resolve, reject);
         });
     };

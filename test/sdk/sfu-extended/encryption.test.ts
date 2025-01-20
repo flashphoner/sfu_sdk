@@ -6,6 +6,7 @@ import {
     decryptWithPrivateKey,
     encryptPrivateKey,
     encryptWithPublicKey,
+    generateAESKey,
     generateKeyPair
 } from "../../util/encryption";
 import {
@@ -72,16 +73,20 @@ describe("encryption", () => {
                 password: aliceEncryptedChatPassword
             });
 
+            const attachmentsKey = await generateAESKey();
+
             const chat = await bob.createChat({
                 isEncryptionEnabled: true,
                 publicKey: chatKeyPair.publicKey,
                 encryptedPrivateKey: encryptedChatPrivateKey,
-                encryptedChatPasswords
+                encryptedChatPasswords,
+                encryptedAttachmentsSecretKey: attachmentsKey
             });
             expect(chat).toBeTruthy();
             expect(chat.encryptionEnabled).toBeTruthy();
             expect(chat.publicKey).toEqual(chatKeyPair.publicKey);
             expect(chat.encryptedPrivateKey).toEqual(encryptedChatPrivateKey);
+            expect(chat.encryptedAttachmentsSecretKey).toEqual(attachmentsKey);
 
             const decryptedBobChatPassword = await decryptWithPrivateKey(bobKeyPair.privateKey, chat.encryptedChatPassword);
             expect(chatPassword).toEqual(decryptedBobChatPassword);
@@ -116,12 +121,15 @@ describe("encryption", () => {
                 }
             ];
 
+            const attachmentsKey = await generateAESKey();
+
             let chat = await bob.createChat({
                 type: ChatType.PUBLIC,
                 isEncryptionEnabled: true,
                 publicKey: chatKeyPair.publicKey,
                 encryptedPrivateKey: encryptedChatPrivateKey,
-                encryptedChatPasswords
+                encryptedChatPasswords,
+                encryptedAttachmentsSecretKey: attachmentsKey
             });
 
             chat = await bob.addMemberToChat({
@@ -147,13 +155,15 @@ describe("encryption", () => {
                     password: bobEncryptedChatPassword
                 }
             ];
+            const attachmentsKey = await generateAESKey();
 
             let chat = await bob.createChat({
                 type: ChatType.PUBLIC,
                 isEncryptionEnabled: true,
                 publicKey: chatKeyPair.publicKey,
                 encryptedPrivateKey: encryptedChatPrivateKey,
-                encryptedChatPasswords
+                encryptedChatPasswords,
+                encryptedAttachmentsSecretKey: attachmentsKey
             });
 
             const waitNewChatEvent = (): Promise<void> => {

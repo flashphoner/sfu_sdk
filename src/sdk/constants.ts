@@ -1262,6 +1262,7 @@ export type UserSpecificChatInfo = {
     encryptedPrivateKey: string;
     publicKey: string;
     encryptedChatPassword: string;
+    encryptedAttachmentsSecretKey: string;
 }
 export enum ChatType {
     PUBLIC = "PUBLIC",
