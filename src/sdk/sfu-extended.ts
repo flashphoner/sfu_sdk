@@ -141,6 +141,7 @@ import {
     AddedRemovedReactionOnMessage,
     AddedMembersToThread,
     RemovedMemberFromThread,
+    ConnectionError,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -242,6 +243,14 @@ export class SfuExtended {
         if (!options) {
             throw new TypeError("No options provided");
         }
+
+        if (this.#_state === State.PENDING) {
+            return Promise.reject(new Error(ConnectionError.CONNECTION_ALREADY_IN_PROGRESS))
+        }
+        if (this.#_state === State.AUTHENTICATED) {
+            return Promise.reject(new Error(ConnectionError.CONNECTION_ALREADY_ESTABLISHED));
+        }
+        this.#_state = State.PENDING;
         const connectionConfig = {
             url: options.url,
             appName: InternalApi.Z_APP,
@@ -1146,7 +1155,7 @@ export class SfuExtended {
     public logout() {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<LastReadMessageUpdated>(function(resolve, reject) {
+        return new Promise<void>(function(resolve, reject) {
             self.#emmitAction(InternalApi.LOGOUT, {}, resolve, reject);
         });
     }

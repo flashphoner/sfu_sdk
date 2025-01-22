@@ -578,6 +578,11 @@ export enum InternalApi {
     GET_USER_ENCRYPTION_INFO = "getUserEncryptionInfo"
 }
 
+export enum ConnectionError {
+    CONNECTION_ALREADY_ESTABLISHED = "Connection is already established.",
+    CONNECTION_ALREADY_IN_PROGRESS = "Connection is already in progress."
+}
+
 export enum ContactError {
     USER_CAN_NOT_SEND_INVITE_TO_HIMSELF = "User can not send invite to himself"
 }

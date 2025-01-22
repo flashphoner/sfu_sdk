@@ -88,7 +88,7 @@ export class Connection {
     private connected: boolean;
     private connectionTimeout: number;
     private logger: Logger;
-    private pingChecker: WSPingReceiver;
+    private pingChecker: WSPingReceiver | null;
 
     public constructor(onMessage: OnMessageCallback, onBinaryData: OnBinaryDataCallback, onError: Function, onClose: Function, logger?: Logger) {
         this.connected = false;
@@ -132,19 +132,23 @@ export class Connection {
                 }, timeout);
             }
             that.ws.onerror = function (e) {
+                that.stopPingChecking();
                 if (that.connected) {
                     that.onError(e);
                 } else {
                     reject(e);
                 }
+                that.connected = false;
             };
             that.ws.onclose = function (e) {
                 that.logger.debug("WebSocket connection closed, reason " + e.reason);
+                that.stopPingChecking();
                 if (that.connected) {
                     that.onClose(e);
                 } else {
                     reject(e);
                 }
+                that.connected = false;
             };
             that.ws.onopen = function () {
                 clearInterval(that.connectionTimeout);
@@ -219,9 +223,7 @@ export class Connection {
     public async close(error?: ConnectionFailedEvent) {
         if (this.ws) {
             // Stop pings checking if enabled
-            if (this.pingChecker) {
-                this.pingChecker.stop();
-            }
+            this.stopPingChecking();
             // Close websocket connection
             const self = this;
             return new Promise<void>(function (resolve) {
@@ -234,10 +236,18 @@ export class Connection {
                             self.onClose(e);
                         }
                     }
+                    self.connected = false;
                     resolve();
                 }
                 self.ws.close();
             });
+        }
+    }
+
+    private stopPingChecking() {
+        if (this.pingChecker) {
+            this.pingChecker.stop();
+            this.pingChecker = null;
         }
     }
 

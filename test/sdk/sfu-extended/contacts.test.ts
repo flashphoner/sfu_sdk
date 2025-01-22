@@ -753,14 +753,26 @@ describe("contacts", () => {
             it('user should be notified when contact disconnects', async () => {
                 const waitEvent = async () => {
                     return new Promise<void>((resolve) => {
-                        const bobHandler = (msg) => {
+                        let eventsCount = 0;
+                        const checkEvents = () => {
+                            if (eventsCount === 2) {
+                                resolve();
+                            }
+                        }
+                        const bobStatusHandler = (msg) => {
                             const event = msg as UserPresenceStatusUpdated;
                             expect(event.userId).toEqual(TEST_USER_1.username);
                             expect(event.status).toEqual(PresenceStatus.OFFLINE);
-                            bob.off(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
+                            bob.off(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobStatusHandler);
                             resolve();
                         }
-                        bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
+                        const aliceDisconnectedHandler = (msg) => {
+                            alice.off(SfuEvent.DISCONNECTED, aliceDisconnectedHandler);
+                            eventsCount++;
+                            checkEvents();
+                        }
+                        bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobStatusHandler);
+                        alice.on(SfuEvent.DISCONNECTED, aliceDisconnectedHandler);
                     });
                 };
 
@@ -783,16 +795,29 @@ describe("contacts", () => {
                 await bob.deleteChat({id: chat.id});
             });
             it('user should be notified when contact connects', async () => {
-                const waitEvent = async (status: PresenceStatus) => {
+                const waitEvent = async (status: PresenceStatus, connectionEvent: SfuEvent) => {
                     return new Promise<void>((resolve) => {
-                        const bobHandler = (msg) => {
+                        let eventsCount = 0;
+                        const checkEvents = () => {
+                            if (eventsCount === 2) {
+                                resolve();
+                            }
+                        }
+                        const bobStatusHandler = (msg) => {
                             const event = msg as UserPresenceStatusUpdated;
                             expect(event.userId).toEqual(TEST_USER_1.username);
                             expect(event.status).toEqual(status);
-                            bob.off(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
-                            resolve();
+                            bob.off(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobStatusHandler);
+                            eventsCount++;
+                            checkEvents();
                         }
-                        bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
+                        bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobStatusHandler);
+                        const aliceConnectionHandler = (msg) => {
+                            alice.off(connectionEvent, aliceConnectionHandler);
+                            eventsCount++;
+                            checkEvents();
+                        }
+                        alice.on(connectionEvent, aliceConnectionHandler);
                     });
                 };
 
@@ -801,13 +826,14 @@ describe("contacts", () => {
                 });
 
                 alice.disconnect();
-                await waitEvent(PresenceStatus.OFFLINE);
+                await waitEvent(PresenceStatus.OFFLINE, SfuEvent.DISCONNECTED);
+
                 alice.connect({
                     url: url,
                     ...TEST_USER_1,
                     username: TEST_USER_1.email
                 });
-                await waitEvent(PresenceStatus.ONLINE);
+                await waitEvent(PresenceStatus.ONLINE, SfuEvent.CONNECTED);
 
                 const bobContacts = await bob.getContacts();
                 expect(bobContacts.contacts.some((item) => item.userId === TEST_USER_1.username && item.nickname === TEST_USER_1.nickname && item.status === PresenceStatus.ONLINE)).toBeTruthy();
@@ -995,6 +1021,12 @@ describe("contacts", () => {
                 it('user should be notified when friend disconnects', async () => {
                     const waitEvent = async () => {
                         return new Promise<void>((resolve) => {
+                            let eventsCount = 0;
+                            const checkEvents = () => {
+                                if (eventsCount === 2) {
+                                    resolve();
+                                }
+                            }
                             const bobHandler = (msg) => {
                                 const event = msg as UserPresenceStatusUpdated;
                                 expect(event.userId).toEqual(TEST_USER_1.username);
@@ -1003,6 +1035,12 @@ describe("contacts", () => {
                                 resolve();
                             }
                             bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
+                            const aliceDisconnectedHandler = () => {
+                                alice.off(SfuEvent.DISCONNECTED, aliceDisconnectedHandler);
+                                eventsCount++;
+                                checkEvents();
+                            }
+                            alice.on(SfuEvent.DISCONNECTED, aliceDisconnectedHandler);
                         });
                     };
 
@@ -1027,16 +1065,29 @@ describe("contacts", () => {
                     await bob.removeFriend({userId: TEST_USER_1.username});
                 });
                 it('user should be notified when friend connects', async () => {
-                    const waitEvent = async (status: PresenceStatus) => {
+                    const waitEvent = async (status: PresenceStatus, connectionEvent: SfuEvent) => {
                         return new Promise<void>((resolve) => {
+                            let eventsCount = 0;
+                            const checkEvents = () => {
+                                if (eventsCount === 2) {
+                                    resolve();
+                                }
+                            }
                             const bobHandler = (msg) => {
                                 const event = msg as UserPresenceStatusUpdated;
                                 expect(event.userId).toEqual(TEST_USER_1.username);
                                 expect(event.status).toEqual(status);
                                 bob.off(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
-                                resolve();
+                                eventsCount++;
+                                checkEvents();
                             }
                             bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
+                            const aliceConnectionHandler = () => {
+                                alice.off(connectionEvent, aliceConnectionHandler);
+                                eventsCount++;
+                                checkEvents();
+                            }
+                            alice.on(connectionEvent, aliceConnectionHandler);
                         });
                     };
 
@@ -1047,13 +1098,13 @@ describe("contacts", () => {
                     await alice.acceptFriendInvite({inviteId: incomingInvite.inviteId})
 
                     alice.disconnect();
-                    await waitEvent(PresenceStatus.OFFLINE);
+                    await waitEvent(PresenceStatus.OFFLINE, SfuEvent.DISCONNECTED);
                     alice.connect({
                         url: url,
                         ...TEST_USER_1,
                         username: TEST_USER_1.email
                     });
-                    await waitEvent(PresenceStatus.ONLINE);
+                    await waitEvent(PresenceStatus.ONLINE, SfuEvent.CONNECTED);
 
                     const bobContacts = await bob.getContacts();
                     expect(bobContacts.contacts.some((item) => item.userId === TEST_USER_1.username && item.nickname === TEST_USER_1.nickname && item.status === PresenceStatus.ONLINE)).toBeTruthy();
