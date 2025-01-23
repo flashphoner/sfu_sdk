@@ -142,6 +142,7 @@ import {
     AddedMembersToThread,
     RemovedMemberFromThread,
     ConnectionError,
+    UserSpaceNicknameUpdated,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -713,6 +714,11 @@ export class SfuExtended {
                             const event = data[0] as RolePermissionSectionsEvent;
                             if (!promises.resolve(data[0].internalMessageId, event.permissionSections)) {
                                 this.#notifier.notify(SpaceEvent.ROLE_PERMISSION_SECTIONS, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.USER_SPACE_NICKNAME_UPDATED) {
+                            const event = data[0] as UserSpaceNicknameUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.USER_SPACE_NICKNAME_UPDATED, event);
                             }
                         } else if (data[0].type === SfuEvent.USER_MEETINGS) {
                             const event = data[0] as MeetingsPreviewEvent;
@@ -3146,6 +3152,29 @@ export class SfuExtended {
         const self = this;
         return new Promise<Array<SfuSpaceRolePermissionSection>>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_ROLE_PERMISSIONS, {}, resolve, reject);
+        });
+    }
+
+    /**
+     * Update nickname in the space
+     *
+     * A custom nickname takes higher priority over the global one in a space. The nickname is updated for the {@link SfuSpaceMember}.
+     * If a custom nickname is not set, it will be an empty string, and in this case, the display global nickname will be taken from the contacts.
+     * To remove a custom nickname and use the global one, provide an empty string.
+     *
+     * Space members will receive {@link SpaceEvent.USER_SPACE_NICKNAME_UPDATED} with {@link UserSpaceNicknameUpdated}
+     */
+    public updateSpaceNickname(options: {
+        spaceId: string,
+        nickname: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_NICKNAME, {
+                spaceId: options.spaceId,
+                nickname: options.nickname
+            }, resolve, reject);
         });
     }
 

@@ -273,6 +273,8 @@ export enum SpaceEvent {
     REMOVED_ROLE_FROM_MEMBER = "REMOVED_ROLE_FROM_MEMBER",
     /** Used to receive {@link RolePermissionSectionsEvent} */
     ROLE_PERMISSION_SECTIONS = "ROLE_PERMISSION_SECTIONS",
+    /** Used to receive {@link UserSpaceNicknameUpdated} */
+    USER_SPACE_NICKNAME_UPDATED = "USER_SPACE_NICKNAME_UPDATED"
 }
 
 /**
@@ -575,7 +577,8 @@ export enum InternalApi {
     UPDATE_ACTIVITY_STATUS = "updateActivityStatus",
     GET_EXAMPLES_FREE_USER = "getFreeUser",
     ADD_USER_ENCRYPTION_INFO = "addUserEncryptionInfo",
-    GET_USER_ENCRYPTION_INFO = "getUserEncryptionInfo"
+    GET_USER_ENCRYPTION_INFO = "getUserEncryptionInfo",
+    UPDATE_SPACE_NICKNAME = "updateSpaceNickname"
 }
 
 export enum ConnectionError {
@@ -1801,6 +1804,12 @@ export type UserEncryptionInfo = {
 
 export type UserEncryptionInfoEvent = InternalMessage & {
     info: UserEncryptionInfo;
+}
+
+export type UserSpaceNicknameUpdated = InternalMessage & {
+    spaceId: string;
+    userId: string;
+    nickname: string;
 }
 
 export enum SortOrder {

@@ -46,6 +46,7 @@ import {
     NewSpaceThreadEvent,
     RemovedMemberFromThread,
     SpaceThreadDeleted,
+    UserSpaceNicknameUpdated,
 } from "../../../src/sdk/constants";
 
 describe("spaces", () => {
@@ -873,6 +874,29 @@ describe("spaces", () => {
                 };
                 alice.leaveSpace({id: space.id});
                 await waitLeftEvent();
+                await bob.deleteSpace({id: space.id});
+            });
+            it('should update space nickname', async () => {
+                const newNickname = "CUSTOM_NICKNAME";
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+
+                await alice.joinSpaceByInviteCode(invite.inviteCode);
+                const waitUpdateEvent = async () => {
+                    return new Promise<void>((resolve) => {
+                        bob.on(SpaceEvent.USER_SPACE_NICKNAME_UPDATED, (msg) => {
+                            const event = msg as UserSpaceNicknameUpdated;
+                            expect(event.spaceId).toEqual(space.id);
+                            if (event.userId === alice.user().username && event.nickname === newNickname) {
+                                resolve();
+                            }
+                        });
+                    })
+                };
+                alice.updateSpaceNickname({spaceId: space.id, nickname : newNickname});
+                await waitUpdateEvent();
+
+                await alice.updateSpaceNickname({spaceId: space.id, nickname : ""});
                 await bob.deleteSpace({id: space.id});
             });
             describe("notifications", () => {
