@@ -494,6 +494,7 @@ export enum InternalApi {
     UPDATE_CHAT_CONFIGURATION = "updateChatConfiguration",
     ADD_CHAT_TO_FAVOURITES = "addChatToFavourites",
     REMOVE_CHAT_FROM_FAVOURITES = "removeChatFromFavourites",
+    UPDATE_CHAT_HIDING = "updateChatHiding",
     ADD_CONTACT_TO_FAVOURITES = "addContactToFavourites",
     REMOVE_CONTACT_FROM_FAVOURITES = "removeContactFromFavourites",
     GET_ACTIVE_ROOMS = "getActiveRooms",
@@ -1254,9 +1255,11 @@ export type UserSpecificChatInfo = {
     id: string;
     roomId: string;
     favourite: boolean;
+    hidden: boolean;
     channel: boolean;
     name: string;
     owner: UserId;
+    creationDate: number;
     members: Array<UserId>;
     lastReadMessageId: string;
     lastReadMessageDate: number;

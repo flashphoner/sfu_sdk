@@ -892,6 +892,26 @@ describe("chat", () => {
                 member: TEST_USER_1.username
             })).rejects.toHaveProperty("error", ChatError.CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT);
         });
+        it("Should update personal chat hiding", async () => {
+            let chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
+            chat = await bob.updateChatHiding({
+                id: chat.id,
+                hidden: true,
+            });
+            expect(chat.hidden).toBeTruthy();
+            let chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.hidden).toBeTruthy();
+            chat = await bob.updateChatHiding({
+                id: chat.id,
+                hidden: false,
+            });
+            expect(chat.hidden).toBeFalsy();
+            chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.hidden).toBeFalsy();
+            await bob.deleteChat(chat);
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});
@@ -1470,10 +1490,12 @@ describe("chat", () => {
                 alice.on(SfuEvent.NEW_CHAT, async (msg) => {
                     const chat1 = msg as UserSpecificChatInfo;
                     expect(chat1.id).toEqual(chat0.id);
+                    expect(chat1.creationDate).toBeGreaterThan(1);
                     await bob.deleteChat(chat0);
                     done();
                 });
                 let chat0 = await bob.createChat({channel: false, type: ChatType.PUBLIC});
+                expect(chat0.creationDate).toBeGreaterThan(1);
                 await bob.addMemberToChat({id: chat0.id, member: TEST_USER_1.username});
             });
             it("user should be notified when removed from group chat", async (done) => {

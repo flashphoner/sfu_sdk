@@ -2408,6 +2408,23 @@ export class SfuExtended {
     }
 
     /**
+     * Used to change {@link UserSpecificChatInfo.hidden}
+     */
+    public updateChatHiding(chat: {
+        id: string,
+        hidden: boolean,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<UserSpecificChatInfo>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHAT_HIDING, {
+                id: chat.id,
+                value: chat.hidden
+            }, resolve, reject);
+        });
+    }
+
+    /**
      * Create room
      *
      * To create with PMI settings, PMI must be specified as the ID.
