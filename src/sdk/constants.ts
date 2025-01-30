@@ -134,6 +134,8 @@ export enum RoomEvent {
     JOINED = "JOINED",
     /** Used to receive {@link LeftRoom} */
     LEFT = "LEFT",
+    /** Used to receive {@link ForcefullyLeftEvent} */
+    FORCEFULLY_LEFT = "FORCEFULLY_LEFT",
     /** Used to receive {@link PlacedInLobbyEvent} */
     PLACED_IN_LOBBY = "PLACED_IN_LOBBY",
     /** Used without callback event */
@@ -815,6 +817,11 @@ export type LeftRoom = InternalMessage & {
 export type EvictedFromRoom = InternalMessage & {
     userId: UserId,
     name: UserNickname
+}
+
+export type ForcefullyLeftEvent = InternalMessage & {
+    userId: string,
+    reason: string
 }
 
 export type ParticipantRenamed = InternalMessage & {

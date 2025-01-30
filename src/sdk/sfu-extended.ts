@@ -34,6 +34,7 @@ import {
     InternalMessage,
     LastReadMessageUpdated,
     LeftRoom,
+    ForcefullyLeftEvent,
     LoadMessagesWithMentionsResult,
     Message,
     MessageAttachment,
@@ -420,6 +421,10 @@ export class SfuExtended {
                                 if (participant.userId === room.userId()) {
                                     cleanup();
                                 }
+                            }).on(RoomEvent.FORCEFULLY_LEFT, function (event: ForcefullyLeftEvent) {
+                                if (event.userId === room.userId()) {
+                                    cleanup();
+                                }
                             }).on(RoomEvent.EVICTED, function (participant: LeftRoom) {
                                 if (participant.userId === room.userId()) {
                                     cleanup();
@@ -453,6 +458,10 @@ export class SfuExtended {
                                 if (participant.userId === room.userId()) {
                                     cleanup();
                                 }
+                            }).on(RoomEvent.FORCEFULLY_LEFT, function (event: ForcefullyLeftEvent) {
+                                if (event.userId === room.userId()) {
+                                    cleanup();
+                                }
                             }).on(RoomEvent.DROPPED, function (participant: LeftRoom) {
                                 if (participant.userId === room.userId()) {
                                     cleanup();
@@ -481,6 +490,10 @@ export class SfuExtended {
                                     }
                                 }).on(RoomEvent.EVICTED, function (participant: LeftRoom) {
                                     if (participant.userId === room.userId()) {
+                                        cleanup();
+                                    }
+                                }).on(RoomEvent.FORCEFULLY_LEFT, function (event: ForcefullyLeftEvent) {
+                                    if (event.userId === room.userId()) {
                                         cleanup();
                                     }
                                 }).on(RoomEvent.DROPPED, function (participant: LeftRoom) {

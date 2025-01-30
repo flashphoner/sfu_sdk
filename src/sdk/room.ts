@@ -11,6 +11,7 @@ import {
     InternalMessage,
     JoinedRoom,
     LeftRoom,
+    ForcefullyLeftEvent,
     OperationFailed,
     Operations,
     ParticipantRenamed,
@@ -264,6 +265,9 @@ export class Room {
             const leftRoom = e as LeftRoom;
             promises.resolve(leftRoom.internalMessageId, leftRoom);
             this.notifier.notify(RoomEvent.LEFT, leftRoom);
+        } else if (e.type === RoomEvent.FORCEFULLY_LEFT) {
+            const forcefullyLeft = e as ForcefullyLeftEvent;
+            this.notifier.notify(RoomEvent.FORCEFULLY_LEFT, forcefullyLeft);
         } else if (e.type === RoomEvent.PARTICIPANT_RENAMED) {
             const participantRenamed = e as ParticipantRenamed;
             if (this._userId === participantRenamed.userId) {
