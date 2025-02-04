@@ -282,6 +282,61 @@ describe("spaces", () => {
                 expect(channelAfterUpdate.categoryId).toEqual(category2.id);
                 await bob.deleteSpace({id: space.id});
             });
+            it('channel should contain info about first and last messages', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const category1 = await bob.createSpaceCategory({
+                    spaceId: space.id,
+                    name: TEST_CATEGORY_NAME
+                });
+                let channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    categoryId: category1.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+
+                const msg1 = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHANNEL,
+                    targetEntityId: {
+                        spaceId: space.id,
+                        channelId: channel.id
+                    },
+                    body: "1"
+                });
+
+                let spaces = await bob.getUserSpaces();
+                let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                channel = spaceAfterUpdate.channels.find((item) => item.id === channel.id);
+                expect(channel).toBeTruthy();
+                expect(channel.messagesCount).toBe(1);
+                expect(channel.firstMessageId).toEqual(msg1.id);
+                expect(channel.firstMessageDate).toBe(msg1.date);
+                expect(channel.lastMessageId).toEqual(msg1.id);
+                expect(channel.lastMessageDate).toBe(msg1.date);
+
+                const msg2 = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHANNEL,
+                    targetEntityId: {
+                        spaceId: space.id,
+                        channelId: channel.id
+                    },
+                    body: "2"
+                });
+
+                spaces = await bob.getUserSpaces();
+                spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                channel = spaceAfterUpdate.channels.find((item) => item.id === channel.id);
+                expect(channel).toBeTruthy();
+                expect(channel.messagesCount).toBe(2);
+                expect(channel.firstMessageId).toEqual(msg1.id);
+                expect(channel.firstMessageDate).toBe(msg1.date);
+                expect(channel.lastMessageId).toEqual(msg2.id);
+                expect(channel.lastMessageDate).toBe(msg2.date);
+
+                await bob.deleteSpace({id: space.id});
+            });
         });
         describe("thread", () => {
             it('should create a thread', async () => {
@@ -376,6 +431,70 @@ describe("spaces", () => {
                 expect(channelWithUpdatedThread).toBeTruthy();
                 const deletedThread = channelWithUpdatedThread.threads.find((currentThread) => currentThread.id === thread.id);
                 expect(deletedThread).toBeFalsy();
+                await bob.deleteSpace({id: space.id});
+            });
+            it('thread should contain info about first and last messages', async () => {
+                let space = await bob.createSpace({name: TEST_SPACE_NAME});
+                let channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+                let thread = await bob.createSpaceThread({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    name: TEST_THREAD_NAME,
+                    isPrivate: false
+                });
+
+                const msg1 = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.THREAD,
+                    targetEntityId: {
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        threadId: thread.id
+                    },
+                    body: "1"
+                });
+
+                let spaces = await bob.getUserSpaces();
+                space = spaces.find((item) => item.id === space.id);
+                expect(space).toBeTruthy();
+                channel = space.channels.find((item) => item.id === channel.id);
+                expect(channel).toBeTruthy();
+                thread = channel.threads.find((item) => item.id === thread.id);
+                expect(thread).toBeTruthy();
+
+                expect(thread.messagesCount).toBe(1);
+                expect(thread.firstMessageId).toEqual(msg1.id);
+                expect(thread.firstMessageDate).toBe(msg1.date);
+                expect(thread.lastMessageId).toEqual(msg1.id);
+                expect(thread.lastMessageDate).toBe(msg1.date);
+
+                const msg2 = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.THREAD,
+                    targetEntityId: {
+                        spaceId: space.id,
+                        channelId: channel.id,
+                        threadId: thread.id
+                    },
+                    body: "2"
+                });
+
+                spaces = await bob.getUserSpaces();
+                space = spaces.find((item) => item.id === space.id);
+                expect(space).toBeTruthy();
+                channel = space.channels.find((item) => item.id === channel.id);
+                expect(channel).toBeTruthy();
+                thread = channel.threads.find((item) => item.id === thread.id);
+                expect(thread).toBeTruthy();
+
+                expect(thread.messagesCount).toBe(2);
+                expect(thread.firstMessageId).toEqual(msg1.id);
+                expect(thread.firstMessageDate).toBe(msg1.date);
+                expect(thread.lastMessageId).toEqual(msg2.id);
+                expect(thread.lastMessageDate).toBe(msg2.date);
+
                 await bob.deleteSpace({id: space.id});
             });
         });

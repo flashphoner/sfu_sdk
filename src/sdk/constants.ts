@@ -1276,6 +1276,11 @@ export type UserSpecificChatInfo = {
     chatReceivePolicy: ChatReceivePolicy;
     sendPermissionList: Array<string>;
     allowedToAddExternalUser: boolean;
+    messagesCount: number;
+    firstMessageId: string;
+    firstMessageDate: number;
+    lastMessageId: string;
+    lastMessageDate: number;
     encryptionEnabled: boolean;
     encryptedPrivateKey: string;
     publicKey: string;
@@ -1533,6 +1538,11 @@ export type SfuSpaceThread = {
     private: boolean;
     createdAt: number;
     members: Array<string>;
+    messagesCount: number;
+    firstMessageId: string;
+    firstMessageDate: number;
+    lastMessageId: string;
+    lastMessageDate: number;
     lastReadMessageId: string;
     lastReadMessageDate: number;
 }
@@ -1546,7 +1556,12 @@ export type SfuSpaceChannel = {
     accessRights: SfuSpaceChannelAccessRights;
     createdAt: number;
     members: Array<string>;
-    threads: Array<SfuSpaceThread>
+    threads: Array<SfuSpaceThread>;
+    messagesCount: number;
+    firstMessageId: string;
+    firstMessageDate: number;
+    lastMessageId: string;
+    lastMessageDate: number;
     lastReadMessageId: string;
     lastReadMessageDate: number;
 }

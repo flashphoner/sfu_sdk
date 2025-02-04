@@ -912,6 +912,46 @@ describe("chat", () => {
             expect(chat.hidden).toBeFalsy();
             await bob.deleteChat(chat);
         });
+        it('chat should contain info about first and last messages', async () => {
+            let chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
+            expect(chat.messagesCount).toBe(0);
+            expect(chat.firstMessageId).toEqual("");
+            expect(chat.firstMessageDate).toBe(0);
+            expect(chat.lastMessageId).toEqual("");
+            expect(chat.lastMessageDate).toBe(0);
+            const msg1 = await bob.sendMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
+                body: MESSAGE_BODY + " 1"
+            });
+
+            let chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.messagesCount).toBe(1);
+            expect(chat.firstMessageId).toEqual(msg1.id);
+            expect(chat.firstMessageDate).toBe(msg1.date);
+            expect(chat.lastMessageId).toEqual(msg1.id);
+            expect(chat.lastMessageDate).toBe(msg1.date);
+
+            const msg2 = await bob.sendMessage({
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {
+                    chatId: chat.id
+                },
+                body: MESSAGE_BODY + " 2"
+            });
+
+            chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.messagesCount).toBe(2);
+            expect(chat.firstMessageId).toEqual(msg1.id);
+            expect(chat.firstMessageDate).toBe(msg1.date);
+            expect(chat.lastMessageId).toEqual(msg2.id);
+            expect(chat.lastMessageDate).toBe(msg2.date);
+            await bob.deleteChat(chat);
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});
