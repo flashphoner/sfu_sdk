@@ -36,6 +36,7 @@ import {
     MessageEdited,
     MessageState,
     MessageTargetEntityType,
+    NotificationMode,
     SfuEvent,
     SortOrder,
     UpdateMessagesDeliveryStatusEvent,
@@ -950,6 +951,41 @@ describe("chat", () => {
             expect(chat.firstMessageDate).toBe(msg1.date);
             expect(chat.lastMessageId).toEqual(msg2.id);
             expect(chat.lastMessageDate).toBe(msg2.date);
+            await bob.deleteChat(chat);
+        });
+        it('should update chat notification settings', async () => {
+            let chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
+            expect(chat).toBeTruthy();
+            expect(chat.notificationSettings).toEqual(NotificationMode.ALL_MESSAGES);
+            await bob.updateChatNotificationSettings({
+                id: chat.id,
+                value: NotificationMode.MENTIONS_ONLY
+            });
+            let chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.notificationSettings).toEqual(NotificationMode.MENTIONS_ONLY);
+            await bob.deleteChat(chat);
+        });
+        it('should mute and unmute chat', async () => {
+            let chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
+            expect(chat).toBeTruthy();
+            expect(chat.muteSettings).toBeFalsy();
+            await bob.muteChat({
+                id: chat.id,
+                muteTime: 1000,
+                mutedIndefinitely: true
+            });
+            let chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.muteSettings).toBeTruthy();
+            expect(chat.muteSettings.mutedUntil).toBeGreaterThan(1000);
+            expect(chat.muteSettings.mutedIndefinitely).toBeTruthy();
+            await bob.unmuteChat({
+                id: chat.id,
+            });
+            chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.muteSettings).toBeFalsy();
             await bob.deleteChat(chat);
         });
         describe("attachments", () => {

@@ -47,6 +47,7 @@ import {
     RemovedMemberFromThread,
     SpaceThreadDeleted,
     UserSpaceNicknameUpdated,
+    NotificationMode,
 } from "../../../src/sdk/constants";
 
 describe("spaces", () => {
@@ -114,6 +115,44 @@ describe("spaces", () => {
             expect(invite.createdAt).toBeGreaterThan(0);
             expect(invite.expiresAt).toBe(invite.createdAt + lifespan);
 
+            await bob.deleteSpace({id: space.id});
+        });
+        it('should update space notification settings', async () => {
+            const space = await bob.createSpace({name: TEST_SPACE_NAME});
+            expect(space).toBeTruthy();
+            expect(space.notificationSettings).toEqual(NotificationMode.ALL_MESSAGES);
+            await bob.updateSpaceNotificationSettings({
+                spaceId: space.id,
+                value: NotificationMode.NOTHING
+            });
+            const spaces = await bob.getUserSpaces();
+            const spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+            expect(spaceAfterUpdate).toBeTruthy();
+            expect(spaceAfterUpdate.notificationSettings).toEqual(NotificationMode.NOTHING);
+            await bob.deleteSpace({id: space.id});
+        });
+        it('should mute and unmute space', async () => {
+            const space = await bob.createSpace({name: TEST_SPACE_NAME});
+            expect(space).toBeTruthy();
+            expect(space.muteSettings).toBeFalsy();
+            await bob.muteSpace({
+                spaceId: space.id,
+                muteTime: 1000,
+                mutedIndefinitely: true
+            });
+            let spaces = await bob.getUserSpaces();
+            let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+            expect(spaceAfterUpdate).toBeTruthy();
+            expect(spaceAfterUpdate.muteSettings).toBeTruthy();
+            expect(spaceAfterUpdate.muteSettings.mutedUntil).toBeGreaterThan(1000);
+            expect(spaceAfterUpdate.muteSettings.mutedIndefinitely).toBeTruthy();
+            await bob.unmuteSpace({
+                spaceId: space.id,
+            });
+            spaces = await bob.getUserSpaces();
+            spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+            expect(spaceAfterUpdate).toBeTruthy();
+            expect(spaceAfterUpdate.muteSettings).toBeFalsy();
             await bob.deleteSpace({id: space.id});
         });
         describe("category", () => {
@@ -337,6 +376,64 @@ describe("spaces", () => {
 
                 await bob.deleteSpace({id: space.id});
             });
+            it('should update channel notification settings', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+                expect(channel.notificationSettings).toEqual(NotificationMode.DEFAULT);
+                await bob.updateChannelNotificationSettings({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    value: NotificationMode.MENTIONS_ONLY
+                });
+
+                let spaces = await bob.getUserSpaces();
+                let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                const channelAfterUpdate = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
+                expect(channelAfterUpdate).toBeTruthy();
+                expect(channelAfterUpdate.notificationSettings).toEqual(NotificationMode.MENTIONS_ONLY);
+                await bob.deleteSpace({id: space.id});
+            });
+            it('should mute and unmute channel', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+                expect(channel.muteSettings).toBeFalsy();
+                await bob.muteChannel({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    muteTime: 1000,
+                    mutedIndefinitely: true
+                });
+
+                let spaces = await bob.getUserSpaces();
+                let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                let channelAfterUpdate = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
+                expect(channelAfterUpdate).toBeTruthy();
+                expect(channelAfterUpdate.muteSettings).toBeTruthy();
+                expect(channelAfterUpdate.muteSettings.mutedUntil).toBeGreaterThan(1000);
+                expect(channelAfterUpdate.muteSettings.mutedIndefinitely).toBeTruthy();
+
+                await bob.unmuteChannel({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                });
+                spaces = await bob.getUserSpaces();
+                spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                channelAfterUpdate = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
+                expect(channelAfterUpdate).toBeTruthy();
+                expect(channelAfterUpdate.muteSettings).toBeFalsy();
+                await bob.deleteSpace({id: space.id});
+            });
         });
         describe("thread", () => {
             it('should create a thread', async () => {
@@ -495,6 +592,83 @@ describe("spaces", () => {
                 expect(thread.lastMessageId).toEqual(msg2.id);
                 expect(thread.lastMessageDate).toBe(msg2.date);
 
+                await bob.deleteSpace({id: space.id});
+            });
+            it('should update thread notification settings', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+                const thread = await bob.createSpaceThread({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    name: TEST_THREAD_NAME,
+                    isPrivate: false
+                });
+                expect(thread.notificationSettings).toEqual(NotificationMode.DEFAULT);
+                await bob.updateThreadNotificationSettings({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    threadId: thread.id,
+                    value: NotificationMode.NOTHING
+                });
+                let spaces = await bob.getUserSpaces();
+                let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                let channelWithUpdatedThread = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
+                expect(channelWithUpdatedThread).toBeTruthy();
+                let updatedThread = channelWithUpdatedThread.threads.find((currentThread) => currentThread.id === thread.id);
+                expect(updatedThread).toBeTruthy();
+                expect(updatedThread.notificationSettings).toEqual(NotificationMode.NOTHING);
+                await bob.deleteSpace({id: space.id});
+            });
+            it('should mute and unmute thread', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = await bob.createSpaceChannel({
+                    spaceId: space.id,
+                    name: TEST_CHANNEL_NAME,
+                    isPrivate: false
+                });
+                const thread = await bob.createSpaceThread({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    name: TEST_THREAD_NAME,
+                    isPrivate: false
+                });
+                expect(thread.muteSettings).toBeFalsy();
+                await bob.muteThread({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    threadId: thread.id,
+                    muteTime: 1000,
+                    mutedIndefinitely: true
+                });
+                let spaces = await bob.getUserSpaces();
+                let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                let channelWithUpdatedThread = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
+                expect(channelWithUpdatedThread).toBeTruthy();
+                let updatedThread = channelWithUpdatedThread.threads.find((currentThread) => currentThread.id === thread.id);
+                expect(updatedThread).toBeTruthy();
+                expect(updatedThread.muteSettings).toBeTruthy();
+                expect(updatedThread.muteSettings.mutedUntil).toBeGreaterThan(1000);
+                expect(updatedThread.muteSettings.mutedIndefinitely).toBeTruthy();
+
+                await bob.unmuteThread({
+                    spaceId: space.id,
+                    channelId: channel.id,
+                    threadId: thread.id,
+                });
+                spaces = await bob.getUserSpaces();
+                spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+                expect(spaceAfterUpdate).toBeTruthy();
+                channelWithUpdatedThread = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
+                expect(channelWithUpdatedThread).toBeTruthy();
+                updatedThread = channelWithUpdatedThread.threads.find((currentThread) => currentThread.id === thread.id);
+                expect(updatedThread).toBeTruthy();
+                expect(updatedThread.muteSettings).toBeFalsy();
                 await bob.deleteSpace({id: space.id});
             });
         });

@@ -27,6 +27,12 @@ export enum SfuEvent {
     CHAT_DELETED = "CHAT_DELETED",
     /** Used to receive {@link UserSpecificChatInfo} */
     CHAT_UPDATED = "CHAT_UPDATED",
+    /** Used to receive {@link ChatNotificationSettingsUpdated} */
+    CHAT_NOTIFICATION_SETTINGS_UPDATED = "CHAT_NOTIFICATION_SETTINGS_UPDATED",
+    /** Used to receive {@link ChatMuted} */
+    CHAT_MUTED = "CHAT_MUTED",
+    /** Used to receive {@link ChatUnmuted} */
+    CHAT_UNMUTED = "CHAT_UNMUTED",
     /** Used to receive {@link MessageStatus} */
     MESSAGE_STATE = "MESSAGE_STATE",
     /** Used to receive {@link AttachmentStatus} */
@@ -276,7 +282,25 @@ export enum SpaceEvent {
     /** Used to receive {@link RolePermissionSectionsEvent} */
     ROLE_PERMISSION_SECTIONS = "ROLE_PERMISSION_SECTIONS",
     /** Used to receive {@link UserSpaceNicknameUpdated} */
-    USER_SPACE_NICKNAME_UPDATED = "USER_SPACE_NICKNAME_UPDATED"
+    USER_SPACE_NICKNAME_UPDATED = "USER_SPACE_NICKNAME_UPDATED",
+    /** Used to receive {@link SpaceNotificationSettingsUpdated} */
+    SPACE_NOTIFICATION_SETTINGS_UPDATED = "SPACE_NOTIFICATION_SETTINGS_UPDATED",
+    /** Used to receive {@link SpaceMuted} */
+    SPACE_MUTED = "SPACE_MUTED",
+    /** Used to receive {@link SpaceUnmuted} */
+    SPACE_UNMUTED = "SPACE_UNMUTED",
+    /** Used to receive {@link ChannelNotificationSettingsUpdated} */
+    CHANNEL_NOTIFICATION_SETTINGS_UPDATED = "CHANNEL_NOTIFICATION_SETTINGS_UPDATED",
+    /** Used to receive {@link ChannelMuted} */
+    CHANNEL_MUTED = "CHANNEL_MUTED",
+    /** Used to receive {@link ChannelUnmuted} */
+    CHANNEL_UNMUTED = "CHANNEL_UNMUTED",
+    /** Used to receive {@link ThreadNotificationSettingsUpdated} */
+    THREAD_NOTIFICATION_SETTINGS_UPDATED = "THREAD_NOTIFICATION_SETTINGS_UPDATED",
+    /** Used to receive {@link ThreadMuted} */
+    THREAD_MUTED = "THREAD_MUTED",
+    /** Used to receive {@link ThreadUnmuted} */
+    THREAD_UNMUTED = "THREAD_UNMUTED"
 }
 
 /**
@@ -487,6 +511,9 @@ export enum InternalApi {
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
     RENAME_CHAT = "renameChat",
+    UPDATE_CHAT_NOTIFICATION_SETTINGS = "updateChatNotificationSettings",
+    MUTE_CHAT = "muteChat",
+    UNMUTE_CHAT = "unmuteChat",
     ADD_MEMBER_TO_CHAT = "addMemberToChat",
     REMOVE_MEMBER_FROM_CHAT = "removeMemberFromChat",
     UPDATE_CHANNEL_SEND_POLICY = "updateChannelSendPolicy",
@@ -546,6 +573,9 @@ export enum InternalApi {
     CREATE_SPACE = "createSpace",
     DELETE_SPACE = "deleteSpace",
     LEAVE_SPACE = "leaveSpace",
+    UPDATE_SPACE_NOTIFICATION_SETTINGS = "updateSpaceNotificationSettings",
+    MUTE_SPACE = "muteSpace",
+    UNMUTE_SPACE = "unmuteSpace",
     UPDATE_SPACE_OVERVIEW = "updateSpaceOverview",
     CREATE_SPACE_CATEGORY = "createSpaceCategory",
     DELETE_SPACE_CATEGORY = "deleteSpaceCategory",
@@ -554,11 +584,17 @@ export enum InternalApi {
     UPDATE_SPACE_CHANNEL = "updateSpaceChannel",
     MOVE_SPACE_CHANNEL = "moveSpaceChannel",
     DELETE_SPACE_CHANNEL = "deleteSpaceChannel",
+    UPDATE_CHANNEL_NOTIFICATION_SETTINGS = "updateChannelNotificationSettings",
+    MUTE_CHANNEL = "muteChannel",
+    UNMUTE_CHANNEL = "unmuteChannel",
     CREATE_SPACE_THREAD = "createSpaceThread",
     UPDATE_SPACE_THREAD = "updateSpaceThread",
     ADD_MEMBERS_TO_THREAD = "addMembersToThread",
     REMOVE_MEMBER_FROM_THREAD = "removeMemberFromThread",
     DELETE_SPACE_THREAD = "deleteSpaceThread",
+    UPDATE_THREAD_NOTIFICATION_SETTINGS = "updateThreadNotificationSettings",
+    MUTE_THREAD = "muteThread",
+    UNMUTE_THREAD = "unmuteThread",
     GENERATE_SPACE_INVITE =  "generateNewSpaceInvite",
     REVOKE_SPACE_INVITE = "revokeSpaceInvite",
     JOIN_SPACE_BY_INVITE_CODE =  "joinSpaceByInviteCode",
@@ -1258,6 +1294,18 @@ export type CalendarEventEvent = InternalMessage & {
     entry: CalendarEvent
 }
 
+export enum NotificationMode {
+    DEFAULT = "DEFAULT",
+    ALL_MESSAGES = "ALL_MESSAGES",
+    MENTIONS_ONLY = "MENTIONS_ONLY",
+    NOTHING = "NOTHING"
+}
+
+export type MuteSettings = {
+    mutedUntil?: number;
+    mutedIndefinitely?: boolean;
+}
+
 export type UserSpecificChatInfo = {
     id: string;
     roomId: string;
@@ -1272,6 +1320,8 @@ export type UserSpecificChatInfo = {
     lastReadMessageDate: number;
     canSend: boolean;
     type: ChatType;
+    notificationSettings: NotificationMode;
+    muteSettings: MuteSettings;
     channelSendPolicy: ChannelSendPolicy;
     chatReceivePolicy: ChatReceivePolicy;
     sendPermissionList: Array<string>;
@@ -1330,6 +1380,20 @@ export type RemovedChatEvent = InternalMessage & {
 
 export type UpdateChatEvent = InternalMessage & {
     info: UserSpecificChatInfo
+}
+
+export type ChatNotificationSettingsUpdated = InternalMessage & {
+    id: string;
+    value: NotificationMode;
+}
+
+export type ChatMuted = InternalMessage & {
+    id: string;
+    muteSettings: MuteSettings;
+}
+
+export type ChatUnmuted = InternalMessage & {
+    id: string;
 }
 
 export type ChatMap = {[key: string]: UserSpecificChatInfo};
@@ -1537,6 +1601,8 @@ export type SfuSpaceThread = {
     creator: string;
     private: boolean;
     createdAt: number;
+    notificationSettings: NotificationMode;
+    muteSettings: MuteSettings;
     members: Array<string>;
     messagesCount: number;
     firstMessageId: string;
@@ -1555,6 +1621,8 @@ export type SfuSpaceChannel = {
     private: boolean;
     accessRights: SfuSpaceChannelAccessRights;
     createdAt: number;
+    notificationSettings: NotificationMode;
+    muteSettings: MuteSettings;
     members: Array<string>;
     threads: Array<SfuSpaceThread>;
     messagesCount: number;
@@ -1590,6 +1658,8 @@ export type SfuSpace = {
     name: string;
     owner: string;
     createdAt: number;
+    notificationSettings: NotificationMode;
+    muteSettings: MuteSettings;
     roles: Array<SfuSpaceRole>;
     members: Array<SfuSpaceMember>;
     categories: Array<SfuSpaceCategory>;
@@ -1614,6 +1684,58 @@ export type SpaceDeletedEvent = InternalMessage & {
 export type SpaceOverviewUpdated = InternalMessage & {
     id: string;
     name: string;
+}
+
+
+export type SpaceNotificationSettingsUpdated = InternalMessage & {
+    spaceId: string;
+    value: NotificationMode;
+}
+
+export type SpaceMuted = InternalMessage & {
+    spaceId: string;
+    muteSettings: MuteSettings;
+}
+
+export type SpaceUnmuted = InternalMessage & {
+    spaceId: string;
+}
+
+export type ChannelNotificationSettingsUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    value: NotificationMode;
+}
+
+export type ChannelMuted = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    muteSettings: MuteSettings;
+}
+
+export type ChannelUnmuted = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+}
+
+export type ThreadNotificationSettingsUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
+    value: NotificationMode;
+}
+
+export type ThreadMuted = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
+    muteSettings: MuteSettings;
+}
+
+export type ThreadUnmuted = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threadId: string;
 }
 
 export type NewSpaceCategoryEvent = InternalMessage & {

@@ -144,6 +144,19 @@ import {
     RemovedMemberFromThread,
     ConnectionError,
     UserSpaceNicknameUpdated,
+    SpaceNotificationSettingsUpdated,
+    ChannelNotificationSettingsUpdated,
+    ThreadNotificationSettingsUpdated,
+    NotificationMode,
+    ChatNotificationSettingsUpdated,
+    ChatMuted,
+    SpaceMuted,
+    ChannelMuted,
+    ThreadMuted,
+    SpaceUnmuted,
+    ChannelUnmuted,
+    ThreadUnmuted,
+    ChatUnmuted,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -386,6 +399,21 @@ export class SfuExtended {
                             const chat = data[0] as UpdateChatEvent;
                             if (!promises.resolve(data[0].internalMessageId, chat.info)) {
                                 this.#notifier.notify(SfuEvent.CHAT_UPDATED, chat.info);
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_NOTIFICATION_SETTINGS_UPDATED) {
+                            const event = data[0] as ChatNotificationSettingsUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHAT_NOTIFICATION_SETTINGS_UPDATED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_MUTED) {
+                            const event = data[0] as ChatMuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHAT_MUTED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.CHAT_UNMUTED) {
+                            const event = data[0] as ChatUnmuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHAT_UNMUTED, event);
                             }
                         } else if (data[0].type === InternalApi.USER_CHATS) {
                             //TODO: optimize - should use with if (zapp-420)
@@ -732,6 +760,51 @@ export class SfuExtended {
                             const event = data[0] as UserSpaceNicknameUpdated;
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.USER_SPACE_NICKNAME_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_NOTIFICATION_SETTINGS_UPDATED) {
+                            const event = data[0] as SpaceNotificationSettingsUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_NOTIFICATION_SETTINGS_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.CHANNEL_NOTIFICATION_SETTINGS_UPDATED) {
+                            const event = data[0] as ChannelNotificationSettingsUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.CHANNEL_NOTIFICATION_SETTINGS_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.THREAD_NOTIFICATION_SETTINGS_UPDATED) {
+                            const event = data[0] as ThreadNotificationSettingsUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.THREAD_NOTIFICATION_SETTINGS_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_MUTED) {
+                            const event = data[0] as SpaceMuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_MUTED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_UNMUTED) {
+                            const event = data[0] as SpaceUnmuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_UNMUTED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.CHANNEL_MUTED) {
+                            const event = data[0] as ChannelMuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.CHANNEL_MUTED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.CHANNEL_UNMUTED) {
+                            const event = data[0] as ChannelUnmuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.CHANNEL_UNMUTED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.THREAD_MUTED) {
+                            const event = data[0] as ThreadMuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.THREAD_MUTED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.THREAD_UNMUTED) {
+                            const event = data[0] as ThreadUnmuted;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.THREAD_UNMUTED, event);
                             }
                         } else if (data[0].type === SfuEvent.USER_MEETINGS) {
                             const event = data[0] as MeetingsPreviewEvent;
@@ -2265,6 +2338,70 @@ export class SfuExtended {
     };
 
     /**
+     * Update chat notification settings
+     *
+     * Used to modify and store chat notification settings specified in {@link UserSpecificChatInfo.notificationSettings}.
+     *
+     * Returns {@link ChatNotificationSettingsUpdated}, and other connected devices will also receive this event for synchronization.
+     */
+    public updateChatNotificationSettings(options: {
+        id: string,
+        value: NotificationMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatNotificationSettingsUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHAT_NOTIFICATION_SETTINGS, {
+                id: options.id,
+                value: options.value
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Mute chat
+     *
+     * @param options.muteTime – the duration for which the sound is muted. The final event will contain {@link MuteSettings.mutedUntil}, which is the current time plus the specified duration.
+     * @param options.mutedIndefinitely – indicates whether the sound is muted indefinitely.
+     *
+     * Returns {@link ChatMuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public muteChat(options: {
+        id: string,
+        muteTime?: number,
+        mutedIndefinitely?: boolean,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatMuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.MUTE_CHAT, {
+                id: options.id,
+                muteTime: options.muteTime,
+                mutedIndefinitely: options.mutedIndefinitely
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Unmute chat
+     *
+     * {@link UserSpecificChatInfo.muteSettings} wil be null - that means the chat is not muted.
+     *
+     * Returns {@link ChatUnmuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public unmuteChat(options: {
+        id: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatUnmuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UNMUTE_CHAT, {
+                id: options.id,
+            }, resolve, reject);
+        });
+    }
+
+    /**
      *  Add a member to chat
      *
      * Chat members will receive {@link SfuEvent.CHAT_UPDATED} with {@link UserSpecificChatInfo}
@@ -2678,6 +2815,70 @@ export class SfuExtended {
     }
 
     /**
+     * Update space notification settings
+     *
+     * Used to modify and store space notification settings specified in {@link SfuSpace.notificationSettings}.
+     *
+     * Returns {@link SpaceNotificationSettingsUpdated}, and other connected devices will also receive this event for synchronization.
+     */
+    public updateSpaceNotificationSettings(options: {
+        spaceId: string,
+        value: NotificationMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceNotificationSettingsUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_NOTIFICATION_SETTINGS, {
+                spaceId: options.spaceId,
+                value: options.value
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Mute space
+     *
+     * @param options.muteTime – the duration for which the sound is muted. The final event will contain {@link MuteSettings.mutedUntil}, which is the current time plus the specified duration.
+     * @param options.mutedIndefinitely – indicates whether the sound is muted indefinitely.
+     *
+     * Returns {@link SpaceMuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public muteSpace(options: {
+        spaceId: string,
+        muteTime?: number;
+        mutedIndefinitely?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceMuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.MUTE_SPACE, {
+                spaceId: options.spaceId,
+                muteTime: options.muteTime,
+                mutedIndefinitely: options.mutedIndefinitely
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Unmute space
+     *
+     * {@link SfuSpace.muteSettings} wil be null - that means the space is not muted.
+     *
+     * Returns {@link SpaceUnmuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public unmuteSpace(options: {
+        spaceId: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceUnmuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UNMUTE_SPACE, {
+                spaceId: options.spaceId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
      * Generate space invite
      *
      * If user has permission to create a space invite - generating invite code with 8 symbols.
@@ -2912,6 +3113,76 @@ export class SfuExtended {
     }
 
     /**
+     * Update channel notification settings
+     *
+     * Used to modify and store channel notification settings specified in {@link SfuSpaceChannel.notificationSettings}.
+     *
+     * Returns {@link ChannelNotificationSettingsUpdated}, and other connected devices will also receive this event for synchronization.
+     */
+    public updateChannelNotificationSettings(options: {
+        spaceId: string,
+        channelId: string,
+        value: NotificationMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelNotificationSettingsUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHANNEL_NOTIFICATION_SETTINGS, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                value: options.value
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Mute channel
+     *
+     * @param options.muteTime – the duration for which the sound is muted. The final event will contain {@link MuteSettings.mutedUntil}, which is the current time plus the specified duration.
+     * @param options.mutedIndefinitely – indicates whether the sound is muted indefinitely.
+     *
+     * Returns {@link ChannelMuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public muteChannel(options: {
+        spaceId: string,
+        channelId: string,
+        muteTime?: number;
+        mutedIndefinitely?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelMuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.MUTE_CHANNEL, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                muteTime: options.muteTime,
+                mutedIndefinitely: options.mutedIndefinitely
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Unmute channel
+     *
+     * {@link SfuSpaceChannel.muteSettings} wil be null - that means the channel is not muted.
+     *
+     * Returns {@link ChannelUnmuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public unmuteChannel(options: {
+        spaceId: string,
+        channelId: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelUnmuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UNMUTE_CHANNEL, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
      * Create space thread
      *
      * Thread members will receive {@link SpaceEvent.NEW_SPACE_THREAD} with {@link NewSpaceThreadEvent}
@@ -3031,6 +3302,82 @@ export class SfuExtended {
                 spaceId: options.spaceId,
                 channelId: options.channelId,
                 threadId: options.threadId
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Update thread notification settings
+     *
+     * Used to modify and store thread notification settings specified in {@link SfuSpaceThread.notificationSettings}.
+     *
+     * Returns {@link ThreadNotificationSettingsUpdated}, and other connected devices will also receive this event for synchronization.
+     */
+    public updateThreadNotificationSettings(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string,
+        value: NotificationMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ThreadNotificationSettingsUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_THREAD_NOTIFICATION_SETTINGS, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId,
+                value: options.value
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Mute thread
+     *
+     * @param options.muteTime – the duration for which the sound is muted. The final event will contain {@link MuteSettings.mutedUntil}, which is the current time plus the specified duration.
+     * @param options.mutedIndefinitely – indicates whether the sound is muted indefinitely.
+     *
+     * Returns {@link ThreadMuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public muteThread(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string,
+        muteTime?: number;
+        mutedIndefinitely?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ThreadMuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.MUTE_THREAD, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId,
+                muteTime: options.muteTime,
+                mutedIndefinitely: options.mutedIndefinitely
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Unmute thread
+     *
+     * {@link SfuSpaceThread.muteSettings} wil be null - that means the thread is not muted.
+     *
+     * Returns {@link ThreadUnmuted}, and other connected devices will also receive this event for synchronization.
+     */
+    public unmuteThread(options: {
+        spaceId: string,
+        channelId: string,
+        threadId: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ThreadUnmuted>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UNMUTE_THREAD, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                threadId: options.threadId,
             }, resolve, reject);
         });
     }
