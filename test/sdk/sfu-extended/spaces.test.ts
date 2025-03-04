@@ -1192,6 +1192,29 @@ describe("spaces", () => {
                 await alice.updateSpaceNickname({spaceId: space.id, nickname : ""});
                 await bob.deleteSpace({id: space.id});
             });
+            it('owner should update patricipant\'s space nickname', async () => {
+                const newNickname = "CUSTOM_NICKNAME";
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+
+                await alice.joinSpaceByInviteCode(invite.inviteCode);
+                const waitUpdateEvent = async () => {
+                    return new Promise<void>((resolve) => {
+                        alice.on(SpaceEvent.USER_SPACE_NICKNAME_UPDATED, (msg) => {
+                            const event = msg as UserSpaceNicknameUpdated;
+                            expect(event.spaceId).toEqual(space.id);
+                            if (event.userId === alice.user().username && event.nickname === newNickname) {
+                                resolve();
+                            }
+                        });
+                    })
+                };
+                bob.updateSpaceNickname({spaceId: space.id, userId: alice.user().username, nickname : newNickname});
+                await waitUpdateEvent();
+
+                await alice.updateSpaceNickname({spaceId: space.id, nickname : ""});
+                await bob.deleteSpace({id: space.id});
+            });
             describe("notifications", () => {
                 it('should receive event when user joined', async () => {
                     const space = await bob.createSpace({name: TEST_SPACE_NAME});

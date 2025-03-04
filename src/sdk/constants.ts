@@ -692,7 +692,8 @@ export enum UserManagementError {
 
 export enum SpaceError {
     USER_ALREADY_JOINED = "User already joined",
-    RESTRICTED_ACCESS = "Restricted access"
+    RESTRICTED_ACCESS = "Restricted access",
+    UPDATE_NICKNAME_ACCESS_RIGHTS_ERROR = "Only the owner or the user themselves can update the nickname",
 }
 
 export enum ExamplesError {

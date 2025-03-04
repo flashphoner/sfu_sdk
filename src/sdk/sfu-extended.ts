@@ -3534,22 +3534,31 @@ export class SfuExtended {
 
     /**
      * Update nickname in the space
+     * Updates a user's nickname in the space.
      *
-     * A custom nickname takes higher priority over the global one in a space. The nickname is updated for the {@link SfuSpaceMember}.
-     * If a custom nickname is not set, it will be an empty string, and in this case, the display global nickname will be taken from the contacts.
-     * To remove a custom nickname and use the global one, provide an empty string.
+     * A custom nickname, if set, takes precedence over the user's global nickname.
+     * If no custom nickname is provided (or an empty string is passed), the user's global nickname must be displayed.
      *
-     * Space members will receive {@link SpaceEvent.USER_SPACE_NICKNAME_UPDATED} with {@link UserSpaceNicknameUpdated}
+     * To remove a previously set the custom nickname and revert to the global one, pass an empty string.
+     *
+     * @param options.userId - Optional. The ID of the user whose nickname is being updated.
+     * If this field is omitted or set to the caller's own ID, the caller's nickname is updated.
+     * The space owner can update anyone's nickname by specifying user ID.
+     * If a non-owner attempts to update another user's nickname, a {@link SpaceError.UPDATE_NICKNAME_ACCESS_RIGHTS_ERROR} is thrown.
+     * All space members receive a {@link SpaceEvent.USER_SPACE_NICKNAME_UPDATED} event
+     * with a {@link UserSpaceNicknameUpdated} payload when the nickname is updated.
      */
     public updateSpaceNickname(options: {
         spaceId: string,
+        userId?: string,
         nickname: string
     }) {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<void>(function (resolve, reject) {
+        return new Promise<UserSpaceNicknameUpdated>(function (resolve, reject) {
             self.#emmitAction(InternalApi.UPDATE_SPACE_NICKNAME, {
                 spaceId: options.spaceId,
+                userId: options.userId,
                 nickname: options.nickname
             }, resolve, reject);
         });
