@@ -114,6 +114,8 @@ export enum SfuEvent {
     CONTACT_UPDATED = "CONTACT_UPDATED",
     /** Used to receive {@link ContactDeleted} */
     CONTACT_DELETED = "CONTACT_DELETED",
+    /** Used to receive {@link ContactPersonalSettingsUpdated} */
+    CONTACT_PERSONAL_SETTINGS_UPDATED = "CONTACT_PERSONAL_SETTINGS_UPDATED",
     /** Used to receive {@link UserEncryptionInfoEvent} */
     USER_ENCRYPTION_INFO_ADDED = "USER_ENCRYPTION_INFO_ADDED",
     /** Used to receive {@link UserEncryptionInfoEvent} */
@@ -612,6 +614,7 @@ export enum InternalApi {
     REVOKE_FRIEND_INVITE = "revokeFriendInvite",
     ACCEPT_FRIEND_INVITE = "acceptFriendInvite",
     REJECT_FRIEND_INVITE = "rejectFriendInvite",
+    UPDATE_CONTACT_VOLUME = "updateContactVolume",
     UPDATE_PRESENCE_STATUS = "updatePresenceStatus",
     UPDATE_ACTIVITY_STATUS = "updateActivityStatus",
     GET_EXAMPLES_FREE_USER = "getFreeUser",
@@ -1889,6 +1892,10 @@ export type BannedContact = {
     bannedAt: number;
 }
 
+export type ContactPersonalSettings = {
+    volume: number;
+}
+
 export type Contact = {
     userId: string;
     nickname: string;
@@ -1896,6 +1903,7 @@ export type Contact = {
     status: PresenceStatus;
     publicKey: string;
     encryptionEnabled: boolean;
+    personalSettings: ContactPersonalSettings;
 }
 
 export type UserContacts = {
@@ -1917,6 +1925,10 @@ export type NewFriendInvite = InternalMessage & {
 
 export type FriendInviteDeleted = InternalMessage & {
     inviteId: string;
+}
+
+export type ContactPersonalSettingsUpdated = InternalMessage & {
+    personalSettings: ContactPersonalSettings;
 }
 
 export type UserPresenceStatusUpdated = InternalMessage & {

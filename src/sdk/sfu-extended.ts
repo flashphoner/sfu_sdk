@@ -157,6 +157,8 @@ import {
     ChannelUnmuted,
     ThreadUnmuted,
     ChatUnmuted,
+    ContactPersonalSettings,
+    ContactPersonalSettingsUpdated,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -892,6 +894,11 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.USER_ENCRYPTION_INFO) {
                             const event = data[0] as UserEncryptionInfoEvent;
                             promises.resolve(data[0].internalMessageId, event.info)
+                        } else if (data[0].type === SfuEvent.CONTACT_PERSONAL_SETTINGS_UPDATED) {
+                            const event = data[0] as ContactPersonalSettingsUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event.personalSettings)) {
+                                this.#notifier.notify(SfuEvent.CONTACT_PERSONAL_SETTINGS_UPDATED, event);
+                            }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -1846,6 +1853,29 @@ export class SfuExtended {
         return new Promise<FriendInviteDeleted>(function (resolve, reject) {
             self.#emmitAction(InternalApi.REJECT_FRIEND_INVITE, {
                 inviteId: invite.inviteId,
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Update contact volume
+     *
+     * Used to change and store the contact's volume in meetings.
+     *
+     * @param options.value - whole number
+     *
+     * Returns {@link ContactPersonalSettings}, and other connected devices will receive {@link ContactPersonalSettingsUpdated} for synchronization.
+     */
+    public updateContactVolume(options: {
+        userId: string,
+        value: number
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ContactPersonalSettings>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CONTACT_VOLUME, {
+                userId: options.userId,
+                value: options.value
             }, resolve, reject);
         });
     }
