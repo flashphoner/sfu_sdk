@@ -119,7 +119,15 @@ export enum SfuEvent {
     /** Used to receive {@link UserEncryptionInfoEvent} */
     USER_ENCRYPTION_INFO_ADDED = "USER_ENCRYPTION_INFO_ADDED",
     /** Used to receive {@link UserEncryptionInfoEvent} */
-    USER_ENCRYPTION_INFO = "USER_ENCRYPTION_INFO"
+    USER_ENCRYPTION_INFO = "USER_ENCRYPTION_INFO",
+    /** Used to receive {@link MeetingsHistoryEvent} */
+    MEETINGS_HISTORY = "MEETINGS_HISTORY",
+    /** Used to receive {@link MeetingAddedToHistory} */
+    MEETING_ADDED_TO_HISTORY = "MEETING_ADDED_TO_HISTORY",
+    /** Used to receive {@link MeetingRemovedFromHistory} */
+    MEETING_REMOVED_FROM_HISTORY = "MEETING_REMOVED_FROM_HISTORY",
+    /** Used to receive {@link MeetingRecordDeleted} */
+    MEETING_RECORD_DELETED = "MEETING_RECORD_DELETED"
 }
 
 /**
@@ -620,7 +628,10 @@ export enum InternalApi {
     GET_EXAMPLES_FREE_USER = "getFreeUser",
     ADD_USER_ENCRYPTION_INFO = "addUserEncryptionInfo",
     GET_USER_ENCRYPTION_INFO = "getUserEncryptionInfo",
-    UPDATE_SPACE_NICKNAME = "updateSpaceNickname"
+    UPDATE_SPACE_NICKNAME = "updateSpaceNickname",
+    LOAD_MEETINGS_HISTORY = "loadMeetingsHistory",
+    REMOVE_MEETING_FROM_HISTORY = "removeMeetingFromHistory",
+    REMOVE_MEETING_RECORD = "removeMeetingRecord"
 }
 
 export enum ConnectionError {
@@ -1169,9 +1180,15 @@ export type MessageReaction = {
     reactedUsers: Array<string>
 }
 
+export enum MessageType {
+    REGULAR = "REGULAR",
+    MEETING_HISTORY = "MEETING_HISTORY"
+}
+
 export type Message = {
     id: string;
     parentMessage?: Message;
+    type: MessageType;
     targetEntityType: MessageTargetEntityType;
     targetEntityId: MessageTargetEntityId;
     date: number;
@@ -1970,6 +1987,47 @@ export type UserSpaceNicknameUpdated = InternalMessage & {
     spaceId: string;
     userId: string;
     nickname: string;
+}
+
+export type RecordInfo = {
+    id: string;
+    meetingId: string;
+    record: string;
+    startedBy: string;
+    size: number;
+    startedAt: number;
+    endedAt: number;
+}
+
+export type MeetingHistoryItem = {
+    id: string;
+    meetingId: string;
+    name: string;
+    owner: string;
+    type: ConferenceType;
+    startedBy: string;
+    startedAt: number;
+    endedAt: number;
+    participants: Array<string>;
+    records: Array<RecordInfo>;
+}
+
+export type MeetingsHistoryEvent = InternalMessage & {
+    meetings: Array<MeetingHistoryItem>;
+    totalSize: number;
+}
+
+export type MeetingAddedToHistory = InternalMessage & {
+    meeting: MeetingHistoryItem;
+}
+
+export type MeetingRemovedFromHistory = InternalMessage & {
+    id: string;
+}
+
+export type MeetingRecordDeleted = InternalMessage & {
+    meetingHistoryItemId: string;
+    recordId: string;
 }
 
 export enum SortOrder {

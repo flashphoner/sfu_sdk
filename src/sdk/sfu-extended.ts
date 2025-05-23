@@ -159,6 +159,11 @@ import {
     ChatUnmuted,
     ContactPersonalSettings,
     ContactPersonalSettingsUpdated,
+    MeetingsHistoryEvent,
+    MeetingAddedToHistory,
+    MeetingRemovedFromHistory,
+    ConferenceType,
+    MeetingRecordDeleted,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -899,6 +904,22 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event.personalSettings)) {
                                 this.#notifier.notify(SfuEvent.CONTACT_PERSONAL_SETTINGS_UPDATED, event);
                             }
+                        } else if (data[0].type === SfuEvent.MEETINGS_HISTORY) {
+                            const event = data[0] as MeetingsHistoryEvent;
+                            promises.resolve(data[0].internalMessageId, event)
+                        } else if (data[0].type === SfuEvent.MEETING_ADDED_TO_HISTORY) {
+                            const event = data[0] as MeetingAddedToHistory;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.MEETING_ADDED_TO_HISTORY, event);
+                            }
+                        } else if (data[0].type === SfuEvent.MEETING_REMOVED_FROM_HISTORY) {
+                            const event = data[0] as MeetingRemovedFromHistory;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.MEETING_REMOVED_FROM_HISTORY, event);
+                            }
+                        } else if (data[0].type === SfuEvent.MEETING_RECORD_DELETED) {
+                            const event = data[0] as MeetingRecordDeleted;
+                            this.#notifier.notify(SfuEvent.MEETING_RECORD_DELETED, event);
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -3590,6 +3611,83 @@ export class SfuExtended {
                 spaceId: options.spaceId,
                 userId: options.userId,
                 nickname: options.nickname
+            }, resolve, reject);
+        });
+    }
+
+
+    /**
+     * Load meetings history
+     *
+     * Used to load the history of global meetings.
+     *
+     * The response returns a {@link MeetingsHistoryEvent} with the requested items and the total size.
+     */
+    public loadMeetingsHistory(params: {
+        timeFrame?: {
+            start: number,
+            end: number,
+            limit?: number
+        },
+        boundaries?: {
+            dateMark: number,
+            lowerLimit: number,
+            upperLimit: number
+        },
+        pageRequest?: {
+            page: number,
+            pageSize: number,
+        }
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<MeetingsHistoryEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LOAD_MEETINGS_HISTORY, params, resolve, reject);
+        });
+    };
+
+    /**
+     * Remove meeting from history
+     *
+     * Used to remove meeting from history. Any user can remove it. This does not affect other users' history in any way.
+     */
+    public async removeMeetingFromHistory(id: string) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_MEETING_FROM_HISTORY, {
+                id
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Removes the meeting recording (video).
+     *
+     * The right to remove is granted to the following roles:
+     * In global meetings – the meeting owner
+     * In channel meetings – the space owner
+     * In group direct chats – the chat creator
+     * In personal direct chats – no one
+     *
+     * Users will receive {@link MeetingRecordDeleted} for global meetings and {@link MessageEdited} for others, because it's system message
+     */
+    public async removeMeetingRecord(options: {
+        meetingHistoryItemId: string;
+        recordId: string;
+        meetingType: ConferenceType;
+        meetingId?: string;
+        spaceId?: string;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_MEETING_RECORD, {
+                meetingHistoryItemId: options.meetingHistoryItemId,
+                recordId: options.recordId,
+                meetingType: options.meetingType,
+                meetingId: options.meetingId,
+                spaceId: options.spaceId,
             }, resolve, reject);
         });
     }

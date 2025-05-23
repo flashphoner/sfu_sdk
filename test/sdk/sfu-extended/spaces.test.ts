@@ -1,12 +1,17 @@
 import {SfuExtended, SpaceEvent} from "../../../src";
 import {connect, waitForUsers} from "../../util/utils";
 import {
+    ALLOWS_TO_CREATE_INVITE,
     ALLOWS_TO_MANAGE_CATEGORIES,
     ALLOWS_TO_MANAGE_CHANNELS,
     ALLOWS_TO_MANAGE_ROLES,
     ALLOWS_TO_MANAGE_SPACE,
+    ALLOWS_TO_VIEW_CHANNELS,
     DEFAULT_CATEGORY_NAME,
     DEFAULT_CHANNEL_NAME,
+    DEFAULT_ROLE_ID,
+    MESSAGE_REACTION,
+    NAME_OF_DEFAULT_ROLE,
     TEST_CATEGORY_NAME,
     TEST_CHANNEL_NAME,
     TEST_SPACE_NAME,
@@ -16,19 +21,21 @@ import {
     TEST_USER_0,
     TEST_USER_1,
     TEST_USER_2,
-    DEFAULT_ROLE_ID,
-    NAME_OF_DEFAULT_ROLE,
-    ALLOWS_TO_VIEW_CHANNELS,
-    ALLOWS_TO_CREATE_INVITE,
-    MESSAGE_REACTION,
 } from "../../util/constants";
 import {
+    AddedRemovedReactionOnMessage,
     AddedRoleToMember,
+    ConferenceType,
+    MeetingHistoryItem,
     Message,
-    MessageTargetEntityType,
+    MessageTargetEntityType, MessageType,
     NewSpaceCategoryEvent,
     NewSpaceChannelEvent,
     NewSpaceRoleAdded,
+    NewSpaceThreadEvent,
+    NotificationMode,
+    RemovedMemberFromThread,
+    SfuEvent,
     SpaceCategoryDeleted,
     SpaceCategoryUpdated,
     SpaceChannelDeleted,
@@ -38,16 +45,10 @@ import {
     SpaceOverviewUpdated,
     SpaceRoleDeleted,
     SpaceRoleUpdated,
+    SpaceThreadDeleted,
     UserJoinedToSpaceEvent,
     UserLeftSpace,
-    SfuEvent,
-    ConferenceType,
-    AddedRemovedReactionOnMessage,
-    NewSpaceThreadEvent,
-    RemovedMemberFromThread,
-    SpaceThreadDeleted,
     UserSpaceNicknameUpdated,
-    NotificationMode,
 } from "../../../src/sdk/constants";
 
 describe("spaces", () => {
@@ -2507,6 +2508,58 @@ describe("spaces", () => {
                 expect(aliceState.name).toEqual(TEST_USER_1.nickname);
                 await bobRoom.destroyRoom();
                 await bob.deleteSpace({id: space.id});
+            });
+            describe("history", () => {
+                it('should receive meeting system message after ending channel meeting', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const channel = space.channels[0];
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    const bobRoom = await bob.createChannelMeeting({
+                        spaceId: space.id,
+                        channelId: channel.id
+                    });
+                    const bobPc = new wrtc.RTCPeerConnection();
+                    const bobState = await bobRoom.join(bobPc);
+                    expect(bobState.userId).toEqual(TEST_USER_0.username);
+                    expect(bobState.name).toEqual(TEST_USER_0.nickname);
+                    const aliceRoom = await alice.roomAvailable({
+                        id: channel.id
+                    });
+                    expect(aliceRoom).toBeTruthy();
+                    const alicePc = new wrtc.RTCPeerConnection();
+                    await aliceRoom.join(alicePc);
+
+                    const waitEvents = async () => {
+                        return new Promise<void>(resolve => {
+                            let eventsCount = 0;
+                            const checkEventsAndResolve = () => {
+                                if (eventsCount === 2) {
+                                    resolve();
+                                }
+                            }
+                            const eventHandler = (msg) => {
+                                const systemMsg = msg as Message;
+                                expect(systemMsg.type).toEqual(MessageType.MEETING_HISTORY);
+                                const meetingMsg: MeetingHistoryItem = JSON.parse(systemMsg.body);
+                                expect(meetingMsg.meetingId).toEqual(channel.id);
+                                expect(meetingMsg.owner).toEqual(bob.user().username);
+                                expect(meetingMsg.startedBy).toEqual(bob.user().username);
+                                expect(meetingMsg.participants.length).toBe(2);
+                                expect(meetingMsg.endedAt).toBeGreaterThan(meetingMsg.startedAt);
+                                expect(meetingMsg.type).toEqual(ConferenceType.CHANNEL);
+                                eventsCount++;
+                                checkEventsAndResolve();
+                            }
+                            bob.on(SfuEvent.MESSAGE, eventHandler);
+                            alice.on(SfuEvent.MESSAGE, eventHandler);
+                        })
+                    }
+
+                    bobRoom.destroyRoom();
+                    await waitEvents();
+                    await bob.deleteSpace({id: space.id});
+                });
             });
         })
     });

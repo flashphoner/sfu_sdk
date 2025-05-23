@@ -42,6 +42,7 @@ import {
     UpdateMessagesDeliveryStatusEvent,
     UserSpecificChatInfo,
     AddedRemovedReactionOnMessage,
+    MeetingHistoryItem, MessageType,
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -2645,6 +2646,58 @@ describe("chat", () => {
                 expect(aliceState.userId).toEqual(TEST_USER_1.username);
                 expect(aliceState.name).toEqual(TEST_USER_1.nickname);
                 await bob.deleteChat({id: chat.id});
+            });
+            describe("history", () => {
+                it('should receive meeting system message after ending direct meeting', async () => {
+                    const chat = await bob.createChat({
+                        channel: false,
+                        members: [TEST_USER_1.username, TEST_USER_2.username],
+                        type: ChatType.PUBLIC
+                    });
+                    const bobRoom = await bob.createDirectMeeting({
+                        directChatId: chat.id
+                    });
+                    const bobPc = new wrtc.RTCPeerConnection();
+                    const bobState = await bobRoom.join(bobPc);
+                    expect(bobState.userId).toEqual(TEST_USER_0.username);
+                    expect(bobState.name).toEqual(TEST_USER_0.nickname);
+                    const aliceRoom = await alice.roomAvailable({
+                        id: chat.id
+                    });
+                    expect(aliceRoom).toBeTruthy();
+                    const alicePc = new wrtc.RTCPeerConnection();
+                    await aliceRoom.join(alicePc);
+
+                    const waitEvents = async () => {
+                        return new Promise<void>(resolve => {
+                            let eventsCount = 0;
+                            const checkEventsAndResolve = () => {
+                                if (eventsCount === 2) {
+                                    resolve();
+                                }
+                            }
+                            const eventHandler = (msg) => {
+                                const systemMsg = msg as Message;
+                                expect(systemMsg.type).toEqual(MessageType.MEETING_HISTORY);
+                                const meetingMsg: MeetingHistoryItem = JSON.parse(systemMsg.body);
+                                expect(meetingMsg.meetingId).toEqual(chat.id);
+                                expect(meetingMsg.startedBy).toEqual(bob.user().username);
+                                expect(meetingMsg.participants.length).toBe(2);
+                                expect(meetingMsg.endedAt).toBeGreaterThan(meetingMsg.startedAt);
+                                expect(meetingMsg.type).toEqual(ConferenceType.DIRECT);
+                                eventsCount++;
+                                checkEventsAndResolve();
+                            }
+                            bob.on(SfuEvent.MESSAGE, eventHandler);
+                            alice.on(SfuEvent.MESSAGE, eventHandler);
+                        })
+                    }
+
+                    bobRoom.leaveRoom();
+                    aliceRoom.leaveRoom();
+                    await waitEvents();
+                    await bob.deleteChat({id: chat.id});
+                });
             });
         });
         describe("reactions", () => {
