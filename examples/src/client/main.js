@@ -202,7 +202,7 @@ const publishPreconfiguredStreams = async function (room, pc, streams) {
             localDisplay.add(s.stream.id, "local", s.stream, contentType);
         });
         //join room
-        await room.join(pc, null, config, 1);
+        await room.join(pc, null, config, 10);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
             $('#' + s.stream.id + "-button").prop('disabled', false);
