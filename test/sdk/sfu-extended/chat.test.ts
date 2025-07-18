@@ -979,6 +979,7 @@ describe("chat", () => {
             let chats = await bob.getUserChats();
             chat = chats[chat.id];
             expect(chat.muteSettings).toBeTruthy();
+            expect(chat.muteSettings.muteTime).toBe(1000);
             expect(chat.muteSettings.mutedUntil).toBeGreaterThan(1000);
             expect(chat.muteSettings.mutedIndefinitely).toBeTruthy();
             await bob.unmuteChat({

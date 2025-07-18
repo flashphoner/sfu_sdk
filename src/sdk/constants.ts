@@ -1323,6 +1323,7 @@ export enum NotificationMode {
 }
 
 export type MuteSettings = {
+    muteTime: number;
     mutedUntil?: number;
     mutedIndefinitely?: boolean;
 }

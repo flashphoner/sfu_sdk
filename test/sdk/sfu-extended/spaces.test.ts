@@ -145,6 +145,7 @@ describe("spaces", () => {
             let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
             expect(spaceAfterUpdate).toBeTruthy();
             expect(spaceAfterUpdate.muteSettings).toBeTruthy();
+            expect(spaceAfterUpdate.muteSettings.muteTime).toBe(1000);
             expect(spaceAfterUpdate.muteSettings.mutedUntil).toBeGreaterThan(1000);
             expect(spaceAfterUpdate.muteSettings.mutedIndefinitely).toBeTruthy();
             await bob.unmuteSpace({
@@ -420,6 +421,7 @@ describe("spaces", () => {
                 let channelAfterUpdate = spaceAfterUpdate.channels.find((currentChannel) => currentChannel.id === channel.id);
                 expect(channelAfterUpdate).toBeTruthy();
                 expect(channelAfterUpdate.muteSettings).toBeTruthy();
+                expect(channelAfterUpdate.muteSettings.muteTime).toBe(1000);
                 expect(channelAfterUpdate.muteSettings.mutedUntil).toBeGreaterThan(1000);
                 expect(channelAfterUpdate.muteSettings.mutedIndefinitely).toBeTruthy();
 
@@ -654,6 +656,7 @@ describe("spaces", () => {
                 let updatedThread = channelWithUpdatedThread.threads.find((currentThread) => currentThread.id === thread.id);
                 expect(updatedThread).toBeTruthy();
                 expect(updatedThread.muteSettings).toBeTruthy();
+                expect(updatedThread.muteSettings.muteTime).toBe(1000);
                 expect(updatedThread.muteSettings.mutedUntil).toBeGreaterThan(1000);
                 expect(updatedThread.muteSettings.mutedIndefinitely).toBeTruthy();
 
