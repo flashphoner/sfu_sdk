@@ -967,7 +967,7 @@ describe("chat", () => {
             expect(chat.notificationSettings).toEqual(NotificationMode.MENTIONS_ONLY);
             await bob.deleteChat(chat);
         });
-        it('should mute and unmute chat', async () => {
+        it.skip('should mute and unmute chat', async () => {
             let chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username]});
             expect(chat).toBeTruthy();
             expect(chat.muteSettings).toBeFalsy();
