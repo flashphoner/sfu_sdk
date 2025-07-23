@@ -132,7 +132,7 @@ describe("spaces", () => {
             expect(spaceAfterUpdate.notificationSettings).toEqual(NotificationMode.NOTHING);
             await bob.deleteSpace({id: space.id});
         });
-        it.skip('should mute and unmute space', async () => {
+        it('should mute and unmute space', async () => {
             const space = await bob.createSpace({name: TEST_SPACE_NAME});
             expect(space).toBeTruthy();
             expect(space.muteSettings).toBeFalsy();
@@ -400,7 +400,7 @@ describe("spaces", () => {
                 expect(channelAfterUpdate.notificationSettings).toEqual(NotificationMode.MENTIONS_ONLY);
                 await bob.deleteSpace({id: space.id});
             });
-            it.skip('should mute and unmute channel', async () => {
+            it('should mute and unmute channel', async () => {
                 const space = await bob.createSpace({name: TEST_SPACE_NAME});
                 const channel = await bob.createSpaceChannel({
                     spaceId: space.id,
@@ -627,7 +627,7 @@ describe("spaces", () => {
                 expect(updatedThread.notificationSettings).toEqual(NotificationMode.NOTHING);
                 await bob.deleteSpace({id: space.id});
             });
-            it.skip('should mute and unmute thread', async () => {
+            it('should mute and unmute thread', async () => {
                 const space = await bob.createSpace({name: TEST_SPACE_NAME});
                 const channel = await bob.createSpaceChannel({
                     spaceId: space.id,
