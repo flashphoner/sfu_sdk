@@ -336,6 +336,8 @@ export enum MeetingSyncEvent {
     PARTICIPANT_LIST_SYNC = "PARTICIPANT_LIST_SYNC",
     /** Used to receive {@link MeetingNameUpdatedSync} */
     MEETING_NAME_UPDATED_SYNC = "MEETING_NAME_UPDATED_SYNC",
+    /** Used to receive {@link ParticipantRenamedSyncEvent} */
+    PARTICIPANT_RENAMED_SYNC = "PARTICIPANT_RENAMED_SYNC"
 }
 
 export enum ExamplesEvent {
@@ -1056,6 +1058,12 @@ export type AddRemoveTracksSync = InternalMessage & {
 export type MeetingNameUpdatedSync = InternalMessage & {
     id: string;
     name: string;
+}
+
+export type ParticipantRenamedSyncEvent = InternalMessage & {
+    id: string;
+    userId: string;
+    nickname: string;
 }
 
 export type WaitingRoomUpdate = InternalMessage & {

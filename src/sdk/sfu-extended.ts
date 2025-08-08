@@ -164,6 +164,7 @@ import {
     MeetingRemovedFromHistory,
     ConferenceType,
     MeetingRecordDeleted,
+    ParticipantRenamedSyncEvent,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -846,6 +847,9 @@ export class SfuExtended {
                         } else if (data[0].type === MeetingSyncEvent.MEETING_NAME_UPDATED_SYNC) {
                             const event = data[0] as MeetingNameUpdatedSync;
                             this.#notifier.notify(MeetingSyncEvent.MEETING_NAME_UPDATED_SYNC, event);
+                        } else if (data[0].type === MeetingSyncEvent.PARTICIPANT_RENAMED_SYNC) {
+                            const event = data[0] as ParticipantRenamedSyncEvent;
+                            this.#notifier.notify(MeetingSyncEvent.PARTICIPANT_RENAMED_SYNC, event);
                         } else if (data[0].type === SfuEvent.USER_CONTACTS) {
                             const event = data[0] as UserContactsEvent;
                             if (!promises.resolve(data[0].internalMessageId, event.contacts)) {
