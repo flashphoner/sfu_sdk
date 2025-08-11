@@ -165,6 +165,8 @@ import {
     ConferenceType,
     MeetingRecordDeleted,
     ParticipantRenamedSyncEvent,
+    SystemConfigEvent,
+    SystemConfig,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -924,6 +926,9 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.MEETING_RECORD_DELETED) {
                             const event = data[0] as MeetingRecordDeleted;
                             this.#notifier.notify(SfuEvent.MEETING_RECORD_DELETED, event);
+                        } else if (data[0].type === SfuEvent.SYSTEM_CONFIG) {
+                            const event = data[0] as SystemConfigEvent;
+                            promises.resolve(data[0].internalMessageId, event.config);
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -3693,6 +3698,19 @@ export class SfuExtended {
                 meetingId: options.meetingId,
                 spaceId: options.spaceId,
             }, resolve, reject);
+        });
+    }
+
+    /**
+     * Get system config (settings)
+     *
+     * Used to receive {@link SystemConfig}
+     */
+    public async getSystemConfig() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SystemConfig>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_SYSTEM_CONFIG, {}, resolve, reject);
         });
     }
 

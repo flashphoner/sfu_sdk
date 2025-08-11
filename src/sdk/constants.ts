@@ -127,7 +127,9 @@ export enum SfuEvent {
     /** Used to receive {@link MeetingRemovedFromHistory} */
     MEETING_REMOVED_FROM_HISTORY = "MEETING_REMOVED_FROM_HISTORY",
     /** Used to receive {@link MeetingRecordDeleted} */
-    MEETING_RECORD_DELETED = "MEETING_RECORD_DELETED"
+    MEETING_RECORD_DELETED = "MEETING_RECORD_DELETED",
+    /** Used to receive {@link SystemConfig} */
+    SYSTEM_CONFIG = "SYSTEM_CONFIG"
 }
 
 /**
@@ -633,7 +635,8 @@ export enum InternalApi {
     UPDATE_SPACE_NICKNAME = "updateSpaceNickname",
     LOAD_MEETINGS_HISTORY = "loadMeetingsHistory",
     REMOVE_MEETING_FROM_HISTORY = "removeMeetingFromHistory",
-    REMOVE_MEETING_RECORD = "removeMeetingRecord"
+    REMOVE_MEETING_RECORD = "removeMeetingRecord",
+    GET_SYSTEM_CONFIG = "getSystemConfig"
 }
 
 export enum ConnectionError {
@@ -2037,6 +2040,18 @@ export type MeetingRemovedFromHistory = InternalMessage & {
 export type MeetingRecordDeleted = InternalMessage & {
     meetingHistoryItemId: string;
     recordId: string;
+}
+
+export type RecorderConfig = {
+    username: string;
+}
+
+export type SystemConfig = {
+    recorder: RecorderConfig
+}
+
+export type SystemConfigEvent = InternalMessage & {
+    config: SystemConfig
 }
 
 export enum SortOrder {
