@@ -2,6 +2,7 @@ import {RoomEvent, SfuExtended} from "../../src";
 import {RoomExtended} from "../../src/sdk/room-extended";
 import {TEST_USER_0, TEST_USER_1, url} from "./constants";
 import {Verbosity} from "../../src/sdk/logger";
+const { URL } = require('url');
 
 export type WaitCondition = (room: RoomExtended) => boolean;
 
@@ -47,4 +48,13 @@ export async function waitForUsers() {
 
 export async function waitForUser() {
     return await connect(TEST_USER_0);
+}
+
+export function isValidUrl(url) {
+    try {
+        new URL(url);
+        return true;
+    } catch (e) {
+        return false;
+    }
 }

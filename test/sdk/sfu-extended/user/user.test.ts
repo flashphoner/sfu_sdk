@@ -1,5 +1,10 @@
-import {TEST_USER_0, TEST_USER_1, UPDATED_PMI_SETTINGS, url} from "../../../util/constants";
-import {connect, waitForUser} from "../../../util/utils";
+import {
+    iconFile,
+    TEST_USER_0,
+    TEST_USER_1,
+    UPDATED_PMI_SETTINGS,
+} from "../../../util/constants";
+import {connect, isValidUrl, waitForUser} from "../../../util/utils";
 import {SfuExtended} from "../../../../src";
 import {UserInfoError} from "../../../../src/sdk/constants";
 
@@ -114,5 +119,20 @@ describe("user", () => {
         await bob.changeUserPhoneNumber("");
         await bob.changeUserHostKey("");
         await bob.changeUserTimezone("");
+    });
+    it('should add and delete icon', async () => {
+        await bob.updateUserIcon({
+            icon: iconFile
+        });
+
+        let userInfo = await bob.getUserInfo();
+        const downloadIconUrlIsValid = isValidUrl(userInfo.icon);
+        expect(downloadIconUrlIsValid).toBeTruthy();
+
+        await bob.updateUserIcon({
+            remove: true
+        });
+        userInfo = await bob.getUserInfo();
+        expect(userInfo.icon).toBeFalsy();
     });
 });

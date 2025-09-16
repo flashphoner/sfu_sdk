@@ -1,5 +1,5 @@
 import {SfuExtended, SpaceEvent} from "../../../src";
-import {connect, waitForUsers} from "../../util/utils";
+import {connect, isValidUrl, waitForUsers} from "../../util/utils";
 import {
     ALLOWS_TO_CREATE_INVITE,
     ALLOWS_TO_MANAGE_CATEGORIES,
@@ -10,6 +10,7 @@ import {
     DEFAULT_CATEGORY_NAME,
     DEFAULT_CHANNEL_NAME,
     DEFAULT_ROLE_ID,
+    iconFile,
     MESSAGE_REACTION,
     NAME_OF_DEFAULT_ROLE,
     TEST_CATEGORY_NAME,
@@ -155,6 +156,26 @@ describe("spaces", () => {
             spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
             expect(spaceAfterUpdate).toBeTruthy();
             expect(spaceAfterUpdate.muteSettings).toBeFalsy();
+            await bob.deleteSpace({id: space.id});
+        });
+        it('should update space icon', async () => {
+            const space = await bob.createSpace({name: TEST_SPACE_NAME});
+            await bob.updateSpaceIcon({
+                id: space.id,
+                icon: iconFile
+            });
+            let spaces = await bob.getUserSpaces();
+            let spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+            const downloadIconUrlIsValid = isValidUrl(spaceAfterUpdate.icon);
+            expect(downloadIconUrlIsValid).toBeTruthy();
+            await bob.updateSpaceIcon({
+                id: space.id,
+                remove: true
+            });
+            spaces = await bob.getUserSpaces();
+            spaceAfterUpdate = spaces.find((userSpace) => userSpace.id === space.id);
+            expect(spaceAfterUpdate).toBeTruthy();
+            expect(spaceAfterUpdate.icon).toBeFalsy();
             await bob.deleteSpace({id: space.id});
         });
         describe("category", () => {
@@ -1602,6 +1623,49 @@ describe("spaces", () => {
                         spaceId: space.id,
                         roleId: role.id,
                         memberId: alice.user().username
+                    });
+                    await waitEvents();
+                    await bob.deleteSpace({id: space.id});
+                });
+                it('should receive event when updating icon', async () => {
+                    const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                    const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
+
+                    await alice.joinSpaceByInviteCode(invite.inviteCode);
+                    await kiri.joinSpaceByInviteCode(invite.inviteCode);
+
+                    const waitEvents = async () => {
+                        return new Promise<void>((resolve) => {
+                            let eventsCount = 0;
+                            const checkEvent = (msg) => {
+                                const event = msg as SpaceOverviewUpdated;
+                                expect(event.id).toEqual(space.id);
+                                if (isValidUrl(event.icon)) {
+                                    eventsCount++;
+                                }
+                            };
+                            const aliceHandler = (msg) => {
+                                checkEvent(msg);
+                                alice.off(SpaceEvent.SPACE_OVERVIEW_UPDATED, aliceHandler);
+                                if (eventsCount == 2) {
+                                    resolve();
+                                }
+                            };
+                            const kiriHandler = (msg) => {
+                                checkEvent(msg);
+                                kiri.off(SpaceEvent.SPACE_OVERVIEW_UPDATED, kiriHandler);
+                                if (eventsCount == 2) {
+                                    resolve();
+                                }
+                            };
+                            alice.on(SpaceEvent.SPACE_OVERVIEW_UPDATED, aliceHandler);
+                            kiri.on(SpaceEvent.SPACE_OVERVIEW_UPDATED, kiriHandler);
+                        })
+                    };
+
+                    bob.updateSpaceIcon({
+                        id: space.id,
+                        icon: iconFile
                     });
                     await waitEvents();
                     await bob.deleteSpace({id: space.id});

@@ -1,4 +1,12 @@
-import {TEST_CHANNEL_NAME, TEST_SPACE_NAME, TEST_USER_0, TEST_USER_1, TEST_USER_2, url} from "../../util/constants";
+import {
+    iconFile,
+    TEST_CHANNEL_NAME,
+    TEST_SPACE_NAME,
+    TEST_USER_0,
+    TEST_USER_1,
+    TEST_USER_2,
+    url
+} from "../../util/constants";
 import {
     ContactDeleted,
     ContactUpdated,
@@ -10,7 +18,7 @@ import {
     UserPresenceStatusUpdated
 } from "../../../src/sdk/constants";
 import {SfuExtended} from "../../../src";
-import {connect, waitForUsers} from "../../util/utils";
+import {connect, isValidUrl, waitForUsers} from "../../util/utils";
 
 describe("contacts", () => {
     let bob: SfuExtended;
@@ -1014,6 +1022,42 @@ describe("contacts", () => {
                 expect(bobContacts.contacts.some((item) => item.userId === TEST_USER_1.username && item.nickname === CHANGED_NICKNAME)).toBeTruthy();
 
                 await alice.changeUserNickname(TEST_USER_1.nickname);
+
+                await bob.removeFriend({userId: TEST_USER_1.username});
+            });
+            it('user should be notified when friend changes icon', async () => {
+                let updatedIcon = "";
+                const waitEvent = async () => {
+                    return new Promise<void>((resolve) => {
+                        const bobHandler = (msg) => {
+                            const event = msg as ContactUpdated;
+                            updatedIcon = event.contact.icon
+                            const downloadIconUrlIsValid = isValidUrl(updatedIcon);
+                            expect(downloadIconUrlIsValid).toBeTruthy();
+                            bob.off(SfuEvent.CONTACT_UPDATED, bobHandler);
+                            resolve();
+                        }
+                        bob.on(SfuEvent.CONTACT_UPDATED, bobHandler);
+                    });
+                };
+
+                await bob.addFriend({userId: TEST_USER_1.username});
+                const aliceContacts = await alice.getContacts();
+                expect(aliceContacts.incomingFriendInvites.length).toBe(1);
+                const incomingInvite = aliceContacts.incomingFriendInvites[0];
+                await alice.acceptFriendInvite({inviteId: incomingInvite.inviteId})
+
+                alice.updateUserIcon({
+                    icon: iconFile
+                });
+                await waitEvent();
+
+                const bobContacts = await bob.getContacts();
+                expect(bobContacts.contacts.some((item) => item.userId === TEST_USER_1.username && item.nickname === TEST_USER_1.nickname && item.icon === updatedIcon)).toBeTruthy();
+
+                await alice.updateUserIcon({
+                    remove: true
+                });
 
                 await bob.removeFriend({userId: TEST_USER_1.username});
             });

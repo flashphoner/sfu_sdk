@@ -167,6 +167,8 @@ import {
     ParticipantRenamedSyncEvent,
     SystemConfigEvent,
     SystemConfig,
+    UploadIconEvent,
+    ChatIconUpdated,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -174,6 +176,7 @@ import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 import {AttachmentsTransferManager} from "./attachments-transfer-manager";
+import { uploadFile } from './file-upload';
 
 export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact;
 
@@ -929,6 +932,14 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.SYSTEM_CONFIG) {
                             const event = data[0] as SystemConfigEvent;
                             promises.resolve(data[0].internalMessageId, event.config);
+                        } else if (data[0].type === SfuEvent.UPLOAD_ICON) {
+                            const event = data[0] as UploadIconEvent;
+                            promises.resolve(data[0].internalMessageId, event.url);
+                        } else if (data[0].type === SfuEvent.CHAT_ICON_UPDATED) {
+                            const event = data[0] as ChatIconUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHAT_ICON_UPDATED, event);
+                            }
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -3712,6 +3723,160 @@ export class SfuExtended {
         return new Promise<SystemConfig>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_SYSTEM_CONFIG, {}, resolve, reject);
         });
+    }
+
+
+    private async updateSpaceIconRequest(options: {
+        id: string;
+        name?: string;
+        size?: number;
+        remove?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<string>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_ICON, {
+                id: options.id,
+                iconName: options.name,
+                iconSize: options.size,
+                remove: options.remove
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Update space icon
+     *
+     * Used to update space icon.
+     *
+     * Space members will receive {@link SpaceOverviewUpdated} with {@link SpaceOverviewUpdated.icon} as download url.
+     *
+     * Returns download url or null if removed.
+     */
+    public async updateSpaceIcon(options: {
+        id: string;
+        icon?: File;
+        remove?: boolean;
+    }): Promise<string | null> {
+        try {
+            const uploadUrl = await this.updateSpaceIconRequest({
+                id: options.id,
+                name: options.icon?.name,
+                size: options.icon?.size,
+                remove: options.remove
+            });
+
+            if (!uploadUrl) {
+                return null;
+            }
+
+            return uploadFile({
+                url: uploadUrl,
+                file: options.icon
+            });
+        } catch (error) {
+            throw new Error(error.error);
+        }
+    }
+
+    private async updateUserIconRequest(options: {
+        name?: string;
+        size?: number;
+        remove?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<string>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_USER_ICON, {
+                iconName: options.name,
+                iconSize: options.size,
+                remove: options.remove
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Update user avatar
+     *
+     * Used to update user avatar.
+     *
+     * User will receive {@link UserInfoChangedEvent} and {@link ContactUpdated} with self.
+     * User's contacts will receive {@link ContactUpdated}
+     *
+     * Returns download url or null if removed.
+     */
+    public async updateUserIcon(options: {
+        icon?: File;
+        remove?: boolean;
+    }): Promise<string | null> {
+        try {
+            const uploadUrl = await this.updateUserIconRequest({
+                name: options.icon?.name,
+                size: options.icon?.size,
+                remove: options.remove
+            });
+
+            if (!uploadUrl) {
+                return null;
+            }
+
+            return uploadFile({
+                url: uploadUrl,
+                file: options.icon
+            });
+        } catch (error) {
+            throw new Error(error.error);
+        }
+    }
+
+    private async updateChatIconRequest(options: {
+        id: string;
+        name?: string;
+        size?: number;
+        remove?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<string | undefined>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHAT_ICON, {
+                id: options.id,
+                iconName: options.name,
+                iconSize: options.size,
+                remove: options.remove
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Update chat icon
+     *
+     * Used to update direct chat icon.
+     *
+     * Chat members will receive {@link ChatIconUpdated} with {@link ChatIconUpdated.icon} as download url.
+     *
+     * Returns download url or null if removed.
+     */
+    public async updateChatIcon(options: {
+        id: string;
+        icon?: File;
+        remove?: boolean;
+    }): Promise<string | null> {
+        try {
+            const uploadUrl = await this.updateChatIconRequest({
+                id: options.id,
+                name: options.icon?.name,
+                size: options.icon?.size,
+                remove: options.remove
+            });
+
+            if (!uploadUrl) {
+                return null;
+            }
+
+            return uploadFile({url: uploadUrl, file: options.icon});
+        } catch (error) {
+            throw new Error(error.error);
+        }
     }
 
     public user() {

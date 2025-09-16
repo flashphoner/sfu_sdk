@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import {ChannelSendPolicy, ChatType, MessageAttachmentType} from "../../src/sdk/constants";
+import {createFileFromPath} from "./fsUtils";
 export const url = "ws://127.0.0.1:8080/";
 export const wrongWsUrl = "ws://127.0.0.1:8081/";
 export const TEST_USER_0 = {
@@ -86,9 +87,11 @@ export const CALENDAR_EVENT = {
 
 export const PDF_FILE_NAME = "sample.pdf";
 export const PICTURE_FILE_NAME = "sample.jpeg";
+export const ICON_FILE_NAME = "icon.png";
 export const PICTURE_2M_FILE_NAME = "sample2.jpeg";
 export const DOWNLOAD_PATH = "../resources/downloads/"
 export const PICTURE_FILE_PATH = "../resources/" + PICTURE_FILE_NAME;
+export const ICON_FILE_PATH = "../resources/" + ICON_FILE_NAME;
 export const PICTURE_2M_FILE_PATH = "../resources/" + PICTURE_2M_FILE_NAME;
 export const PDF_FILE_PATH = "../resources/" + PDF_FILE_NAME;
 
@@ -198,3 +201,5 @@ export const MASTER_PASSWORD = "master-password-encryption";
 export const MASTER_PASSWORD_HASH = "6b42857320f232c514058458e8fbe0a380ed7ef25a32712b24e09ba116e7953e";
 
 export const MESSAGE_REACTION = "😁";
+
+export const iconFile = createFileFromPath(ICON_FILE_PATH, "image/png");

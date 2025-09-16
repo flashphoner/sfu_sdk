@@ -4,6 +4,7 @@ import {
     ATTACHMENTS_PAYLOAD,
     DOWNLOAD_PATH,
     EVERYONE_TAG,
+    iconFile,
     MESSAGE_REACTION,
     PDF_FILE_NAME,
     PICTURE_FILE_NAME,
@@ -42,11 +43,13 @@ import {
     UpdateMessagesDeliveryStatusEvent,
     UserSpecificChatInfo,
     AddedRemovedReactionOnMessage,
-    MeetingHistoryItem, MessageType,
+    MeetingHistoryItem,
+    MessageType,
+    ChatIconUpdated,
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
-import {connect, waitForUsers} from "../../util/utils";
+import {connect, isValidUrl, waitForUsers} from "../../util/utils";
 
 const MESSAGE_BODY = "test message";
 
@@ -990,6 +993,27 @@ describe("chat", () => {
             expect(chat.muteSettings).toBeFalsy();
             await bob.deleteChat(chat);
         });
+        it('should update chat icon', async () => {
+            let chat = await bob.createChat({members: [TEST_USER_0.username, TEST_USER_1.username, TEST_USER_2.username]});
+            expect(chat).toBeTruthy();
+
+            await bob.updateChatIcon({
+                id: chat.id,
+                icon: iconFile
+            });
+            let chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            const downloadIconUrlIsValid = isValidUrl(chat.icon);
+            expect(downloadIconUrlIsValid).toBeTruthy();
+            await bob.updateChatIcon({
+                id: chat.id,
+                remove: true
+            });
+            chats = await bob.getUserChats();
+            chat = chats[chat.id];
+            expect(chat.icon).toBeFalsy();
+            await bob.deleteChat(chat);
+        });
         describe("attachments", () => {
             it("Should send message with attachment", async () => {
                 const chat = await bob.createChat({});
@@ -1849,6 +1873,30 @@ describe("chat", () => {
                     }
                 });
                 await waitUpdateDeliveryStatusEvent(firstPendingMessage.date - 1, secondPendingMessage.date);
+                await bob.deleteChat({id: chat.id});
+            });
+            it("Chat member should be notified about changing icon", async () => {
+                let chat = await bob.createChat({
+                    members: [TEST_USER_1.username, TEST_USER_2.username]
+                });
+
+                const waitEvent = async () => {
+                    return new Promise<void>((resolve) => {
+                        alice.on(SfuEvent.CHAT_ICON_UPDATED, (msg) => {
+                            const updated = msg as ChatIconUpdated;
+                            if (isValidUrl(updated.icon)) {
+                                resolve();
+                            }
+                        })
+                    })
+                };
+
+                bob.updateChatIcon({
+                    id: chat.id,
+                    icon: iconFile
+                });
+                await waitEvent();
+
                 await bob.deleteChat({id: chat.id});
             });
             describe("multiple-clients", () => {

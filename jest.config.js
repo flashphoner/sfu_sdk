@@ -2,5 +2,6 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
-  testRunner: "jest-jasmine2"
+  testRunner: "jest-jasmine2",
+  setupFiles: ["./setup-jest.js"]
 };

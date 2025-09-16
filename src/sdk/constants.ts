@@ -129,7 +129,9 @@ export enum SfuEvent {
     /** Used to receive {@link MeetingRecordDeleted} */
     MEETING_RECORD_DELETED = "MEETING_RECORD_DELETED",
     /** Used to receive {@link SystemConfig} */
-    SYSTEM_CONFIG = "SYSTEM_CONFIG"
+    SYSTEM_CONFIG = "SYSTEM_CONFIG",
+    UPLOAD_ICON = "UPLOAD_ICON",
+    CHAT_ICON_UPDATED = "CHAT_ICON_UPDATED"
 }
 
 /**
@@ -636,7 +638,10 @@ export enum InternalApi {
     LOAD_MEETINGS_HISTORY = "loadMeetingsHistory",
     REMOVE_MEETING_FROM_HISTORY = "removeMeetingFromHistory",
     REMOVE_MEETING_RECORD = "removeMeetingRecord",
-    GET_SYSTEM_CONFIG = "getSystemConfig"
+    GET_SYSTEM_CONFIG = "getSystemConfig",
+    UPDATE_USER_ICON = "updateUserIcon",
+    UPDATE_SPACE_ICON = "updateSpaceIcon",
+    UPDATE_CHAT_ICON = "updateChatIcon"
 }
 
 export enum ConnectionError {
@@ -1291,6 +1296,7 @@ export type UserInfo = {
     id: UserId,
     email: UserEmail,
     nickname: UserNickname,
+    icon: string,
     phoneNumber: UserPhoneNumber,
     hostKey: UserHostKey,
     timezone: UserTimezone,
@@ -1347,6 +1353,7 @@ export type UserSpecificChatInfo = {
     channel: boolean;
     name: string;
     owner: UserId;
+    icon: string;
     creationDate: number;
     members: Array<UserId>;
     lastReadMessageId: string;
@@ -1690,6 +1697,7 @@ export type SfuSpace = {
     id: string;
     name: string;
     owner: string;
+    icon: string;
     createdAt: number;
     notificationSettings: NotificationMode;
     muteSettings: MuteSettings;
@@ -1717,6 +1725,7 @@ export type SpaceDeletedEvent = InternalMessage & {
 export type SpaceOverviewUpdated = InternalMessage & {
     id: string;
     name: string;
+    icon: string;
 }
 
 
@@ -1928,6 +1937,7 @@ export type ContactPersonalSettings = {
 export type Contact = {
     userId: string;
     nickname: string;
+    icon: string;
     friend: boolean;
     status: PresenceStatus;
     publicKey: string;
@@ -2047,11 +2057,20 @@ export type RecorderConfig = {
 }
 
 export type SystemConfig = {
-    recorder: RecorderConfig
+    recorder: RecorderConfig;
 }
 
 export type SystemConfigEvent = InternalMessage & {
-    config: SystemConfig
+    config: SystemConfig;
+}
+
+export type UploadIconEvent = InternalMessage & {
+    url: string;
+}
+
+export type ChatIconUpdated = InternalMessage & {
+    chatId: string;
+    icon: string;
 }
 
 export enum SortOrder {
