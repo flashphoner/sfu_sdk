@@ -169,6 +169,9 @@ import {
     SystemConfig,
     UploadIconEvent,
     ChatIconUpdated,
+    AttachmentListResult,
+    AttachmentSizeInfo,
+    AttachmentType,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -624,6 +627,17 @@ export class SfuExtended {
                             const result = data[0] as MessageAttachmentsSearchResult;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT, result);
+                            }
+                        } else if (data[0].type === SfuEvent.ATTACHMENTS_LIST_RESULT) {
+                            const result = data[0] as AttachmentListResult;
+                            if (!promises.resolve(data[0].internalMessageId, result)) {
+                                this.#notifier.notify(SfuEvent.ATTACHMENTS_LIST_RESULT, result);
+                            }
+
+                        }else if (data[0].type === SfuEvent.ATTACHMENTS_SIZE_INFO) {
+                            const result = data[0] as AttachmentSizeInfo;
+                            if (!promises.resolve(data[0].internalMessageId, result)) {
+                                this.#notifier.notify(SfuEvent.ATTACHMENTS_SIZE_INFO, result);
                             }
                         } else if (data[0].type === SfuEvent.LOAD_MESSAGES_WITH_MENTIONS_RESULT) {
                             const result = data[0] as LoadMessagesWithMentionsResult;
@@ -1558,6 +1572,40 @@ export class SfuExtended {
                 targetEntityId: options.targetEntityId
             }, resolve, reject);
         });
+    }
+
+    /**
+     * List user attachments
+     *
+     * @param filter.offset     starting point for retrieving a subset of attachments
+     * @param filter.pageSize   number of items retrieved and displayed per page
+     */
+    public listAttachments(filter: {
+        offset: number,
+        pageSize: number,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AttachmentListResult>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LIST_ATTACHMENTS, {
+                ...filter
+            }, resolve, reject);
+        })
+    }
+
+    /**
+     * Get total size of attachments
+     *
+     * @param type {@link AttachmentType}
+     */
+    public getAttachmentsSize(type?: AttachmentType) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AttachmentSizeInfo>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_ATTACHMENTS_SIZE, {
+                type: type
+            }, resolve, reject);
+        })
     }
 
     /**

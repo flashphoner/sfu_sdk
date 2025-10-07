@@ -3,6 +3,8 @@ import {RoomExtended} from "../../src/sdk/room-extended";
 import {TEST_USER_0, TEST_USER_1, url} from "./constants";
 import {Verbosity} from "../../src/sdk/logger";
 const { URL } = require('url');
+import {v4 as uuidv4} from 'uuid';
+import {MessageAttachmentType} from "../../src/sdk/constants";
 
 export type WaitCondition = (room: RoomExtended) => boolean;
 
@@ -57,4 +59,25 @@ export function isValidUrl(url) {
     } catch (e) {
         return false;
     }
+}
+
+export const generateAttachments = (attachmentsSize: number, size: number) => {
+    const result = {
+        metadata: [],
+        payload: []
+    };
+    for (let i = 0; i < attachmentsSize; i++) {
+        let id = uuidv4();
+        result.metadata.push({
+            type: MessageAttachmentType.file,
+            id: id,
+            size: size,
+            name: "file" + i + ".txt"
+        })
+        result.payload.push({
+            payload: Buffer.from(new ArrayBuffer(size)).buffer,
+            id: id,
+        })
+    }
+    return result;
 }

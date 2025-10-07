@@ -86,6 +86,10 @@ export enum SfuEvent {
     UNREAD_MESSAGES_COUNT_UPDATE = "UNREAD_MESSAGES_COUNT_UPDATE",
     /** Used to receive {@link MessageAttachmentsSearchResult} */
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
+    /** Used to receive {@link AttachmentListResult} */
+    ATTACHMENTS_LIST_RESULT = "ATTACHMENTS_LIST_RESULT",
+    /** Used to receive {@link AttachmentSizeInfo} */
+    ATTACHMENTS_SIZE_INFO = "ATTACHMENTS_SIZE_INFO",
     /** Used to receive {@link LoadMessagesWithMentionsResult} */
     LOAD_MESSAGES_WITH_MENTIONS_RESULT = "LOAD_MESSAGES_WITH_MENTIONS_RESULT",
     /** Used to receive {@link Message} */
@@ -522,6 +526,8 @@ export enum InternalApi {
     LOAD_MESSAGES = "loadMessages",
     SEARCH_CHAT_MESSAGES = "searchChatMessages",
     GET_MESSAGES_COUNT = "getMessagesCount",
+    LIST_ATTACHMENTS = "listAttachments",
+    GET_ATTACHMENTS_SIZE = "getAttachmentsSize",
     GET_FIRST_AND_LAST_MESSAGE = "getFirstAndLastMessage",
     GET_UNREAD_MESSAGES_COUNT = "getUnreadMessagesCount",
     CREATE_CHAT = "createChat",
@@ -1572,6 +1578,27 @@ export type AttachmentInfo = {
     size: number;
     from: string;
     date: number;
+}
+
+export enum AttachmentType {
+    SPACE = "SPACE",
+    DIRECT = "DIRECT"
+}
+
+export type AttachmentListItem = {
+    id: string;
+    name: string;
+    size: number;
+    from: string;
+    date: number;
+}
+
+export type AttachmentListResult = InternalMessage & {
+    result: Array<AttachmentListItem>
+}
+
+export type AttachmentSizeInfo = InternalMessage & {
+    result: {[key: string]:string}
 }
 
 export type MessageAttachmentsSearchResult = InternalMessage & {
