@@ -78,6 +78,15 @@ const init = function () {
         //use default config
         cControls = createControls(defaultConfig);
     });
+
+    // insert transport values in entrance modal
+    const transportSelect = document.getElementById('transport');
+    Object.values(constants.SFU_TRANSPORT_TYPE).forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        transportSelect.appendChild(option);
+    });
     //open entrance modal
     $('#entranceModal').modal('show');
 }
@@ -202,7 +211,8 @@ const publishPreconfiguredStreams = async function (room, pc, streams) {
             localDisplay.add(s.stream.id, "local", s.stream, contentType);
         });
         //join room
-        await room.join(pc, null, config, 10);
+        const transportType = cControls.roomConfig().transport;
+        await room.join(pc, null, config, 10, transportType);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
             $('#' + s.stream.id + "-button").prop('disabled', false);

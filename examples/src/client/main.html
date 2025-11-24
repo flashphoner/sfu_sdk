@@ -216,6 +216,14 @@
                     <label for="nickName">Nickname</label>
                     <input class="form-control" id="nickName" type="text" value="Bob">
                 </div>
+
+                <div class="row mb-2">
+                    <label for="transport">Transport</label>
+                    <select class="form-select" id="transport">
+                        <option value="" selected>Auto (server default)</option>
+                        <!-- Other options are populated dynamically by init() in main.js -->
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancel()">Close</button>

@@ -9,7 +9,8 @@ const createControls = function (config) {
             roomName: document.getElementById("roomName"),
             roomPin: document.getElementById("roomPin"),
             nickName: document.getElementById("nickName"),
-            enter: document.getElementById("startButton")
+            enter: document.getElementById("startButton"),
+            transport: document.getElementById("transport")
         },
         addVideoTrack: {
             source: document.getElementById("addVideoTrackSource"),
@@ -171,7 +172,8 @@ const createControls = function (config) {
             url: controls.entrance.url.value,
             roomName: controls.entrance.roomName.value,
             pin: controls.entrance.roomPin.value,
-            nickname: controls.entrance.nickName.value
+            nickname: controls.entrance.nickName.value,
+            transport: controls.entrance.transport.value
         };
         if (config.room.failedProbesThreshold !== undefined) {
             roomConfig.failedProbesThreshold = config.room.failedProbesThreshold;

@@ -31,6 +31,7 @@ import {
     UserId,
     UserNickname,
     WaitingRoomUpdate,
+    TransportType,
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
@@ -319,10 +320,11 @@ export class Room {
      * @param nickname - user nickname
      * @param config - [track.id] : track content type
      * @param predefinedTracksCount - Initial number of allocated transceivers.
+     * @param transportType - Ice transport protocol. "UDP"/"TCP".
      */
     public join(pc: RTCPeerConnection, nickname?: UserNickname, config?: {
         [key: string]: string
-    }, predefinedTracksCount?: number): Promise<JoinedRoom> {
+    }, predefinedTracksCount?: number, transportType?: TransportType): Promise<JoinedRoom> {
         const self = this;
         this.#_pc = pc;
         this.#_pc.addEventListener("signalingstatechange", () => {
@@ -400,7 +402,8 @@ export class Room {
                         nickname: nickname,
                         internalMessageId: id,
                         sdpType: RemoteSdpType.OFFER,
-                        tid: self._crutch.tid
+                        tid: self._crutch.tid,
+                        transport: transportType
                     });
                 } catch (e) {
                     reject(e);

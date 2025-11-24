@@ -1084,6 +1084,11 @@ export type WaitingRoomUpdate = InternalMessage & {
     enabled: boolean
 }
 
+export enum TransportType {
+    TCP = "TCP",
+    UDP = "UDP"
+}
+
 export enum MessageState {
     NO_DELIVERY_NO_READ = "NO_DELIVERY_NO_READ",
     PARTIAL_DELIVERY_NO_READ = "PARTIAL_DELIVERY_NO_READ",

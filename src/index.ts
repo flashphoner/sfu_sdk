@@ -8,7 +8,8 @@ import {
     RoomState,
     WS_PING_INTERVAL_MS,
     WS_PINGS_MISSING_THRESHOLD,
-    StatsType
+    StatsType,
+    TransportType
 } from "./sdk/constants";
 
 export const sfu = new Sfu();
@@ -23,5 +24,6 @@ export {
     RoomState,
     WS_PING_INTERVAL_MS,
     WS_PINGS_MISSING_THRESHOLD,
-    StatsType
+    StatsType,
+    TransportType
 };
