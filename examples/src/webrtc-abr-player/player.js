@@ -133,7 +133,7 @@ const onConnected = async function(state, pc, session) {
         // Display error state
         setStatus(playErrorInfo, e, "red");
     }).on(constants.SFU_ROOM_EVENT.OPERATION_FAILED, function (e) {
-        onOperationFailed(state);
+        onOperationFailed(state, e);
     }).on(constants.SFU_ROOM_EVENT.ENDED, function () {
         // Publishing is stopped, dispose playback and close connection
         setStatus(playErrorInfo, "ABR stream is stopped", "red");
@@ -184,7 +184,7 @@ const onStopClick = async function(state) {
 
 const onOperationFailed = function(state, event) {
     if (event.operation && event.error) {
-        setStatus(playErrorInfo, e.operation + " failed: " + e.error, "red");
+        setStatus(playErrorInfo, event.operation + " failed: " + event.error, "red");
     } else {
         setStatus(playErrorInfo, event, "red");
     }
