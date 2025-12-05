@@ -69,7 +69,7 @@ const createControls = function (config) {
     }
 
     //apply room config
-    controls.entrance.url.value = config.room.url;
+    controls.entrance.url.value = (config.room.url && config.room.url.indexOf("127.0.0.1") === -1) ? config.room.url : setURL();
     controls.entrance.roomName.value = config.room.name;
     controls.entrance.roomPin.value = config.room.pin;
     controls.entrance.nickName.value = config.room.nickName;

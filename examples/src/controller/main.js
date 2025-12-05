@@ -4,6 +4,12 @@ const config = {
     }
 };
 
+const init = function () {
+    let proto = window.location.protocol;
+    let port = proto === "http:" ? "8081" : "8444";
+    document.getElementById("url").value = proto + "//" + window.location.hostname + ":" + port;
+}
+
 const connect = function() {
     let freeze = false;
     const urlElem = document.getElementById("url");
