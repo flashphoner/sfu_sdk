@@ -30,51 +30,56 @@
             <!-- Tracks console -->
             <ul class="nav nav-tabs" id="tracksTablist" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="videoTracksTab" data-bs-toggle="tab" data-bs-target="#videoTracks" type="button" role="tab" aria-controls="videoTracks" aria-selected="true">VideoTracks</button>
+                    <button class="nav-link active" id="videoTracksTab" data-bs-toggle="tab"
+                            data-bs-target="#videoTracks" type="button" role="tab" aria-controls="videoTracks"
+                            aria-selected="true">VideoTracks
+                    </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="audioTracksTab" data-bs-toggle="tab" data-bs-target="#audioTracks" type="button" role="tab" aria-controls="audioTracks" aria-selected="false">AudioTracks</button>
+                    <button class="nav-link" id="audioTracksTab" data-bs-toggle="tab" data-bs-target="#audioTracks"
+                            type="button" role="tab" aria-controls="audioTracks" aria-selected="false">AudioTracks
+                    </button>
                 </li>
             </ul>
             <div class="tab-content" id="tracksTabContent">
                 <div class="tab-pane fade show active mt-2" id="videoTracks" role="tabpanel" aria-labelledby="raw-tab">
                     <table class="table" id="videoTracksTable">
                         <thead>
-                            <tr>
-                                <th></th>
-                                <th>Source</th>
-                                <th>Width</th>
-                                <th>Height</th>
-                                <th>Codec</th>
-                                <th>Action</th>
-                            </tr>
+                        <tr>
+                            <th></th>
+                            <th>Source</th>
+                            <th>Width</th>
+                            <th>Height</th>
+                            <th>Codec</th>
+                            <th>Action</th>
+                        </tr>
                         </thead>
                         <tfoot>
-                            <tr>
-                                <th></th>
-                                <th>
-                                    <select class="form-select-sm" id="addVideoTrackSource">
-                                        <option value="camera" selected>camera</option>
-                                        <option value="screen">screen</option>
-                                    </select>
-                                </th>
-                                <th>
-                                    <input class="form-control-sm" id="addVideoTrackWidth" type="number" value="1280">
-                                </th>
-                                <th>
-                                    <input class="form-control-sm" id="addVideoTrackHeight" type="number" value="720">
-                                </th>
-                                <th>
-                                    <select class="form-select-sm" id="addVideoTrackCodec">
-                                        <option value="H264" selected>H264</option>
-                                        <option value="VP8">VP8</option>
-                                        <option value="VP9">VP9</option>
-                                    </select>
-                                </th>
-                                <th>
-                                    <button class="btn btn-primary" id="addVideoTrack">Add</button>
-                                </th>
-                            </tr>
+                        <tr>
+                            <th></th>
+                            <th>
+                                <select class="form-select-sm" id="addVideoTrackSource">
+                                    <option value="camera" selected>camera</option>
+                                    <option value="screen">screen</option>
+                                </select>
+                            </th>
+                            <th>
+                                <input class="form-control-sm" id="addVideoTrackWidth" type="number" value="1280">
+                            </th>
+                            <th>
+                                <input class="form-control-sm" id="addVideoTrackHeight" type="number" value="720">
+                            </th>
+                            <th>
+                                <select class="form-select-sm" id="addVideoTrackCodec">
+                                    <option value="H264" selected>H264</option>
+                                    <option value="VP8">VP8</option>
+                                    <option value="VP9">VP9</option>
+                                </select>
+                            </th>
+                            <th>
+                                <button class="btn btn-primary" id="addVideoTrack">Add</button>
+                            </th>
+                        </tr>
                         </tfoot>
                         <tbody id="videoTracksTableBody"></tbody>
                     </table>
@@ -83,50 +88,51 @@
                         <div class="col">
                             <table class="table" id="videoTrackEncodingsTable">
                                 <thead>
-                                    <tr>
-                                        <th>RID</th>
-                                        <th>Active</th>
-                                        <th>MaxBitrate</th>
-                                        <th>ResolutionScale</th>
-                                        <th>Scalability Mode</th>
-                                        <th>Action</th>
-                                    </tr>
+                                <tr>
+                                    <th>RID</th>
+                                    <th>Active</th>
+                                    <th>MaxBitrate</th>
+                                    <th>ResolutionScale</th>
+                                    <th>Scalability Mode</th>
+                                    <th>Action</th>
+                                </tr>
                                 </thead>
                                 <tfoot>
-                                    <tr>
-                                        <th>
-                                            <select class="form-select-sm" id="addVideoTrackEncodingRid">
-                                                <option value="h" selected>h</option>
-                                                <option value="m">m</option>
-                                                <option value="l">l</option>
-                                            </select>
-                                        </th>
-                                        <th>
-                                            <select class="form-select-sm" id="addVideoTrackEncodingActive">
-                                                <option value="true" selected>true</option>
-                                                <option value="false">false</option>
-                                            </select>
-                                        </th>
-                                        <th>
-                                            <input class="form-control-sm" id="addVideoTrackEncodingMaxBitrate" type="number" value="900000">
-                                        </th>
-                                        <th>
-                                            <select class="form-select-sm" id="addVideoTrackEncodingResolutionScale">
-                                                <option value="1" selected>1</option>
-                                                <option value="2">2</option>
-                                                <option value="4">4</option>
-                                                <option value="6">6</option>
-                                            </select>
-                                        </th>
-                                        <th>
-                                            <select class="form-select-sm" id="addVideoTrackScalabilityMode">
-                                                <option selected value="">NONE</option>
-                                            </select>
-                                        </th>
-                                        <th>
-                                            <button class="btn btn-primary" id="addVideoTrackEncoding">Add</button>
-                                        </th>
-                                    </tr>
+                                <tr>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackEncodingRid">
+                                            <option value="h" selected>h</option>
+                                            <option value="m">m</option>
+                                            <option value="l">l</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackEncodingActive">
+                                            <option value="true" selected>true</option>
+                                            <option value="false">false</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <input class="form-control-sm" id="addVideoTrackEncodingMaxBitrate"
+                                               type="number" value="900000">
+                                    </th>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackEncodingResolutionScale">
+                                            <option value="1" selected>1</option>
+                                            <option value="2">2</option>
+                                            <option value="4">4</option>
+                                            <option value="6">6</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackScalabilityMode">
+                                            <option selected value="">NONE</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-primary" id="addVideoTrackEncoding">Add</button>
+                                    </th>
+                                </tr>
                                 </tfoot>
                                 <tbody id="videoTrackEncodingsTableBody"></tbody>
                             </table>
@@ -137,29 +143,29 @@
                     <table class="table" id="audioTracksTable">
                         <caption class="caption-top">Audio tracks</caption>
                         <thead>
-                            <tr>
-                                <th>Source</th>
-                                <th>Channels</th>
-                                <th>Action</th>
-                            </tr>
+                        <tr>
+                            <th>Source</th>
+                            <th>Channels</th>
+                            <th>Action</th>
+                        </tr>
                         </thead>
                         <tfoot>
-                            <tr>
-                                <th>
-                                    <select class="form-select-sm" id="addAudioTrackSource">
-                                        <option value="mic" selected>mic</option>
-                                    </select>
-                                </th>
-                                <th>
-                                    <select class="form-select-sm" id="addAudioTrackChannels">
-                                        <option value="1" selected>1</option>
-                                        <option value="2">2</option>
-                                    </select>
-                                </th>
-                                <th>
-                                    <button id="addAudioTrack" class="btn btn-primary form-control-sm">Add</button>
-                                </th>
-                            </tr>
+                        <tr>
+                            <th>
+                                <select class="form-select-sm" id="addAudioTrackSource">
+                                    <option value="mic" selected>mic</option>
+                                </select>
+                            </th>
+                            <th>
+                                <select class="form-select-sm" id="addAudioTrackChannels">
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                </select>
+                            </th>
+                            <th>
+                                <button id="addAudioTrack" class="btn btn-primary form-control-sm">Add</button>
+                            </th>
+                        </tr>
                         </tfoot>
                         <tbody></tbody>
                     </table>
@@ -221,9 +227,17 @@
                         <!-- Other options are populated dynamically by init() in main.js -->
                     </select>
                 </div>
+
+                <div class="row">
+                    <label for="participantViewType">Participant View</label>
+                    <select class="form-select" id="participantViewType">
+                        <!-- Other options are populated dynamically by init() in main.js -->
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancel()">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="cancel()">Close
+                </button>
                 <button class="btn btn-primary" id="startButton" onclick="connect()">Enter</button>
             </div>
         </div>

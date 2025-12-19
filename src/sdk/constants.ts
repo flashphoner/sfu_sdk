@@ -237,7 +237,9 @@ export enum RoomEvent {
     ROOM_RECORD_STARTED = "ROOM_RECORD_STARTED",
     ROOM_RECORD_STOPPED = "ROOM_RECORD_STOPPED",
     ROOM_RECORD_PAUSED = "ROOM_RECORD_PAUSED",
-    ROOM_RECORD_FAILED = "ROOM_RECORD_FAILED"
+    ROOM_RECORD_FAILED = "ROOM_RECORD_FAILED",
+
+    WEBRTC_METRICS_DESCRIPTION_UPDATE = "WEBRTC_METRICS_DESCRIPTION_UPDATE",
 }
 
 /**
@@ -617,9 +619,9 @@ export enum InternalApi {
     UPDATE_THREAD_NOTIFICATION_SETTINGS = "updateThreadNotificationSettings",
     MUTE_THREAD = "muteThread",
     UNMUTE_THREAD = "unmuteThread",
-    GENERATE_SPACE_INVITE =  "generateNewSpaceInvite",
+    GENERATE_SPACE_INVITE = "generateNewSpaceInvite",
     REVOKE_SPACE_INVITE = "revokeSpaceInvite",
-    JOIN_SPACE_BY_INVITE_CODE =  "joinSpaceByInviteCode",
+    JOIN_SPACE_BY_INVITE_CODE = "joinSpaceByInviteCode",
     ADD_SPACE_ROLE = "addSpaceRole",
     UPDATE_SPACE_ROLE = "updateSpaceRole",
     DELETE_SPACE_ROLE = "deleteSpaceRole",
@@ -874,6 +876,7 @@ export type JoinedRoom = InternalMessage & {
     name: UserNickname,
     chatId: string,
     owner: boolean
+    mediaSessionId: string
 }
 
 export type LeftRoom = InternalMessage & {
@@ -967,7 +970,7 @@ export type AddRemoveTracks = InternalMessage & {
 export type TracksQualityState = InternalMessage & {
     info: {
         nickName: UserNickname,
-        userId:UserId;
+        userId: UserId;
         tracks: Array<{
             mid: string,
             quality: Array<Quality>,
@@ -1115,7 +1118,7 @@ export enum AttachmentState {
 }
 
 export type MessageDeliveryStatus = {
-    [key:UserId] : DeliveryStatus
+    [key: UserId]: DeliveryStatus
 }
 
 export type MessageStatusUpdate = {
@@ -1388,15 +1391,18 @@ export type UserSpecificChatInfo = {
     encryptedChatPassword: string;
     encryptedAttachmentsSecretKey: string;
 }
+
 export enum ChatType {
     PUBLIC = "PUBLIC",
     PRIVATE = "PRIVATE"
 }
+
 export enum ChannelSendPolicy {
     EVERYONE = "EVERYONE",
     ADMIN = "ADMIN",
     ADMIN_AND_LIST = "ADMIN_AND_LIST"
 }
+
 export enum ChatReceivePolicy {
     EVERYONE = "EVERYONE",
     OWNER_ONLY = "OWNER_ONLY",
@@ -1447,7 +1453,7 @@ export type ChatUnmuted = InternalMessage & {
     id: string;
 }
 
-export type ChatMap = {[key: string]: UserSpecificChatInfo};
+export type ChatMap = { [key: string]: UserSpecificChatInfo };
 
 export type ChatsEvent = InternalMessage & {
     chats: ChatMap
@@ -1603,7 +1609,7 @@ export type AttachmentListResult = InternalMessage & {
 }
 
 export type AttachmentSizeInfo = InternalMessage & {
-    result: {[key: string]:string}
+    result: { [key: string]: string }
 }
 
 export type MessageAttachmentsSearchResult = InternalMessage & {
@@ -2170,17 +2176,17 @@ export type UserHostKey = string;
 export type UserTimezone = string
 
 export type Quality = {
-    quality:string;
-    available:boolean;
+    quality: string;
+    available: boolean;
     layersInfo: {
-        spatialLayers:Array<{
-            resolution:{
-                width:number;
-                height:number;
+        spatialLayers: Array<{
+            resolution: {
+                width: number;
+                height: number;
             };
-            sid:number;
+            sid: number;
         }>;
-        temporalLayers:Array<{tid:number}>;
+        temporalLayers: Array<{ tid: number }>;
     }
 }
 

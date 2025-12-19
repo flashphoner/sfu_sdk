@@ -1,15 +1,9 @@
-import {Connection} from "./connection";
-import {
-    InternalApi,
-    InternalMessage,
-    RoomState,
-    SfuEvent,
-    State,
-    UserNickname
-} from "./constants";
+import {Connection, InitialUserData} from "./connection";
+import {InternalApi, InternalMessage, RoomState, SfuEvent, State, UserNickname} from "./constants";
 import {Notifier} from "./notifier";
 import {Room} from "./room";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
+import {RTCMetricsServerDescription} from "./metrics/constants";
 
 export class Sfu {
     #connection: Connection;
@@ -21,6 +15,7 @@ export class Sfu {
     #notifier: Notifier<SfuEvent, InternalMessage> = new Notifier<SfuEvent, InternalMessage>();
     #logger: Logger = new Logger();
     #loggerPrefix: PrefixFunction;
+    #_webRTCMetricsServerDescription: RTCMetricsServerDescription
 
     constructor(logLevel?: Verbosity, prefix?: PrefixFunction) {
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
@@ -92,11 +87,12 @@ export class Sfu {
                 this.#logger
             );
             try {
-                await this.#connection.connect(connectionConfig);
+                let userData: InitialUserData = await this.#connection.connect(connectionConfig);
+                self.#_webRTCMetricsServerDescription = userData.webRTCMetricsServerDescription;
                 self.#_state = State.CONNECTED;
                 this.#notifier.notify(SfuEvent.CONNECTED);
                 resolve();
-            } catch(e) {
+            } catch (e) {
                 self.#_state = State.FAILED;
                 this.#notifier.notify(SfuEvent.FAILED, e);
                 reject(e);
@@ -116,31 +112,31 @@ export class Sfu {
                     throw new Error("Only one room at a time, already have one with state " + this.#_room.state());
                 case RoomState.FAILED:
                 case RoomState.DISPOSED:
-                    this.#_room = new Room(this.#connection, options.name, options.pin, this.#_nickname, Date.now());
+                    this.#_room = new Room(this.#connection, options.name, options.pin, this.#_nickname, Date.now(), null, this.#_webRTCMetricsServerDescription);
                     break;
                 default:
                     throw new Error("Unknown room state " + this.#_room.state());
             }
         } else {
-            this.#_room = new Room(this.#connection, options.name, options.pin, this.#_nickname, Date.now());
+            this.#_room = new Room(this.#connection, options.name, options.pin, this.#_nickname, Date.now(), null, this.#_webRTCMetricsServerDescription);
         }
         return this.#_room;
     }
 
     public async disconnect() {
         // Call leaveRoom on disconnect only if room is still active #WCS-3669
-        if (this.#_room  && this.#_room.state() === RoomState.JOINED) {
+        if (this.#_room && this.#_room.state() === RoomState.JOINED) {
             await this.#_room.leaveRoom();
         }
         if (this.#connection) {
             await this.#connection.close();
         }
     }
-    
+
     public room() {
         return this.#_room;
     }
-    
+
     public nickname() {
         return this.#_nickname;
     }

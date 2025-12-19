@@ -8,6 +8,11 @@ const QUALITY_COLORS = {
     SELECTED: "blue"
 };
 
+const PARTICIPANT_VIEW_TYPE = {
+    ONE_TO_ONE: "One-to-one",
+    ONE_TO_MANY: "One-to-many",
+}
+
 const initLocalDisplay = function (localDisplayElement) {
     const localDisplayDiv = localDisplayElement;
     const localDisplays = {};
@@ -678,12 +683,12 @@ const createVideoPlayer = function (participantDiv) {
     const repickQuality = function (qualityName) {
         for (const [quality, state] of qualityButtons.entries()) {
             state.layerButtons.temporalLayerButtons.forEach((lState, __) => {
-                if(lState.btn.style.color === QUALITY_COLORS.SELECTED) {
+                if (lState.btn.style.color === QUALITY_COLORS.SELECTED) {
                     lState.btn.style.color = QUALITY_COLORS.AVAILABLE;
                 }
             });
             state.layerButtons.spatialLayerButtons.forEach((lState, __) => {
-                if(lState.btn.style.color === QUALITY_COLORS.SELECTED) {
+                if (lState.btn.style.color === QUALITY_COLORS.SELECTED) {
                     lState.btn.style.color = QUALITY_COLORS.AVAILABLE;
                 }
             });
@@ -873,7 +878,7 @@ const createVideoPlayer = function (participantDiv) {
                 const isSelectedQuality = qualityButton.style.color === QUALITY_COLORS.SELECTED;
 
                 if (quality.available) {
-                    if(!isSelectedQuality) {
+                    if (!isSelectedQuality) {
                         qualityButton.style.color = QUALITY_COLORS.AVAILABLE;
                     }
                 } else {
@@ -1359,17 +1364,17 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                         const quality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                         if (quality) {
                             quality.available = remoteQualityInfo.available;
-                            for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
+                            for (const info of remoteQualityInfo.layersInfo.temporalLayers) {
                                 const localTidInfo = quality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                                if(localTidInfo) {
+                                if (localTidInfo) {
                                     localTidInfo.available = info.available;
                                 } else {
                                     quality.layersInfo.temporalLayers.push(info);
                                 }
                             }
-                            for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
+                            for (const info of remoteQualityInfo.layersInfo.spatialLayers) {
                                 const localSidInfo = quality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                                if(localSidInfo) {
+                                if (localSidInfo) {
                                     localSidInfo.available = info.available;
                                     localSidInfo.resolution = info.resolution;
                                 } else {
@@ -1380,12 +1385,16 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                             track.quality.push(remoteQualityInfo);
                         }
                     }
-                    return;
+                    continue;
                 }
                 let abrManager = this.abrManagers.get(track.id);
                 if (abrManager && track.quality.length === 0 && remoteTrackQuality.quality.length > 0) {
                     const self = this;
-                    participantView.addQuality(track, {quality:"Auto",available:true,layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                    participantView.addQuality(track, {
+                        quality: "Auto",
+                        available: true,
+                        layersInfo: {spatialLayers: [], temporalLayers: []}
+                    }, async () => {
                         const manager = self.abrManagers.get(track.id);
                         if (!manager) {
                             return;
@@ -1404,17 +1413,17 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                     const localQuality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                     if (localQuality) {
                         localQuality.available = remoteQualityInfo.available;
-                        for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
+                        for (const info of remoteQualityInfo.layersInfo.temporalLayers) {
                             const localTidInfo = localQuality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                            if(localTidInfo) {
+                            if (localTidInfo) {
                                 localTidInfo.available = info.available;
                             } else {
                                 localQuality.layersInfo.temporalLayers.push(info);
                             }
                         }
-                        for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
+                        for (const info of remoteQualityInfo.layersInfo.spatialLayers) {
                             const localSidInfo = localQuality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                            if(localSidInfo) {
+                            if (localSidInfo) {
                                 localSidInfo.available = info.available;
                                 localSidInfo.resolution = info.resolution;
                             } else {
@@ -1447,7 +1456,6 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                     }
                 }
             }
-
         },
         requestVideoTrack: async function (track, remoteTrack) {
             return new Promise((resolve, reject) => {
@@ -1474,7 +1482,11 @@ const createOneToOneParticipantModel = function (userId, nickname, participantVi
                         abrManager.setTrack(remoteTrack);
                         abrManager.stop();
                         if (track.quality.length > 0) {
-                            participantView.addQuality(track, {quality:"Auto",available:true, layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                            participantView.addQuality(track, {
+                                quality: "Auto",
+                                available: true,
+                                layersInfo: {spatialLayers: [], temporalLayers: []}
+                            }, async () => {
                                 const manager = self.abrManagers.get(track.id);
                                 if (!manager) {
                                     return;
@@ -1760,17 +1772,17 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                         const quality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                         if (quality) {
                             quality.available = remoteQualityInfo.available;
-                            for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
+                            for (const info of remoteQualityInfo.layersInfo.temporalLayers) {
                                 const localTidInfo = quality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                                if(localTidInfo) {
+                                if (localTidInfo) {
                                     localTidInfo.available = info.available;
                                 } else {
                                     quality.layersInfo.temporalLayers.push(info);
                                 }
                             }
-                            for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
+                            for (const info of remoteQualityInfo.layersInfo.spatialLayers) {
                                 const localSidInfo = quality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                                if(localSidInfo) {
+                                if (localSidInfo) {
                                     localSidInfo.available = info.available;
                                     localSidInfo.resolution = info.resolution;
                                 } else {
@@ -1785,7 +1797,11 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                 }
                 if (this.abr && track.quality.length === 0 && remoteTrackQuality.quality.length > 0) {
                     const self = this;
-                    participantView.addQuality(track, {quality:"Auto",available:true, layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                    participantView.addQuality(track, {
+                        quality: "Auto",
+                        available: true,
+                        layersInfo: {spatialLayers: [], temporalLayers: []}
+                    }, async () => {
                         if (!self.abr) {
                             return;
                         }
@@ -1803,17 +1819,17 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                     const localQuality = track.quality.find((q) => q.quality === remoteQualityInfo.quality);
                     if (localQuality) {
                         localQuality.available = remoteQualityInfo.available;
-                        for(const info of remoteQualityInfo.layersInfo.temporalLayers) {
+                        for (const info of remoteQualityInfo.layersInfo.temporalLayers) {
                             const localTidInfo = localQuality.layersInfo.temporalLayers.find((t) => t.tid === info.tid);
-                            if(localTidInfo) {
+                            if (localTidInfo) {
                                 localTidInfo.available = info.available;
                             } else {
                                 localQuality.layersInfo.temporalLayers.push(info);
                             }
                         }
-                        for(const info of remoteQualityInfo.layersInfo.spatialLayers) {
+                        for (const info of remoteQualityInfo.layersInfo.spatialLayers) {
                             const localSidInfo = localQuality.layersInfo.spatialLayers.find((s) => s.sid === info.sid);
-                            if(localSidInfo) {
+                            if (localSidInfo) {
                                 localSidInfo.available = info.available;
                                 localSidInfo.resolution = info.resolution;
                             } else {
@@ -1867,7 +1883,11 @@ const createOneToManyParticipantModel = function (userId, nickname, participantV
                         self.abr.setTrack(remoteTrack);
 
                         if (track.quality.length > 0) {
-                            participantView.addQuality(track, {quality:"Auto",available:true,layersInfo:{spatialLayers:[],temporalLayers:[]}}, async () => {
+                            participantView.addQuality(track, {
+                                quality: "Auto",
+                                available: true,
+                                layersInfo: {spatialLayers: [], temporalLayers: []}
+                            }, async () => {
                                 if (!self.abr) {
                                     return;
                                 }
@@ -1975,8 +1995,15 @@ const remoteTrackProvider = function (room) {
         }
     }
 }
-const initDefaultRemoteDisplay = function (room, div, displayOptions, abrOptions) {
-    const participantFactory = createParticipantFactory(remoteTrackProvider(room), createOneToManyParticipantView, createOneToManyParticipantModel);
+const initDefaultRemoteDisplay = function (room, div, displayOptions, abrOptions, participantViewType) {
+    let participantFactory;
+    if (participantViewType === PARTICIPANT_VIEW_TYPE.ONE_TO_ONE) {
+        participantFactory = createParticipantFactory(remoteTrackProvider(room), createOneToOneParticipantView, createOneToOneParticipantModel);
+    } else if (participantViewType === PARTICIPANT_VIEW_TYPE.ONE_TO_MANY) {
+        participantFactory = createParticipantFactory(remoteTrackProvider(room), createOneToManyParticipantView, createOneToManyParticipantModel);
+    } else {
+        participantFactory = createParticipantFactory(remoteTrackProvider(room), createOneToManyParticipantView, createOneToManyParticipantModel);
+    }
     return initRemoteDisplay(room, div, displayOptions, abrOptions, createDefaultMeetingController, createDefaultMeetingModel, createDefaultMeetingView, participantFactory)
 }
 /*

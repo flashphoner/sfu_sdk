@@ -1,20 +1,22 @@
 import Logger, {Verbosity} from "./logger";
 import {
+    ConnectionFailedEvent,
     InternalApi,
     InternalMessage,
     SfuEvent,
-    ConnectionFailedEvent,
+    WS_CONNECTION_TIMEOUT,
     WS_PING_INTERVAL_MS,
-    WS_PINGS_MISSING_THRESHOLD,
-    WS_CONNECTION_TIMEOUT
+    WS_PINGS_MISSING_THRESHOLD
 } from "./constants";
+import {RTCMetricsServerDescription} from "./metrics/constants";
 
-type InitialUserData = {
+export type InitialUserData = {
     sipLogin: string,
     email: string,
     sipVisibleName: string,
     authToken: string,
-    pmi: string
+    pmi: string,
+    webRTCMetricsServerDescription: RTCMetricsServerDescription
 }
 
 type OnMessageCallback = (arg0: string, arg1: Array<InternalMessage>) => void;
@@ -44,7 +46,7 @@ class WSPingReceiver {
     public start() {
         if (this.failedProbesThreshold > 0 && this.interval > 0) {
             const receiver = this;
-            this.checkInterval = window.setInterval(function() {
+            this.checkInterval = window.setInterval(function () {
                 receiver.checkPingsReceived();
             }, this.interval);
         }
@@ -119,9 +121,9 @@ export class Connection {
         this.ws = new WebSocket(options.url);
         this.ws.binaryType = 'arraybuffer';
         const that = this;
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             if (that.ws.readyState === 3) {
-                reject("Can't connect to websocket URL "+ options.url);
+                reject("Can't connect to websocket URL " + options.url);
             }
             if (timeout > 0) {
                 that.connectionTimeout = window.setInterval(function () {

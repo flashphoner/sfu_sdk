@@ -6,12 +6,12 @@ import {
     BitrateTestStatus,
     CreatedRoom,
     EvictedFromRoom,
+    ForcefullyLeftEvent,
     FragmentedMessage,
     InternalApi,
     InternalMessage,
     JoinedRoom,
     LeftRoom,
-    ForcefullyLeftEvent,
     OperationFailed,
     Operations,
     ParticipantRenamed,
@@ -28,10 +28,10 @@ import {
     StatsType,
     TracksQualityState,
     TrackType,
+    TransportType,
     UserId,
     UserNickname,
     WaitingRoomUpdate,
-    TransportType,
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
@@ -39,12 +39,18 @@ import Logger from "./logger";
 import {Mutex} from 'async-mutex';
 import {Queue} from 'queue-typescript';
 import {BitrateComponentEventBus, BitrateTest, BitrateTestController, BitrateTestListener} from "./BitrateTest";
+import {RTCMetricsCollector} from "./metrics/collector";
+import {InactiveInboundTrackRTCStatsReportFilter, InactiveOutboundTrackRTCStatsReportFilter} from "./metrics/filter";
+import {RTCMetricsCollect, RTCMetricsDescriptionUpdate, RTCMetricsServerDescription} from "./metrics/constants";
 
 
 export class Room {
     static readonly #CONTROL_CHANNEL = "control";
     static readonly #BITRATE_CHANNEL = "bitrate";
 
+    _webRTCMetricsServerDescription: RTCMetricsServerDescription;
+    _mediaSessionId: string;
+    #_statCollector: RTCMetricsCollector;
     #_state: RoomState = RoomState.NEW;
     #_role: ParticipantRole = ParticipantRole.PARTICIPANT;
     #inviteId: string;
@@ -72,8 +78,9 @@ export class Room {
     #vacantTransceivers: { video: Queue<RTCRtpTransceiver>, audio: Queue<RTCRtpTransceiver> };
 
 
-    public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number, userId?: UserId) {
+    public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number, userId?: UserId, webRTCMetricsServerDescription?: RTCMetricsServerDescription) {
         this.connection = connection;
+        this._webRTCMetricsServerDescription = webRTCMetricsServerDescription;
         this._id = name;
         this._name = name;
         this._nickname = nickname;
@@ -258,6 +265,13 @@ export class Room {
             this.#_state = RoomState.JOINED;
             if (promises.promised(joinedRoom.internalMessageId)) {
                 this._userId = joinedRoom.userId;
+                this._mediaSessionId = joinedRoom.mediaSessionId;
+                if (this._webRTCMetricsServerDescription && !this.#_statCollector) {
+                    this.#_statCollector = new RTCMetricsCollector(this._mediaSessionId, this._webRTCMetricsServerDescription, this.#_pc, this.connection, this.logger, 3);
+                    this.#_statCollector.addStatsReportFilter(new InactiveOutboundTrackRTCStatsReportFilter());
+                    this.#_statCollector.addStatsReportFilter(new InactiveInboundTrackRTCStatsReportFilter());
+                    this.#_statCollector.start();
+                }
                 promises.resolve(joinedRoom.internalMessageId, joinedRoom);
             } else {
                 this.notifier.notify(RoomEvent.JOINED, joinedRoom);
@@ -304,6 +318,16 @@ export class Room {
             if (promises.promised(e.internalMessageId)) {
                 promises.resolve(e.internalMessageId, bitrateTest.latency);
             }
+        } else if (e.type == RoomEvent.WEBRTC_METRICS_DESCRIPTION_UPDATE) {
+            const updateDescription = e as RTCMetricsDescriptionUpdate;
+            if (this.#_statCollector) {
+                if (updateDescription.collect === RTCMetricsCollect.on) {
+                    this.#_statCollector.collect(true);
+                } else {
+                    this.#_statCollector.collect(false);
+                }
+            }
+            this.notifier.notify(RoomEvent.WEBRTC_METRICS_DESCRIPTION_UPDATE, updateDescription);
         } else {
             //check this is a room event
             if (Object.values(RoomEvent).includes(e.type as RoomEvent)) {
@@ -776,7 +800,7 @@ export class Room {
             track: transceiver.receiver.track,
             preferredQuality: undefined,
             tid: undefined,
-            sid:undefined,
+            sid: undefined,
             disposed: false,
             demandTrack(remoteTrackId?: string): Promise<void> {
                 if (this.disposed && !!remoteTrackId) {
@@ -833,7 +857,7 @@ export class Room {
                         internalMessageId: id
                     });
                 });
-            }, setSid(sid:number):Promise<void> {
+            }, setSid(sid: number): Promise<void> {
                 if (this.disposed) {
                     return new Promise<void>(((resolve, reject) => reject()));
                 }
@@ -849,7 +873,7 @@ export class Room {
                         internalMessageId: id
                     });
                 });
-            },setTid(tid:number):Promise<void> {
+            }, setTid(tid: number): Promise<void> {
                 if (this.disposed) {
                     return new Promise<void>(((resolve, reject) => reject()));
                 }
@@ -865,7 +889,7 @@ export class Room {
                         internalMessageId: id
                     });
                 });
-            },async dispose() {
+            }, async dispose() {
                 if (this.disposed) {
                     return new Promise<void>(((resolve, reject) => reject(new Error(RoomError.TRACK_ALREADY_DISPOSED))));
                 }
@@ -936,10 +960,16 @@ export interface RemoteTrack {
     readonly disposed: boolean;
 
     demandTrack(remoteMid?: string): Promise<void>;
+
     mute(): Promise<void>;
+
     unmute(): Promise<void>;
+
     setPreferredQuality(quality?: string): Promise<void>;
+
     setSid(sid: number): Promise<void>;
+
     setTid(tid: number): Promise<void>;
+
     dispose(): Promise<void>;
 }

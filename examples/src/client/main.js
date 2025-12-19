@@ -87,6 +87,14 @@ const init = function () {
         option.textContent = value;
         transportSelect.appendChild(option);
     });
+    // insert participant view types in entrance modal
+    const participantViewTypeSelect = document.getElementById("participantViewType");
+    Object.values(PARTICIPANT_VIEW_TYPE).forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        participantViewTypeSelect.appendChild(option);
+    })
     //open entrance modal
     $('#entranceModal').modal('show');
 }
@@ -154,7 +162,7 @@ async function connect() {
             abrTryForUpperQuality: ABR_TRY_UPPER_QUALITY,
             interval: ABR_QUALITY_CHECK_PERIOD
         };
-        initDefaultRemoteDisplay(room, remoteDisplay, displayOptions, abrOptions);
+        initDefaultRemoteDisplay(room, remoteDisplay, displayOptions, abrOptions, roomConfig.participantViewType);
 
         //get configured local video streams
         let streams = cControls.getVideoStreams();
@@ -316,6 +324,10 @@ const subscribeTrackToEndedEvent = function (room, track, pc) {
                     pc.removeTrack(sender);
                     //track found, set renegotiation flag
                     negotiate = true;
+                    if (sender.track) {
+                        sender.track.stop();
+                        sender.track.active = false;
+                    }
                     break;
                 }
             }
@@ -324,6 +336,7 @@ const subscribeTrackToEndedEvent = function (room, track, pc) {
             if (negotiate) {
                 //kickoff renegotiation
                 await room.updateState();
+                pc.restartIce();
             }
         } catch (e) {
             onOperationFailed("Failed to update room state", e);
