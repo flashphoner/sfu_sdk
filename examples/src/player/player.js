@@ -222,7 +222,7 @@ const playStreams = async function(state) {
     try {
         remoteDisplay = initDefaultRemoteDisplay(state.room, document.getElementById("remoteVideo"), {quality: true});
         // Start WebRTC negotiation
-        await state.room.join(state.pc, null, null, 1);
+        await state.room.join(state.pc, null, null, 10);
     } catch(e) {
         if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
             onOperationFailed(state, e);
