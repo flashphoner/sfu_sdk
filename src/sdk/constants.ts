@@ -1,3 +1,5 @@
+import {RTCMetricsCollectType} from '@flashphoner/web-sdk-metrics';
+
 /**
  * SfuEvent
  * Used to receive events from the server with SfuExtended.on()
@@ -240,6 +242,7 @@ export enum RoomEvent {
     ROOM_RECORD_FAILED = "ROOM_RECORD_FAILED",
 
     WEBRTC_METRICS_DESCRIPTION_UPDATE = "WEBRTC_METRICS_DESCRIPTION_UPDATE",
+    WEBRTC_METRICS_TOKEN_REFRESH = "WEBRTC_METRICS_TOKEN_REFRESH",
 }
 
 /**
@@ -649,7 +652,8 @@ export enum InternalApi {
     GET_SYSTEM_CONFIG = "getSystemConfig",
     UPDATE_USER_ICON = "updateUserIcon",
     UPDATE_SPACE_ICON = "updateSpaceIcon",
-    UPDATE_CHAT_ICON = "updateChatIcon"
+    UPDATE_CHAT_ICON = "updateChatIcon",
+    WEBRTC_METRICS_TOKEN_REFRESH = "webRTCMetricsTokenRefresh"
 }
 
 export enum ConnectionError {
@@ -2203,4 +2207,14 @@ export const ATTACHMENT_ID_LENGTH = 36;
 export enum StatsType {
     INBOUND = "inbound-rtp",
     OUTBOUND = "outbound-rtp"
+}
+
+export type RTCMetricsDescriptionUpdate = InternalMessage & {
+    collect?: RTCMetricsCollectType;
+    ids?: string[]
+}
+
+export type RTCMetricsTokenRefresh = InternalMessage & {
+    authorization: string;
+    accessExpiresIn: number;
 }

@@ -1,9 +1,9 @@
 import {Connection, InitialUserData} from "./connection";
-import {InternalApi, InternalMessage, RoomState, SfuEvent, State, UserNickname} from "./constants";
+import {InternalApi, InternalMessage, RoomEvent, RoomState, SfuEvent, State, UserNickname} from "./constants";
 import {Notifier} from "./notifier";
 import {Room} from "./room";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
-import {RTCMetricsServerDescription} from "./metrics/constants";
+import {RTCMetricsServerDescription} from '@flashphoner/web-sdk-metrics';
 
 export class Sfu {
     #connection: Connection;
@@ -57,6 +57,12 @@ export class Sfu {
                 (name, data) => {
                     this.#logger.debug("onMessage: ", data[0]);
                     switch (name) {
+                        case InternalApi.WEBRTC_METRICS_TOKEN_REFRESH:
+                            if(this.#_room){
+                                data[0].type = RoomEvent.WEBRTC_METRICS_TOKEN_REFRESH;
+                                this.#_room.processEvent(data[0]);
+                            }
+                            break;
                         case InternalApi.DEFAULT_METHOD:
                             if (data[0].roomId && data[0].roomId.length > 0) {
                                 //room event

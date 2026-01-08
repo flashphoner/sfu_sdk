@@ -8,7 +8,13 @@ import {
     WS_PING_INTERVAL_MS,
     WS_PINGS_MISSING_THRESHOLD
 } from "./constants";
-import {RTCMetricsServerDescription} from "./metrics/constants";
+import {
+    IRTCMetricsSender,
+    RTCMetricsBatchMessage,
+    RTCMetricsClientDescriptionMessage,
+    RTCMetricsMessageType,
+    RTCMetricsServerDescription
+} from "@flashphoner/web-sdk-metrics"
 
 export type InitialUserData = {
     sipLogin: string,
@@ -81,7 +87,7 @@ class WSPingReceiver {
     }
 }
 
-export class Connection {
+export class Connection implements IRTCMetricsSender {
     private ws: WebSocket;
     private onError: Function;
     private onClose: Function;
@@ -104,6 +110,28 @@ export class Connection {
             this.logger.setVerbosity(Verbosity.INFO);
         }
         this.pingChecker = null;
+    }
+
+    public sendDescription(message: RTCMetricsClientDescriptionMessage): Promise<number> {
+        return new Promise((resolve, reject) => {
+            if (!this.ws) {
+                reject(new Error("Connection closed"));
+            }else{
+                this.send(RTCMetricsMessageType.description, message);
+                resolve(200);
+            }
+        })
+    }
+
+    public sendBatch(message: RTCMetricsBatchMessage): Promise<number> {
+        return new Promise((resolve, reject) => {
+            if (!this.ws) {
+                reject(new Error("Connection closed"));
+            }else{
+                this.send(RTCMetricsMessageType.batch, message);
+                resolve(200);
+            }
+        })
     }
 
     public connect(options: {

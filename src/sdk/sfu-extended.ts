@@ -180,6 +180,7 @@ import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 import {AttachmentsTransferManager} from "./attachments-transfer-manager";
 import { uploadFile } from './file-upload';
+import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
 export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact;
 
@@ -197,7 +198,8 @@ export class SfuExtended {
         email: UserEmail,
         nickname: UserNickname,
         authToken: string,
-        pmi: string
+        pmi: string,
+        webRTCMetricsServerDescription?: RTCMetricsServerDescription
     }
     #_server: string;
     #_url: string;
@@ -316,7 +318,8 @@ export class SfuExtended {
                     email: userCredentials.email,
                     nickname: userCredentials.sipVisibleName,
                     authToken: userCredentials.authToken,
-                    pmi: userCredentials.pmi
+                    pmi: userCredentials.pmi,
+                    webRTCMetricsServerDescription: userCredentials.webRTCMetricsServerDescription
                 }
                 self.#_state = State.AUTHENTICATED;
                 self.#notifier.notify(SfuEvent.CONNECTED);
@@ -454,7 +457,7 @@ export class SfuExtended {
                             this.#notifier.notify(SfuEvent.CHAT_SEARCH_RESULT, messagesEvent);
                         } else if (data[0].type === RoomEvent.CREATED) {
                             const state = data[0] as CreatedRoom;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType, this.user().webRTCMetricsServerDescription);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -487,7 +490,7 @@ export class SfuExtended {
                             promises.resolve(data[0].internalMessageId, room);
                         } else if (data[0].type === RoomEvent.AVAILABLE) {
                             const state = data[0] as RoomAvailable;
-                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType);
+                            const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType, this.user().webRTCMetricsServerDescription);
                             this.#rooms[room.id()] = room;
                             const self = this;
                             const cleanup = () => {
@@ -521,7 +524,7 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.USER_ROOMS) {
                             const state = data[0] as UserRoomsEvent;
                             state.rooms.forEach((info) => {
-                                const room = new RoomExtended(this.#connection, info.id, info.owner, info.name, info.pin, this.user().username, this.user().nickname, info.creationTime, info.config, info.waitingRoomEnabled, this.#loggerPrefix);
+                                const room = new RoomExtended(this.#connection, info.id, info.owner, info.name, info.pin, this.user().username, this.user().nickname, info.creationTime, info.config, info.waitingRoomEnabled, this.#loggerPrefix, null, this.user().webRTCMetricsServerDescription);
                                 this.#rooms[room.id()] = room;
                                 const self = this;
                                 const cleanup = () => {

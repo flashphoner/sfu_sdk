@@ -24,6 +24,7 @@ import {
     WaitingRoomUpdate,
 } from "./constants";
 import {PrefixFunction} from "./logger";
+import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
 export class RoomExtended extends Room {
 
@@ -31,8 +32,8 @@ export class RoomExtended extends Room {
     #owner: string;
     #waitingRoomEnabled: boolean;
     #_conferenceType: ConferenceType = ConferenceType.GLOBAL;
-    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, userId: UserId, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction, conferenceType?: ConferenceType) {
-       super(connection, name, pin, nickname, creationTime, userId);
+    public constructor(connection: Connection, id: string, owner: string, name: string, pin: string, userId: UserId, nickname: UserNickname, creationTime: number, config: RoomExtendedConfig, waitingRoomEnabled: boolean, loggerPrefix?: PrefixFunction, conferenceType?: ConferenceType, webRTCMetricsServerDescription?: RTCMetricsServerDescription) {
+       super(connection, name, pin, nickname, creationTime, userId, webRTCMetricsServerDescription);
        this._id = id;
        this.#owner = owner;
        if (!config.participantsConfig) {

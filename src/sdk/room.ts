@@ -24,6 +24,8 @@ import {
     RoomEvent,
     RoomMessage,
     RoomState,
+    RTCMetricsDescriptionUpdate,
+    RTCMetricsTokenRefresh,
     SfuEvent,
     StatsType,
     TracksQualityState,
@@ -36,12 +38,18 @@ import {
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
 import Logger from "./logger";
-import {Mutex} from 'async-mutex';
 import {Queue} from 'queue-typescript';
 import {BitrateComponentEventBus, BitrateTest, BitrateTestController, BitrateTestListener} from "./BitrateTest";
-import {RTCMetricsCollector} from "./metrics/collector";
-import {InactiveInboundTrackRTCStatsReportFilter, InactiveOutboundTrackRTCStatsReportFilter} from "./metrics/filter";
-import {RTCMetricsCollect, RTCMetricsDescriptionUpdate, RTCMetricsServerDescription} from "./metrics/constants";
+import {Mutex} from "async-mutex";
+import {
+    InactiveInboundTrackRTCStatsReportFilter,
+    InactiveOutboundTrackRTCStatsReportFilter,
+    RTCMetricsCollector,
+    RTCMetricsCollectorBuilder,
+    RTCMetricsCollectType,
+    RTCMetricsHttpSender,
+    RTCMetricsServerDescription
+} from '@flashphoner/web-sdk-metrics';
 
 
 export class Room {
@@ -51,6 +59,7 @@ export class Room {
     _webRTCMetricsServerDescription: RTCMetricsServerDescription;
     _mediaSessionId: string;
     #_statCollector: RTCMetricsCollector;
+    #_httpStatSender: RTCMetricsHttpSender | null;
     #_state: RoomState = RoomState.NEW;
     #_role: ParticipantRole = ParticipantRole.PARTICIPANT;
     #inviteId: string;
@@ -266,10 +275,24 @@ export class Room {
             if (promises.promised(joinedRoom.internalMessageId)) {
                 this._userId = joinedRoom.userId;
                 this._mediaSessionId = joinedRoom.mediaSessionId;
+
                 if (this._webRTCMetricsServerDescription && !this.#_statCollector) {
-                    this.#_statCollector = new RTCMetricsCollector(this._mediaSessionId, this._webRTCMetricsServerDescription, this.#_pc, this.connection, this.logger, 3);
-                    this.#_statCollector.addStatsReportFilter(new InactiveOutboundTrackRTCStatsReportFilter());
-                    this.#_statCollector.addStatsReportFilter(new InactiveInboundTrackRTCStatsReportFilter());
+                    const builder: RTCMetricsCollectorBuilder = new RTCMetricsCollectorBuilder()
+                        .id(this._mediaSessionId)
+                        .logger(this.logger)
+                        .peerConnection(this.#_pc)
+                        .websocketSender(this.connection)
+                        .description(this._webRTCMetricsServerDescription)
+                        .addFilter(new InactiveInboundTrackRTCStatsReportFilter())
+                        .addFilter(new InactiveOutboundTrackRTCStatsReportFilter())
+                    if (this._webRTCMetricsServerDescription.ingestPoint != null &&
+                        this._webRTCMetricsServerDescription.ingestPoint.startsWith("http")) {
+                        this.#_httpStatSender = new RTCMetricsHttpSender(this._webRTCMetricsServerDescription.ingestPoint, {
+                            Authorization: this._webRTCMetricsServerDescription.authorization
+                        });
+                        builder.httpSender(this.#_httpStatSender);
+                    }
+                    this.#_statCollector = builder.build();
                     this.#_statCollector.start();
                 }
                 promises.resolve(joinedRoom.internalMessageId, joinedRoom);
@@ -319,15 +342,24 @@ export class Room {
                 promises.resolve(e.internalMessageId, bitrateTest.latency);
             }
         } else if (e.type == RoomEvent.WEBRTC_METRICS_DESCRIPTION_UPDATE) {
+            if (this.#_statCollector == null) {
+                return;
+            }
             const updateDescription = e as RTCMetricsDescriptionUpdate;
-            if (this.#_statCollector) {
-                if (updateDescription.collect === RTCMetricsCollect.on) {
-                    this.#_statCollector.collect(true);
-                } else {
-                    this.#_statCollector.collect(false);
-                }
+            if (updateDescription.collect === RTCMetricsCollectType.on) {
+                this.#_statCollector.collect(true);
+            } else {
+                this.#_statCollector.collect(false);
             }
             this.notifier.notify(RoomEvent.WEBRTC_METRICS_DESCRIPTION_UPDATE, updateDescription);
+        } else if (e.type == RoomEvent.WEBRTC_METRICS_TOKEN_REFRESH) {
+            const tokenRefresh = e as RTCMetricsTokenRefresh;
+            if (this.#_httpStatSender != null) {
+                this.#_httpStatSender.headers = {
+                    ...this.#_httpStatSender.headers,
+                    Authorization: tokenRefresh.authorization,
+                }
+            }
         } else {
             //check this is a room event
             if (Object.values(RoomEvent).includes(e.type as RoomEvent)) {
