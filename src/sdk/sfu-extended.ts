@@ -172,6 +172,7 @@ import {
     AttachmentListResult,
     AttachmentSizeInfo,
     AttachmentType,
+    RoomState,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -524,6 +525,13 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.USER_ROOMS) {
                             const state = data[0] as UserRoomsEvent;
                             state.rooms.forEach((info) => {
+                                const existingRoom = this.#rooms[info.id];
+                                const inactiveStates = [RoomState.DISPOSED, RoomState.FAILED];
+
+                                if (existingRoom && !inactiveStates.includes(existingRoom.state())) {
+                                    return;
+                                }
+
                                 const room = new RoomExtended(this.#connection, info.id, info.owner, info.name, info.pin, this.user().username, this.user().nickname, info.creationTime, info.config, info.waitingRoomEnabled, this.#loggerPrefix, null, this.user().webRTCMetricsServerDescription);
                                 this.#rooms[room.id()] = room;
                                 const self = this;

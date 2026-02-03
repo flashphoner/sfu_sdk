@@ -2511,31 +2511,23 @@ describe("chat", () => {
                         members: [TEST_USER_1.username]
                     });
 
-                    let messageReceived = false;
-                    const onMessageHandler = async (msg) => {
-                        messageReceived = true;
-                        bob.off(SfuEvent.MESSAGE, onMessageHandler);
-                    }
+                    const newMessagePromise = new Promise<boolean>((resolve) => {
+                        const bobHandler = async (msg) => {
+                            const message = msg as Message;
+                            if (message.body === MESSAGE_BODY) {
+                                bob.off(SfuEvent.MESSAGE, bobHandler);
+                                resolve(true);
+                            }
+                        }
 
-                    bob.on(SfuEvent.MESSAGE, onMessageHandler);
+                        bob.on(SfuEvent.MESSAGE, bobHandler);
+                    });
                     await alice.sendMessage({
                         targetEntityType: MessageTargetEntityType.CHAT,
                         targetEntityId: {chatId: channel0.id},
                         body: MESSAGE_BODY
                     });
-                    const waitMessage = async () => {
-                        return new Promise<void>((resolve) => {
-                            const bobHandler = (msg) => {
-                                bob.off(SfuEvent.MESSAGE, bobHandler);
-                                resolve();
-                            }
-
-                            bob.on(SfuEvent.MESSAGE, bobHandler);
-                        });
-                    };
-                    if (!messageReceived) {
-                        await waitMessage();
-                    }
+                    await expect(newMessagePromise).resolves.toBeTruthy();
                     await bob.deleteChat(channel0);
                 });
                 it("send policy ADMIN should fail for non admin", async () => {

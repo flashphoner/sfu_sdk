@@ -24,30 +24,9 @@ describe("chats", () => {
         await bob.disconnect();
         await alice.disconnect();
     })
-    it("Should create chat on creating meeting", async (done) => {
-        bob.on(SfuEvent.NEW_CHAT, async (msg) => {
-            const chat = msg as UserSpecificChatInfo;
-            const rooms = await bob.loadActiveRooms();
-            const chatRoom = rooms.find(room => room.id === chat.id);
-            expect(chatRoom).toBeTruthy();
-            if (chatRoom) {
-                const room = bob.getRoom({id: chatRoom.id});
-                expect(chat.id).toEqual(room.id());
-                await room.destroyRoom();
-            }
-            done();
-        })
-        await bob.createRoom({
-            ...TEST_ROOM
-        });
-    });
-    it("Should remove chat on ending meeting", async (done) => {
-        const bobPc = new wrtc.RTCPeerConnection();
-        const bobRoom = await bob.createRoom({
-            ...TEST_ROOM
-        });
-        bob
-            .on(SfuEvent.NEW_CHAT, async (msg) => {
+    it("Should create chat on creating meeting", async () => {
+        const chatCreatedPromise = new Promise((resolve) => {
+            bob.on(SfuEvent.NEW_CHAT, async (msg) => {
                 const chat = msg as UserSpecificChatInfo;
                 const rooms = await bob.loadActiveRooms();
                 const chatRoom = rooms.find(room => room.id === chat.id);
@@ -56,17 +35,50 @@ describe("chats", () => {
                     const room = bob.getRoom({id: chatRoom.id});
                     expect(chat.id).toEqual(room.id());
                     await room.destroyRoom();
+                    resolve(true);
                 }
-            })
-            .on(SfuEvent.CHAT_DELETED, async (msg) => {
+            });
+        });
+        await bob.createRoom({
+            ...TEST_ROOM
+        });
+        await expect(chatCreatedPromise).resolves.toBeTruthy();
+    });
+    it("Should remove chat on ending meeting", async () => {
+        const bobPc = new wrtc.RTCPeerConnection();
+
+        const chatCreatedPromise = new Promise((resolve) => {
+            bob.on(SfuEvent.NEW_CHAT, async (msg) => {
                 const chat = msg as UserSpecificChatInfo;
-                expect(chat.id).toEqual(bobRoom.id());
-                done();
-            })
+                const rooms = await bob.loadActiveRooms();
+                const chatRoom = rooms.find(room => room.id === chat.id);
+                expect(chatRoom).toBeTruthy();
+                if (chatRoom) {
+                    const room = bob.getRoom({id: chatRoom.id});
+                    expect(chat.id).toEqual(room.id());
+                    resolve(true);
+                }
+            });
+        });
+
+        const bobRoom = await bob.createRoom({ ...TEST_ROOM });
+
+        await chatCreatedPromise;
 
         await bobRoom.join(bobPc);
+
+        const chatDeletedPromise = new Promise((resolve) => {
+            bob.on(SfuEvent.CHAT_DELETED, async (msg) => {
+                const chat = msg as UserSpecificChatInfo;
+                expect(chat.id).toEqual(bobRoom.id());
+                resolve(true);
+            });
+        });
+
         await bobRoom.leaveRoom();
-    })
+
+        await expect(chatDeletedPromise).resolves.toBeTruthy();
+    });
     it("Should remove participant from chat on exit from room", async () => {
         const bobPc = new wrtc.RTCPeerConnection();
         const alicePc = new wrtc.RTCPeerConnection();

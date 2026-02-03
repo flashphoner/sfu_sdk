@@ -35,7 +35,9 @@ export class Notifier<T extends string, A extends object> {
 
     public notify(event: T, msg?: A) {
         if (this.#subscribers[event]) {
-            for (const subscriber of this.#subscribers[event]) {
+            // Copying to avoid skipping handlers if one calls off() during iteration
+            const currentSubscribers = [...this.#subscribers[event]];
+            for (const subscriber of currentSubscribers) {
                 subscriber(msg);
             }
         }
