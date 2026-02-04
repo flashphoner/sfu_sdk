@@ -243,6 +243,8 @@ export enum RoomEvent {
 
     WEBRTC_METRICS_DESCRIPTION_UPDATE = "WEBRTC_METRICS_DESCRIPTION_UPDATE",
     WEBRTC_METRICS_TOKEN_REFRESH = "WEBRTC_METRICS_TOKEN_REFRESH",
+    /** Used to receive {@link ParticipantIconUpdated} */
+    PARTICIPANT_ICON_UPDATED = "PARTICIPANT_ICON_UPDATED"
 }
 
 /**
@@ -879,7 +881,8 @@ export type JoinedRoom = InternalMessage & {
     userId: UserId,
     name: UserNickname,
     chatId: string,
-    owner: boolean
+    owner: boolean,
+    icon: string,
     mediaSessionId: string
 }
 
@@ -914,7 +917,8 @@ export type WaitingParticipant = InternalMessage & {
 
 export type Participant = InternalMessage & {
     userId: UserId,
-    name: string
+    name: string,
+    icon?: string
 }
 
 export type ParticipantsListEvent = InternalMessage & {
@@ -984,6 +988,11 @@ export type TracksQualityState = InternalMessage & {
 
 export type RoomNameUpdated = InternalMessage & {
     name: string;
+}
+
+export type ParticipantIconUpdated = InternalMessage & {
+    userId: string;
+    icon: string;
 }
 
 export enum ConferenceType {

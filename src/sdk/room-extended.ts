@@ -22,6 +22,7 @@ import {
     UserId,
     UserNickname,
     WaitingRoomUpdate,
+    ParticipantIconUpdated,
 } from "./constants";
 import {PrefixFunction} from "./logger";
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
@@ -574,6 +575,9 @@ export class RoomExtended extends Room {
             const event = e as RoomNameUpdated;
             super.updateName(event.name);
             this.#resolveOrNotify(e, e.type, event);
+        } else if (e.type === RoomEvent.PARTICIPANT_ICON_UPDATED) {
+            const event = e as ParticipantIconUpdated;
+            this.notifier.notify(RoomEvent.PARTICIPANT_ICON_UPDATED, event);
         } else {
             super.processEvent(e);
         }
