@@ -173,6 +173,9 @@ import {
     AttachmentSizeInfo,
     AttachmentType,
     RoomState,
+    SpaceRefreshEvent,
+    UserSpacesLicenseUpdated,
+    OwnerSpacesUsersEvent,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -680,6 +683,10 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.SPACE_OVERVIEW_UPDATED, event);
                             }
+                        } else if (data[0].type === SpaceEvent.SPACE_REFRESH) {
+                            const event = data[0] as SpaceRefreshEvent;
+                            promises.resolve(data[0].internalMessageId, event.space)
+                            this.#notifier.notify(SpaceEvent.SPACE_REFRESH, event);
                         } else if (data[0].type === SpaceEvent.NEW_SPACE_CATEGORY) {
                             const event = data[0] as NewSpaceCategoryEvent;
                             if (!promises.resolve(data[0].internalMessageId, event.category)) {
@@ -789,6 +796,14 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.USER_LEFT_SPACE, event);
                             }
+                        } else if (data[0].type === SpaceEvent.USER_SPACES_LICENSE_UPDATED) {
+                            const event = data[0] as UserSpacesLicenseUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.USER_SPACES_LICENSE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.OWNER_SPACES_USERS) {
+                            const event = data[0] as OwnerSpacesUsersEvent;
+                            promises.resolve(data[0].internalMessageId, event);
                         } else if (data[0].type === SpaceEvent.ROLE_PERMISSION_SECTIONS) {
                             const event = data[0] as RolePermissionSectionsEvent;
                             if (!promises.resolve(data[0].internalMessageId, event.permissionSections)) {
@@ -3659,6 +3674,39 @@ export class SfuExtended {
         const self = this;
         return new Promise<Array<SfuSpaceRolePermissionSection>>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_ROLE_PERMISSIONS, {}, resolve, reject);
+        });
+    }
+
+    public assignUserSpacesLicense(options: {
+        userId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.ASSIGN_USER_SPACES_LICENSE, {
+                userId: options.userId,
+            }, resolve, reject);
+        });
+    }
+
+    public revokeUserSpacesLicense(options: {
+        userId: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REVOKE_USER_SPACES_LICENSE, {
+                userId: options.userId,
+            }, resolve, reject);
+        });
+    }
+
+    public getOwnerSpacesUsers() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<OwnerSpacesUsersEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_OWNER_SPACES_USERS, {
+            }, resolve, reject);
         });
     }
 

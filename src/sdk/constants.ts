@@ -260,6 +260,8 @@ export enum SpaceEvent {
     NEW_SPACE = "NEW_SPACE",
     /** Used to receive {@link SpaceDeletedEvent} */
     SPACE_DELETED = "SPACE_DELETED",
+    /** Used to receive {@link SpaceRefreshEvent} */
+    SPACE_REFRESH = "SPACE_REFRESH",
     /** Used to receive {@link SpaceOverviewUpdated} */
     SPACE_OVERVIEW_UPDATED = "SPACE_OVERVIEW_UPDATED",
     /** Used to receive {@link NewSpaceCategoryEvent} */
@@ -325,7 +327,11 @@ export enum SpaceEvent {
     /** Used to receive {@link ThreadMuted} */
     THREAD_MUTED = "THREAD_MUTED",
     /** Used to receive {@link ThreadUnmuted} */
-    THREAD_UNMUTED = "THREAD_UNMUTED"
+    THREAD_UNMUTED = "THREAD_UNMUTED",
+    /** Used to receive {@link UserSpacesLicenseUpdated} */
+    USER_SPACES_LICENSE_UPDATED = "USER_SPACES_LICENSE_UPDATED",
+    /** Used to receive {@link OwnerSpacesUsersEvent} */
+    OWNER_SPACES_USERS = "OWNER_SPACES_USERS",
 }
 
 /**
@@ -655,7 +661,10 @@ export enum InternalApi {
     UPDATE_USER_ICON = "updateUserIcon",
     UPDATE_SPACE_ICON = "updateSpaceIcon",
     UPDATE_CHAT_ICON = "updateChatIcon",
-    WEBRTC_METRICS_TOKEN_REFRESH = "webRTCMetricsTokenRefresh"
+    WEBRTC_METRICS_TOKEN_REFRESH = "webRTCMetricsTokenRefresh",
+    ASSIGN_USER_SPACES_LICENSE = "assignUserSpacesLicense",
+    REVOKE_USER_SPACES_LICENSE = "revokeUserSpacesLicense",
+    GET_OWNER_SPACES_USERS = "getOwnerSpacesUsers",
 }
 
 export enum ConnectionError {
@@ -1677,6 +1686,7 @@ export type SfuSpaceMember = {
     userId: string;
     nickname: string;
     roles: Array<string>;
+    licensed: boolean;
 }
 
 export type SfuSpaceCategory = {
@@ -1759,6 +1769,7 @@ export type SfuSpace = {
     invites: Array<SfuSpaceInvite>;
     bans: Array<SfuSpaceUserBan>;
     permissions: Array<SfuSpaceRolePermission>;
+    locked: boolean;
 }
 
 export type SpaceCreatedEvent = InternalMessage & {
@@ -1779,6 +1790,9 @@ export type SpaceOverviewUpdated = InternalMessage & {
     icon: string;
 }
 
+export type SpaceRefreshEvent = InternalMessage & {
+    space: SfuSpace;
+}
 
 export type SpaceNotificationSettingsUpdated = InternalMessage & {
     spaceId: string;
@@ -1944,6 +1958,7 @@ export type UserJoinedToSpaceEvent = InternalMessage & {
     spaceId: string;
     userId: string;
     nickname: string;
+    licensed: boolean;
     channels: Array<string>;
     threads: Array<string>;
 }
@@ -1967,6 +1982,16 @@ export type RemovedRoleFromMember = InternalMessage & {
 
 export type RolePermissionSectionsEvent = InternalMessage & {
     permissionSections: Array<SfuSpaceRolePermissionSection>;
+}
+
+export type UserSpacesLicenseUpdated = InternalMessage & {
+    userId: string;
+    licenced: boolean;
+    spaces: Array<string>;
+}
+
+export type OwnerSpacesUsersEvent = InternalMessage & {
+    users: Map<string, Array<string>>;
 }
 
 export type FriendInvite = {
@@ -2107,8 +2132,13 @@ export type RecorderConfig = {
     username: string;
 }
 
+export type BillingConfig = {
+    url: string;
+}
+
 export type SystemConfig = {
     recorder: RecorderConfig;
+    billing: BillingConfig;
 }
 
 export type SystemConfigEvent = InternalMessage & {
