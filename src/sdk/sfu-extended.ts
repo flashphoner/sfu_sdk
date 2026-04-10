@@ -169,7 +169,6 @@ import {
     SystemConfig,
     UploadIconEvent,
     ChatIconUpdated,
-    AttachmentListResult,
     AttachmentSizeInfo,
     AttachmentType,
     RoomState,
@@ -179,6 +178,15 @@ import {
     SpacesBrandingLogoUpdated,
     CustomDomainAdded,
     CustomDomainRemoved,
+    StorageSectionsEvent,
+    AttachmentListEvent,
+    RecordListEvent,
+    RecordsDeletedEvent,
+    RemoveRecordsResult,
+    RemoveStorageAttachmentItem,
+    RemoveStorageAttachmentsResult,
+    AttachmentSortField,
+    RecordSortField,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -646,12 +654,25 @@ export class SfuExtended {
                                 this.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENTS_SEARCH_RESULT, result);
                             }
                         } else if (data[0].type === SfuEvent.ATTACHMENTS_LIST_RESULT) {
-                            const result = data[0] as AttachmentListResult;
+                            const result = data[0] as AttachmentListEvent;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.ATTACHMENTS_LIST_RESULT, result);
                             }
-
-                        }else if (data[0].type === SfuEvent.ATTACHMENTS_SIZE_INFO) {
+                        } else if (data[0].type === SfuEvent.RECORDS_LIST_RESULT) {
+                            const result = data[0] as RecordListEvent;
+                            if (!promises.resolve(data[0].internalMessageId, result)) {
+                                this.#notifier.notify(SfuEvent.RECORDS_LIST_RESULT, result);
+                            }
+                        } else if (data[0].type === SfuEvent.RECORDS_DELETED) {
+                            const result = data[0] as RecordsDeletedEvent;
+                            this.#notifier.notify(SfuEvent.RECORDS_DELETED, result);
+                        } else if (data[0].type === SfuEvent.REMOVE_RECORDS_RESULT) {
+                            const result = data[0] as RemoveRecordsResult;
+                            promises.resolve(data[0].internalMessageId, result);
+                        } else if (data[0].type === SfuEvent.REMOVE_STORAGE_ATTACHMENTS_RESULT) {
+                            const result = data[0] as RemoveStorageAttachmentsResult;
+                            promises.resolve(data[0].internalMessageId, result);
+                        } else if (data[0].type === SfuEvent.ATTACHMENTS_SIZE_INFO) {
                             const result = data[0] as AttachmentSizeInfo;
                             if (!promises.resolve(data[0].internalMessageId, result)) {
                                 this.#notifier.notify(SfuEvent.ATTACHMENTS_SIZE_INFO, result);
@@ -996,6 +1017,9 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SfuEvent.CHAT_ICON_UPDATED, event);
                             }
+                        } else if (data[0].type === SfuEvent.STORAGE_SECTIONS) {
+                            const event = data[0] as StorageSectionsEvent;
+                            promises.resolve(data[0].internalMessageId, event)
                         } else {
                             this.#notifier.notify(data[0].type as SfuEvent, data[0]);
                         }
@@ -1623,15 +1647,59 @@ export class SfuExtended {
      * @param filter.pageSize   number of items retrieved and displayed per page
      */
     public listAttachments(filter: {
+        sectionType: string,
         offset: number,
         pageSize: number,
+        spaceId?: string,
+        sortField?: AttachmentSortField,
+        sortOrder?: SortOrder,
     }) {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<AttachmentListResult>(function (resolve, reject) {
+        return new Promise<AttachmentListEvent>(function (resolve, reject) {
             self.#emmitAction(InternalApi.LIST_ATTACHMENTS, {
                 ...filter
             }, resolve, reject);
+        })
+    }
+
+    public listRecords(filter: {
+        sectionType: string,
+        offset: number,
+        pageSize: number,
+        spaceId?: string,
+        sortField?: RecordSortField,
+        sortOrder?: SortOrder,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RecordListEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.LIST_RECORDS, {
+                ...filter
+            }, resolve, reject);
+        })
+    }
+
+    public removeRecords(records: Array<{
+        id: string,
+        record: string,
+        historyItemId: string,
+        conferenceType: string,
+        meetingId: string,
+        spaceId?: string,
+    }>) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RemoveRecordsResult>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_RECORDS, {records}, resolve, reject);
+        })
+    }
+
+    public removeStorageAttachments(attachments: Array<RemoveStorageAttachmentItem>) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<RemoveStorageAttachmentsResult>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.REMOVE_STORAGE_ATTACHMENTS, {attachments}, resolve, reject);
         })
     }
 
@@ -1647,6 +1715,14 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.GET_ATTACHMENTS_SIZE, {
                 type: type
             }, resolve, reject);
+        })
+    }
+
+    public getStorageSections() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<StorageSectionsEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_STORAGE_SECTIONS, {}, resolve, reject);
         })
     }
 

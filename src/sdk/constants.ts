@@ -90,6 +90,8 @@ export enum SfuEvent {
     MESSAGE_ATTACHMENTS_SEARCH_RESULT = "MESSAGE_ATTACHMENTS_SEARCH_RESULT",
     /** Used to receive {@link AttachmentListResult} */
     ATTACHMENTS_LIST_RESULT = "ATTACHMENTS_LIST_RESULT",
+    /** Used to receive {@link RecordListResult} */
+    RECORDS_LIST_RESULT = "RECORDS_LIST_RESULT",
     /** Used to receive {@link AttachmentSizeInfo} */
     ATTACHMENTS_SIZE_INFO = "ATTACHMENTS_SIZE_INFO",
     /** Used to receive {@link LoadMessagesWithMentionsResult} */
@@ -139,7 +141,11 @@ export enum SfuEvent {
     UPLOAD_ICON = "UPLOAD_ICON",
     CHAT_ICON_UPDATED = "CHAT_ICON_UPDATED",
     CUSTOM_DOMAIN_ADDED = "CUSTOM_DOMAIN_ADDED",
-    CUSTOM_DOMAIN_REMOVED = "CUSTOM_DOMAIN_REMOVED"
+    CUSTOM_DOMAIN_REMOVED = "CUSTOM_DOMAIN_REMOVED",
+    STORAGE_SECTIONS = "STORAGE_SECTIONS",
+    RECORDS_DELETED = "RECORDS_DELETED",
+    REMOVE_RECORDS_RESULT = "REMOVE_RECORDS_RESULT",
+    REMOVE_STORAGE_ATTACHMENTS_RESULT = "REMOVE_STORAGE_ATTACHMENTS_RESULT",
 }
 
 /**
@@ -544,7 +550,11 @@ export enum InternalApi {
     SEARCH_CHAT_MESSAGES = "searchChatMessages",
     GET_MESSAGES_COUNT = "getMessagesCount",
     LIST_ATTACHMENTS = "listAttachments",
+    LIST_RECORDS = "listRecords",
+    REMOVE_RECORDS = "removeRecords",
+    REMOVE_STORAGE_ATTACHMENTS = "removeStorageAttachments",
     GET_ATTACHMENTS_SIZE = "getAttachmentsSize",
+    GET_STORAGE_SECTIONS = "getStorageSections",
     GET_FIRST_AND_LAST_MESSAGE = "getFirstAndLastMessage",
     GET_UNREAD_MESSAGES_COUNT = "getUnreadMessagesCount",
     CREATE_CHAT = "createChat",
@@ -1008,6 +1018,10 @@ export type RoomNameUpdated = InternalMessage & {
 export type ParticipantIconUpdated = InternalMessage & {
     userId: string;
     icon: string;
+}
+
+export type RecordStarted = InternalMessage & {
+    startedBy: string;
 }
 
 export enum ConferenceType {
@@ -1630,20 +1644,80 @@ export enum AttachmentType {
     DIRECT = "DIRECT"
 }
 
+export type RecordListItem = {
+    id: string;
+    record: string;
+    size: number;
+    meetingId: string;
+    historyItemId: string;
+    conferenceType: string;
+    startedAt: number;
+    endedAt: number;
+    title: string;
+    spaceId?: string;
+}
+
+export type RecordListResult = {
+    items: Array<RecordListItem>;
+    totalCount: number;
+}
+
+export type RecordListEvent = InternalMessage & {
+    result: RecordListResult;
+}
+
+export type RecordsDeletedEvent = InternalMessage & {
+    historyItemId: string;
+    recordIds: Array<string>;
+}
+
+export type RemoveRecordsResult = InternalMessage & {
+    deletedSize: number;
+}
+
 export type AttachmentListItem = {
     id: string;
     name: string;
     size: number;
     from: string;
     date: number;
+    messageId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
 }
 
-export type AttachmentListResult = InternalMessage & {
-    result: Array<AttachmentListItem>
+export type RemoveStorageAttachmentItem = {
+    id: string;
+    messageId: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+}
+
+export type RemoveStorageAttachmentsResult = InternalMessage & {
+    deletedSize: number;
+}
+
+export type AttachmentListResult = {
+    items: Array<AttachmentListItem>;
+    totalCount: number;
+}
+
+export type AttachmentListEvent = InternalMessage & {
+    result: AttachmentListResult;
 }
 
 export type AttachmentSizeInfo = InternalMessage & {
     result: { [key: string]: string }
+}
+
+export type StorageSection = {
+    name: string;
+    size: number;
+    childSections: Array<StorageSection>;
+}
+
+export type StorageSectionsEvent = InternalMessage & {
+    sections: Array<StorageSection>;
 }
 
 export type MessageAttachmentsSearchResult = InternalMessage & {
@@ -2188,6 +2262,18 @@ export type CustomDomainRemoved = InternalMessage & {
 
 export enum SortOrder {
     ASC, DESC
+}
+
+export enum AttachmentSortField {
+    NAME = "NAME",
+    SIZE = "SIZE",
+    DATE = "DATE",
+}
+
+export enum RecordSortField {
+    NAME = "NAME",
+    SIZE = "SIZE",
+    ENDED_AT = "ENDED_AT",
 }
 
 export type OperationFailedEvent = InternalMessage & {

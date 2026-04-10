@@ -48,23 +48,23 @@ describe("Listing", () => {
         await handler.sendAttachments();
 
         const result = await bob.listAttachments({
-            offset: -1, pageSize: -1
+            sectionType: 'Spaces', spaceId: space.id, offset: -1, pageSize: -1
         });
 
         expect(result).toBeTruthy();
-        expect(result.result.length).toBe(attachmentsCount);
-        for (let i = 0; i < result.result.length; i++) {
-            expect(result.result[i].size).toBe(size);
+        expect(result.result.items.length).toBe(attachmentsCount);
+        for (let i = 0; i < result.result.items.length; i++) {
+            expect(result.result.items[i].size).toBe(size);
         }
 
         await bob.deleteSpace({id: space.id});
 
         const shouldBeEmptyList = await bob.listAttachments({
-            offset: -1, pageSize: -1
+            sectionType: 'Spaces', spaceId: space.id, offset: -1, pageSize: -1
         });
 
         expect(shouldBeEmptyList).toBeTruthy();
-        expect(shouldBeEmptyList.result.length).toBe(0);
+        expect(shouldBeEmptyList.result.items.length).toBe(0);
     })
     it("should get space attachment size", async () => {
         const space = await bob.createSpace({name: TEST_SPACE_NAME});
