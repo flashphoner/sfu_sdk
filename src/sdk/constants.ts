@@ -137,7 +137,9 @@ export enum SfuEvent {
     /** Used to receive {@link SystemConfig} */
     SYSTEM_CONFIG = "SYSTEM_CONFIG",
     UPLOAD_ICON = "UPLOAD_ICON",
-    CHAT_ICON_UPDATED = "CHAT_ICON_UPDATED"
+    CHAT_ICON_UPDATED = "CHAT_ICON_UPDATED",
+    CUSTOM_DOMAIN_ADDED = "CUSTOM_DOMAIN_ADDED",
+    CUSTOM_DOMAIN_REMOVED = "CUSTOM_DOMAIN_REMOVED"
 }
 
 /**
@@ -332,6 +334,8 @@ export enum SpaceEvent {
     USER_SPACES_LICENSE_UPDATED = "USER_SPACES_LICENSE_UPDATED",
     /** Used to receive {@link OwnerSpacesUsersEvent} */
     OWNER_SPACES_USERS = "OWNER_SPACES_USERS",
+    /** Used to receive {@link SpacesBrandingLogoUpdated} */
+    SPACES_BRANDING_LOGO_UPDATED = "SPACES_BRANDING_LOGO_UPDATED",
 }
 
 /**
@@ -665,6 +669,8 @@ export enum InternalApi {
     ASSIGN_USER_SPACES_LICENSE = "assignUserSpacesLicense",
     REVOKE_USER_SPACES_LICENSE = "revokeUserSpacesLicense",
     GET_OWNER_SPACES_USERS = "getOwnerSpacesUsers",
+    UPDATE_BRANDING_LOGO = "updateBrandingLogo",
+    UPDATE_CUSTOM_DOMAIN = "updateCustomDomain"
 }
 
 export enum ConnectionError {
@@ -1328,6 +1334,11 @@ export enum PresenceStatus {
     OFFLINE = "OFFLINE"
 }
 
+export type BrandingLogo = {
+    logo: string;
+    enabled: boolean;
+}
+
 export type UserInfo = {
     id: UserId,
     email: UserEmail,
@@ -1337,6 +1348,7 @@ export type UserInfo = {
     hostKey: UserHostKey,
     timezone: UserTimezone,
     status: PresenceStatus,
+    brandingLogo: BrandingLogo;
 }
 
 export type CalendarEvent = {
@@ -1770,6 +1782,7 @@ export type SfuSpace = {
     bans: Array<SfuSpaceUserBan>;
     permissions: Array<SfuSpaceRolePermission>;
     locked: boolean;
+    brandingLogo: string;
 }
 
 export type SpaceCreatedEvent = InternalMessage & {
@@ -2136,9 +2149,15 @@ export type BillingConfig = {
     url: string;
 }
 
+export type CustomDomain = {
+    domain: string;
+    owner: string;
+}
+
 export type SystemConfig = {
     recorder: RecorderConfig;
     billing: BillingConfig;
+    domains: Array<CustomDomain>;
 }
 
 export type SystemConfigEvent = InternalMessage & {
@@ -2152,6 +2171,19 @@ export type UploadIconEvent = InternalMessage & {
 export type ChatIconUpdated = InternalMessage & {
     chatId: string;
     icon: string;
+}
+
+export type SpacesBrandingLogoUpdated = InternalMessage & {
+    logo: string;
+    spaces: Array<string>;
+}
+
+export type CustomDomainAdded = InternalMessage & {
+    domain: CustomDomain;
+}
+
+export type CustomDomainRemoved = InternalMessage & {
+    domain: string;
 }
 
 export enum SortOrder {

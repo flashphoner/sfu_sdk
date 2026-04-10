@@ -176,6 +176,9 @@ import {
     SpaceRefreshEvent,
     UserSpacesLicenseUpdated,
     OwnerSpacesUsersEvent,
+    SpacesBrandingLogoUpdated,
+    CustomDomainAdded,
+    CustomDomainRemoved,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {RoomExtended} from "./room-extended";
@@ -859,6 +862,9 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.THREAD_UNMUTED, event);
                             }
+                        } else if (data[0].type === SpaceEvent.SPACES_BRANDING_LOGO_UPDATED) {
+                            const event = data[0] as SpacesBrandingLogoUpdated;
+                            this.#notifier.notify(SpaceEvent.SPACES_BRANDING_LOGO_UPDATED, event);
                         } else if (data[0].type === SfuEvent.USER_MEETINGS) {
                             const event = data[0] as MeetingsPreviewEvent;
                             this.#notifier.notify(SfuEvent.USER_MEETINGS, event);
@@ -972,6 +978,16 @@ export class SfuExtended {
                         } else if (data[0].type === SfuEvent.SYSTEM_CONFIG) {
                             const event = data[0] as SystemConfigEvent;
                             promises.resolve(data[0].internalMessageId, event.config);
+                        } else if (data[0].type === SfuEvent.CUSTOM_DOMAIN_ADDED) {
+                            const event = data[0] as CustomDomainAdded;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CUSTOM_DOMAIN_ADDED, event);
+                            }
+                        } else if (data[0].type === SfuEvent.CUSTOM_DOMAIN_REMOVED) {
+                            const event = data[0] as CustomDomainRemoved;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CUSTOM_DOMAIN_REMOVED, event);
+                            }
                         } else if (data[0].type === SfuEvent.UPLOAD_ICON) {
                             const event = data[0] as UploadIconEvent;
                             promises.resolve(data[0].internalMessageId, event.url);
@@ -3984,6 +4000,68 @@ export class SfuExtended {
         } catch (error) {
             throw new Error(error.error);
         }
+    }
+
+    private async updateBrandingLogoRequest(options: {
+        name?: string;
+        size?: number;
+        remove?: boolean;
+        disable?: boolean;
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<string>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_BRANDING_LOGO, {
+                iconName: options.name,
+                iconSize: options.size,
+                remove: options.remove,
+                disable: options.disable
+            }, resolve, reject);
+        });
+    }
+
+    public async updateBrandingLogo(options: {
+        icon?: File;
+        remove?: boolean;
+        disable?: boolean;
+    }): Promise<string | null> {
+        try {
+            const uploadUrl = await this.updateBrandingLogoRequest({
+                name: options.icon?.name,
+                size: options.icon?.size,
+                remove: options.remove,
+                disable: options.disable
+            });
+
+            if (!uploadUrl) {
+                return null;
+            }
+
+            return uploadFile({
+                url: uploadUrl,
+                file: options.icon
+            });
+        } catch (error) {
+            throw new Error(error.error);
+        }
+    }
+
+    public async updateCustomDomain(options: {
+        domain?: string;
+        cert?: string;
+        key?: string;
+        remove?: boolean;
+    }): Promise<void> {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<void>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CUSTOM_DOMAIN, {
+                domain: options.domain,
+                cert: options.cert,
+                key: options.key,
+                remove: options.remove
+            }, resolve, reject);
+        });
     }
 
     public user() {
