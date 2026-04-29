@@ -16,8 +16,10 @@ const defaultConfig = {
         url: "ws://127.0.0.1:8080",
         name: "ROOM1",
         pin: "1234",
-        nickName: "User1"
-    }
+        nickName: "User1",
+    },
+    initPoolParticipantsCount: 10,
+    idleTransceiverTimeoutMs: 60000
 };
 
 /**
@@ -222,7 +224,7 @@ const playStreams = async function(state) {
     try {
         remoteDisplay = initDefaultRemoteDisplay(state.room, document.getElementById("remoteVideo"), {quality: true});
         // Start WebRTC negotiation
-        await state.room.join(state.pc, null, null, 10);
+        await state.room.join(state.pc, null, null, mainConfig.initPoolParticipantsCount, mainConfig.idleTransceiverTimeoutMs);
     } catch(e) {
         if (e.type === constants.SFU_ROOM_EVENT.OPERATION_FAILED) {
             onOperationFailed(state, e);

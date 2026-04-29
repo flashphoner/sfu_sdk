@@ -33,7 +33,9 @@ const defaultConfig = {
                 }
             ]
         }
-    }
+    },
+    initPoolParticipantsCount: 10,
+    idleTransceiverTimeoutMs: 60000
 };
 
 const scalabilityModes = [
@@ -220,7 +222,7 @@ const publishPreconfiguredStreams = async function (room, pc, streams) {
         });
         //join room
         const transportType = cControls.roomConfig().transport;
-        await room.join(pc, null, config, 10, transportType);
+        await room.join(pc, null, config, cControls.initPoolParticipantsCount(), cControls.idleTransceiverTimeoutMs(), transportType);
         // Enable Delete button for each preconfigured stream #WCS-3689
         streams.forEach(function (s) {
             $('#' + s.stream.id + "-button").prop('disabled', false);

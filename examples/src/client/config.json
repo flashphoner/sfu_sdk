@@ -25,5 +25,7 @@
         ]
       }]
     }
-  }
+  },
+  "initPoolParticipantsCount": 10,
+  "idleTransceiverTimeoutMs": 60000
 }

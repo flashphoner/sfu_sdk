@@ -2,6 +2,7 @@ import {RoomEvent, RoomState, Sfu, StatsType} from "../../src";
 import {TEST_GROUP_USER0, TEST_GROUP_USER1, TEST_MESSAGE_ROOM, TEST_ROOM, url} from "../util/constants";
 import {AddRemoveTracks, RoomMessage, TrackType} from "../../src/sdk/constants";
 import {Verbosity} from "../../src/sdk/logger";
+import {TransceiverPool} from "../../src/sdk/room";
 
 const wrtc = require("wrtc");
 const RTCAudioSourceSineWave = require("../lib/rtcaudiosourcesinewave");
@@ -118,15 +119,17 @@ describe("room", () => {
         rtcConnection.addTrack(aTrack1);
         rtcConnection.addTrack(aTrack2);
         rtcConnection.addTrack(vTrack1);
-        const contentTypes = ["mic-1", "mic-2", "cam-1","cam-2"]
+        const contentTypes = ["mic-1", "mic-2", "cam-1", "cam-2"]
 
         const config = {
             [aTrack1.id]: contentTypes[0].valueOf(),
             [aTrack2.id]: contentTypes[1].valueOf(),
             [vTrack1.id]: contentTypes[2].valueOf()
         };
-        const updateConfig = {...config,
-            [vTrack2.id]: contentTypes[3].valueOf()}
+        const updateConfig = {
+            ...config,
+            [vTrack2.id]: contentTypes[3].valueOf()
+        }
 
         room0.on(RoomEvent.ADD_TRACKS, async (msg) => {
             const message = msg as AddRemoveTracks;
@@ -178,7 +181,7 @@ describe("room", () => {
             const message = msg as AddRemoveTracks;
             expect(message).toBeTruthy();
             expect(message.info.userId).toBeTruthy();
-            const t = await room0.getRemoteTrack(TrackType.VIDEO, true);
+            const t = await room0.getRemoteTrack(TrackType.VIDEO);
             await t.demandTrack(message.info.info[0].id);
             room0.getStats(t.track, StatsType.INBOUND, async (stats) => {
                 expect(stats.type).toBe(StatsType.INBOUND);
@@ -191,6 +194,55 @@ describe("room", () => {
 
         await room1.join(rtcConnectionPublish, null, {});
         await room0.join(rtcConnectionPlay, null, {}, 1);
+    });
+    it("Should return a transceiver with mid=0 back to the pool and retrieve it again after a timeout, since such a transceiver cannot be stopped due to timeout", async (done) => {
+        const sfu = await connect(TEST_GROUP_USER0);
+        const room = sfu.createRoom({...TEST_ROOM});
+
+        const pcPlay = new wrtc.RTCPeerConnection();
+        await room.join(pcPlay, null, {}, 1, 10);
+        const pool = (room as any).transceiverPool as TransceiverPool;
+
+        let t: RTCRtpTransceiver = await pool.getTransceiver("video");
+        const mid1 = t.mid;
+        pool.releaseTransceiver(t);
+
+        // Waits for the timeout to elapse to ensure that the transceiver with mid=0 was not stopped
+        await new Promise(r => setTimeout(r, 15));
+        t = await pool.getTransceiver("video");
+        const mid2 = t.mid;
+
+        if (mid1 == mid2) {
+            done();
+        }
+        await sfu.disconnect();
+    });
+    it("Should obtain a transceiver, return it to the pool, and then acquire a new transceiver with a different mid, since the previous transceiver was stopped due to timeout", async (done) => {
+        const timeout = 10;
+        const sfu = await connect(TEST_GROUP_USER0);
+        const room = sfu.createRoom({...TEST_ROOM});
+
+        const pcPlay = new wrtc.RTCPeerConnection();
+
+        await room.join(pcPlay, null, {}, 1, timeout);
+        const pool = (room as any).transceiverPool as TransceiverPool;
+
+        // Takes a transceiver with mid=0 from the pool so that it does not affect the test
+        let t: RTCRtpTransceiver = await pool.getTransceiver("video");
+        let previousMid = t.mid;
+
+        for (let i = 0; i < 10; i++) {
+            let currentTrack: RTCRtpTransceiver = await pool.getTransceiver("video");
+            let currentMid = currentTrack.mid;
+            expect(currentMid).not.toBe(previousMid);
+
+            previousMid = currentMid;
+            pool.releaseTransceiver(currentTrack);
+            // Waiting for the previous transceiver to be stopped
+            await new Promise(r => setTimeout(r, timeout));
+        }
+        await sfu.disconnect();
+        done();
     });
     //relates to zapp-64
     it.skip("should send message", async () => {

@@ -37,7 +37,7 @@ import {
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
-import Logger from "./logger";
+import Logger, {Verbosity} from "./logger";
 import {Queue} from 'queue-typescript';
 import {BitrateComponentEventBus, BitrateTest, BitrateTestController, BitrateTestListener} from "./BitrateTest";
 import {Mutex} from "async-mutex";
@@ -84,7 +84,7 @@ export class Room {
         tid: string
     };
     protected stats: WebRTCStats;
-    #vacantTransceivers: { video: Queue<RTCRtpTransceiver>, audio: Queue<RTCRtpTransceiver> };
+    private transceiverPool: TransceiverPool;
 
 
     public constructor(connection: Connection, name: string, pin: string, nickname: UserNickname, creationTime: number, userId?: UserId, webRTCMetricsServerDescription?: RTCMetricsServerDescription) {
@@ -103,7 +103,6 @@ export class Room {
             mutex: new Mutex(),
             tid: ""
         }
-        this.#vacantTransceivers = {audio: new Queue<RTCRtpTransceiver>(), video: new Queue<RTCRtpTransceiver>()};
     }
 
     #dChannelSend(msg: string): void {
@@ -368,6 +367,13 @@ export class Room {
         }
     }
 
+    private createTransceiverPool(predefinedTracksCount: number, idleTransceiverTimeoutMs: number) {
+        if (!this.transceiverPool) {
+            this.transceiverPool = new TransceiverPool(this.#_pc, 0, predefinedTracksCount, idleTransceiverTimeoutMs, this);
+        }
+    }
+
+
     //TODO(naz): safe guard based on state
     /**
      * Join the room
@@ -376,11 +382,12 @@ export class Room {
      * @param nickname - user nickname
      * @param config - [track.id] : track content type
      * @param predefinedTracksCount - Initial number of allocated transceivers.
+     * @param idleTransceiverTimeoutMs - Timeout for useless transceivers.
      * @param transportType - Ice transport protocol. "UDP"/"TCP".
      */
     public join(pc: RTCPeerConnection, nickname?: UserNickname, config?: {
         [key: string]: string
-    }, predefinedTracksCount?: number, transportType?: TransportType): Promise<JoinedRoom> {
+    }, predefinedTracksCount?: number, idleTransceiverTimeoutMs?: number, transportType?: TransportType): Promise<JoinedRoom> {
         const self = this;
         this.#_pc = pc;
         this.#_pc.addEventListener("signalingstatechange", () => {
@@ -389,12 +396,7 @@ export class Room {
         if (nickname) {
             this._nickname = nickname;
         }
-        if (predefinedTracksCount > 0) {
-            for (let i = 0; i < predefinedTracksCount; i++) {
-                let transceiver = pc.addTransceiver("video", {direction: "recvonly"});
-                this.#vacantTransceivers.video.enqueue(transceiver);
-            }
-        }
+        this.createTransceiverPool(predefinedTracksCount, idleTransceiverTimeoutMs);
         this.#dChannel = this.#_pc.createDataChannel(Room.#CONTROL_CHANNEL);
         const Channel = this.#_pc.createDataChannel(Room.#BITRATE_CHANNEL);
 
@@ -817,16 +819,8 @@ export class Room {
         this.stats.getStats(track, type, callback);
     }
 
-    public async getRemoteTrack(kind: TrackType, force: boolean): Promise<RemoteTrack | undefined> {
-        let transceiver = this.#vacantTransceivers[kind.toLowerCase()].dequeue();
-        if (!transceiver) {
-            if (force) {
-                transceiver = this.pc().addTransceiver(kind.toLowerCase(), {direction: "recvonly"});
-                await this.updateState();
-            } else {
-                return undefined;
-            }
-        }
+    public async getRemoteTrack(kind: TrackType): Promise<RemoteTrack | undefined> {
+        let transceiver = await this.transceiverPool.getTransceiver(kind.toLowerCase());
         const room = this;
         return {
             track: transceiver.receiver.track,
@@ -853,7 +847,7 @@ export class Room {
                     if (!self.disposed) {
                         self.disposed = true;
                         if (transceiver.receiver && transceiver.receiver.track) {
-                            room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                            room.transceiverPool.releaseTransceiver(transceiver);
                         }
                     }
                     throw error;
@@ -932,11 +926,138 @@ export class Room {
 
                 } finally {
                     if (transceiver.receiver && transceiver.receiver.track) {
-                        room.#vacantTransceivers[transceiver.receiver.track.kind].enqueue(transceiver);
+                        room.transceiverPool.releaseTransceiver(transceiver);
                     }
                 }
             }
         };
+    }
+
+}
+
+export class TransceiverPool {
+    private peerConnection: RTCPeerConnection;
+    private idleTimeoutMs: number;
+    private freeAudio: RTCRtpTransceiver[];
+    private freeVideo: RTCRtpTransceiver[];
+    private inUseAudio: Set<RTCRtpTransceiver>;
+    private inUseVideo: Set<RTCRtpTransceiver>;
+    private timeouts: Map<RTCRtpTransceiver, ReturnType<typeof setTimeout>>;
+    private room: Room;
+    private logger: Logger;
+
+    constructor(peerConnection: RTCPeerConnection, initialAudio = 0, initialVideo = 0, idleTimeoutMs = 60000, room: Room, logger: Logger = new Logger()) {
+        this.peerConnection = peerConnection;
+        this.idleTimeoutMs = idleTimeoutMs;
+        this.freeAudio = [];
+        this.freeVideo = [];
+        this.inUseAudio = new Set();
+        this.inUseVideo = new Set();
+        this.timeouts = new Map();
+        this.room = room;
+        this.logger = logger;
+        this.logger.setVerbosity(Verbosity.INFO);
+
+        for (let i = 0; i < initialVideo; i++) {
+            this._createAndAddToFree('video');
+        }
+        for (let i = 0; i < initialAudio; i++) {
+            this._createAndAddToFree('audio');
+        }
+    }
+
+    private _createTransceiver(kind) {
+        return this.peerConnection.addTransceiver(kind, {direction: 'recvonly'});
+    }
+
+    private _createAndAddToFree(kind) {
+        const transceiver: RTCRtpTransceiver = this._createTransceiver(kind);
+        const queue = kind === 'audio' ? this.freeAudio : this.freeVideo;
+        queue.push(transceiver);
+        return transceiver;
+    }
+
+    private _startIdleTimeout(transceiver: RTCRtpTransceiver) {
+        if (transceiver.mid) {
+            const timeoutId = setTimeout(() => {
+                if (this._isInFree(transceiver)) {
+                    this.logger.info(`Idle timeout → stopping transceiver mid=${transceiver.mid}`);
+                    transceiver.stop();
+                    this._removeFromFree(transceiver);
+                    this.updateSate().catch(e => console.error("updateState failed after idle stop", e));
+                }
+            }, this.idleTimeoutMs);
+
+            this.timeouts.set(transceiver, timeoutId);
+        }
+    }
+
+    private async updateSate() {
+        await this.room.updateState();
+    }
+
+    private _cancelIdleTimeout(transceiver) {
+        const timeoutId = this.timeouts.get(transceiver);
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            this.timeouts.delete(transceiver);
+        }
+    }
+
+    private _isInFree(transceiver) {
+        return this.freeAudio.includes(transceiver) || this.freeVideo.includes(transceiver);
+    }
+
+    private _removeFromFree(transceiver) {
+        this.freeAudio = this.freeAudio.filter(t => t !== transceiver);
+        this.freeVideo = this.freeVideo.filter(t => t !== transceiver);
+    }
+
+    public async getTransceiver(kind) {
+        const queue = kind === 'audio' ? this.freeAudio : this.freeVideo;
+        const inUse = kind === 'audio' ? this.inUseAudio : this.inUseVideo;
+
+        let transceiver;
+        if (queue.length > 0) {
+            transceiver = queue.shift();
+            this._cancelIdleTimeout(transceiver);
+        } else {
+            transceiver = this._createTransceiver(kind);
+            await this.room.updateState();
+        }
+
+        inUse.add(transceiver);
+        return transceiver;
+    }
+
+    public releaseTransceiver(transceiver: RTCRtpTransceiver) {
+        const kind = transceiver.receiver.track.kind;
+        const inUse = kind === 'audio' ? this.inUseAudio : this.inUseVideo;
+        const queue = kind === 'audio' ? this.freeAudio : this.freeVideo;
+
+        if (inUse.has(transceiver)) {
+            inUse.delete(transceiver);
+            queue.push(transceiver);
+            // transceiver with mid=0 shouldn't be stopped, because it's the first media section
+            // in the BUNDLE group and acts as the bundle owner (transport owner).
+            // it contains ICE, DTLS-handshake, SRTP-keys
+            if (!(transceiver.mid == "0")) {
+                this._startIdleTimeout(transceiver);
+            } else {
+                this.logger.info("Transceiver with mid=0 can't be stopped, because it's a bundle owner, should be returned to the pool");
+            }
+        }
+    }
+
+    shutdown() {
+        [...this.freeAudio, ...this.freeVideo, ...this.inUseAudio, ...this.inUseVideo].forEach(t => {
+            this._cancelIdleTimeout(t);
+            t.stop();
+        });
+        this.freeAudio = [];
+        this.freeVideo = [];
+        this.inUseAudio.clear();
+        this.inUseVideo.clear();
     }
 }
 

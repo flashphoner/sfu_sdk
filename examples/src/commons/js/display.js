@@ -1988,10 +1988,10 @@ const createDefaultMeetingController = function (room, meetingModel) {
 const remoteTrackProvider = function (room) {
     return {
         getVideoTrack: async function () {
-            return await room.getRemoteTrack("VIDEO", false);
+            return await room.getRemoteTrack("VIDEO");
         },
         getAudioTrack: async function () {
-            return await room.getRemoteTrack("AUDIO", true);
+            return await room.getRemoteTrack("AUDIO");
         }
     }
 }

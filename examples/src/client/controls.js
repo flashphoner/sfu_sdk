@@ -186,6 +186,14 @@ const createControls = function (config) {
         return roomConfig;
     }
 
+    let initPoolParticipantsCount = function () {
+        return config.initPoolParticipantsCount;
+    }
+
+    let idleTransceiverTimeoutMs = function () {
+        return config.idleTransceiverTimeoutMs;
+    }
+
     const getVideoStreams = function () {
         let streams = [];
         controls.tables.video.rows().every(function (rowIdx, tableLoop, rowLoop) {
@@ -308,6 +316,8 @@ const createControls = function (config) {
         getVideoStreams: getVideoStreams,
         onTrack: onTrack,
         cleanTables: cleanTables,
+        initPoolParticipantsCount: initPoolParticipantsCount,
+        idleTransceiverTimeoutMs: idleTransceiverTimeoutMs,
         controls: controls
     }
 }
