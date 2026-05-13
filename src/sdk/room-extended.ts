@@ -24,6 +24,7 @@ import {
     WaitingRoomUpdate,
     ParticipantIconUpdated,
     RecordStarted,
+    AutoRecordFailed,
 } from "./constants";
 import {PrefixFunction} from "./logger";
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
@@ -582,6 +583,9 @@ export class RoomExtended extends Room {
         } else if (e.type === RoomEvent.ROOM_RECORD_STARTED) {
             const event = e as RecordStarted;
             this.notifier.notify(RoomEvent.ROOM_RECORD_STARTED, event);
+        } else if (e.type === RoomEvent.ROOM_AUTO_RECORD_FAILED) {
+            const event = e as AutoRecordFailed;
+            this.notifier.notify(RoomEvent.ROOM_AUTO_RECORD_FAILED, event);
         } else {
             super.processEvent(e);
         }

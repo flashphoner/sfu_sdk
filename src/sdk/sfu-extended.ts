@@ -146,8 +146,14 @@ import {
     UserSpaceNicknameUpdated,
     SpaceNotificationSettingsUpdated,
     ChannelNotificationSettingsUpdated,
+    ChannelRecordingModeUpdated,
+    SpaceRecordingModeUpdated,
+    ChannelAutoRecordJoinModeUpdated,
+    SpaceAutoRecordJoinModeUpdated,
     ThreadNotificationSettingsUpdated,
     NotificationMode,
+    RecordingMode,
+    AutoRecordJoinMode,
     ChatNotificationSettingsUpdated,
     ChatMuted,
     SpaceMuted,
@@ -176,6 +182,7 @@ import {
     UserSpacesLicenseUpdated,
     OwnerSpacesUsersEvent,
     SpacesBrandingLogoUpdated,
+    OwnerFeaturesUpdated,
     CustomDomainAdded,
     CustomDomainRemoved,
     StorageSectionsEvent,
@@ -848,6 +855,26 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.CHANNEL_NOTIFICATION_SETTINGS_UPDATED, event);
                             }
+                        } else if (data[0].type === SpaceEvent.CHANNEL_RECORDING_MODE_UPDATED) {
+                            const event = data[0] as ChannelRecordingModeUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.CHANNEL_RECORDING_MODE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_RECORDING_MODE_UPDATED) {
+                            const event = data[0] as SpaceRecordingModeUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_RECORDING_MODE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.CHANNEL_AUTO_RECORD_JOIN_MODE_UPDATED) {
+                            const event = data[0] as ChannelAutoRecordJoinModeUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.CHANNEL_AUTO_RECORD_JOIN_MODE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_AUTO_RECORD_JOIN_MODE_UPDATED) {
+                            const event = data[0] as SpaceAutoRecordJoinModeUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_AUTO_RECORD_JOIN_MODE_UPDATED, event);
+                            }
                         } else if (data[0].type === SpaceEvent.THREAD_NOTIFICATION_SETTINGS_UPDATED) {
                             const event = data[0] as ThreadNotificationSettingsUpdated;
                             if (!promises.resolve(data[0].internalMessageId, event)) {
@@ -886,6 +913,9 @@ export class SfuExtended {
                         } else if (data[0].type === SpaceEvent.SPACES_BRANDING_LOGO_UPDATED) {
                             const event = data[0] as SpacesBrandingLogoUpdated;
                             this.#notifier.notify(SpaceEvent.SPACES_BRANDING_LOGO_UPDATED, event);
+                        } else if (data[0].type === SpaceEvent.OWNER_FEATURES_UPDATED) {
+                            const event = data[0] as OwnerFeaturesUpdated;
+                            this.#notifier.notify(SpaceEvent.OWNER_FEATURES_UPDATED, event);
                         } else if (data[0].type === SfuEvent.USER_MEETINGS) {
                             const event = data[0] as MeetingsPreviewEvent;
                             this.#notifier.notify(SfuEvent.USER_MEETINGS, event);
@@ -3368,6 +3398,66 @@ export class SfuExtended {
                 spaceId: options.spaceId,
                 channelId: options.channelId,
                 value: options.value
+            }, resolve, reject);
+        });
+    }
+
+    public updateChannelRecordingMode(options: {
+        spaceId: string,
+        channelId: string,
+        recordingMode: RecordingMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelRecordingModeUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHANNEL_RECORDING_MODE, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                recordingMode: options.recordingMode
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceRecordingMode(options: {
+        spaceId: string,
+        recordingMode: RecordingMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceRecordingModeUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_RECORDING_MODE, {
+                spaceId: options.spaceId,
+                recordingMode: options.recordingMode
+            }, resolve, reject);
+        });
+    }
+
+    public updateChannelAutoRecordJoinMode(options: {
+        spaceId: string,
+        channelId: string,
+        autoRecordJoinMode: AutoRecordJoinMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelAutoRecordJoinModeUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHANNEL_AUTO_RECORD_JOIN_MODE, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                autoRecordJoinMode: options.autoRecordJoinMode
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceAutoRecordJoinMode(options: {
+        spaceId: string,
+        autoRecordJoinMode: AutoRecordJoinMode
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceAutoRecordJoinModeUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_AUTO_RECORD_JOIN_MODE, {
+                spaceId: options.spaceId,
+                autoRecordJoinMode: options.autoRecordJoinMode
             }, resolve, reject);
         });
     }

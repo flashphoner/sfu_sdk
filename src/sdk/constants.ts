@@ -248,6 +248,7 @@ export enum RoomEvent {
     ROOM_RECORD_STOPPED = "ROOM_RECORD_STOPPED",
     ROOM_RECORD_PAUSED = "ROOM_RECORD_PAUSED",
     ROOM_RECORD_FAILED = "ROOM_RECORD_FAILED",
+    ROOM_AUTO_RECORD_FAILED = "ROOM_AUTO_RECORD_FAILED",
 
     WEBRTC_METRICS_DESCRIPTION_UPDATE = "WEBRTC_METRICS_DESCRIPTION_UPDATE",
     WEBRTC_METRICS_TOKEN_REFRESH = "WEBRTC_METRICS_TOKEN_REFRESH",
@@ -326,6 +327,14 @@ export enum SpaceEvent {
     SPACE_UNMUTED = "SPACE_UNMUTED",
     /** Used to receive {@link ChannelNotificationSettingsUpdated} */
     CHANNEL_NOTIFICATION_SETTINGS_UPDATED = "CHANNEL_NOTIFICATION_SETTINGS_UPDATED",
+    /** Used to receive {@link ChannelRecordingModeUpdated} */
+    CHANNEL_RECORDING_MODE_UPDATED = "CHANNEL_RECORDING_MODE_UPDATED",
+    /** Used to receive {@link SpaceRecordingModeUpdated} */
+    SPACE_RECORDING_MODE_UPDATED = "SPACE_RECORDING_MODE_UPDATED",
+    /** Used to receive {@link ChannelAutoRecordJoinModeUpdated} */
+    CHANNEL_AUTO_RECORD_JOIN_MODE_UPDATED = "CHANNEL_AUTO_RECORD_JOIN_MODE_UPDATED",
+    /** Used to receive {@link SpaceAutoRecordJoinModeUpdated} */
+    SPACE_AUTO_RECORD_JOIN_MODE_UPDATED = "SPACE_AUTO_RECORD_JOIN_MODE_UPDATED",
     /** Used to receive {@link ChannelMuted} */
     CHANNEL_MUTED = "CHANNEL_MUTED",
     /** Used to receive {@link ChannelUnmuted} */
@@ -342,6 +351,8 @@ export enum SpaceEvent {
     OWNER_SPACES_USERS = "OWNER_SPACES_USERS",
     /** Used to receive {@link SpacesBrandingLogoUpdated} */
     SPACES_BRANDING_LOGO_UPDATED = "SPACES_BRANDING_LOGO_UPDATED",
+    /** Used to receive {@link OwnerFeaturesUpdated} */
+    OWNER_FEATURES_UPDATED = "OWNER_FEATURES_UPDATED",
 }
 
 /**
@@ -634,6 +645,10 @@ export enum InternalApi {
     MOVE_SPACE_CHANNEL = "moveSpaceChannel",
     DELETE_SPACE_CHANNEL = "deleteSpaceChannel",
     UPDATE_CHANNEL_NOTIFICATION_SETTINGS = "updateChannelNotificationSettings",
+    UPDATE_CHANNEL_RECORDING_MODE = "updateChannelRecordingMode",
+    UPDATE_SPACE_RECORDING_MODE = "updateSpaceRecordingMode",
+    UPDATE_CHANNEL_AUTO_RECORD_JOIN_MODE = "updateChannelAutoRecordJoinMode",
+    UPDATE_SPACE_AUTO_RECORD_JOIN_MODE = "updateSpaceAutoRecordJoinMode",
     MUTE_CHANNEL = "muteChannel",
     UNMUTE_CHANNEL = "unmuteChannel",
     CREATE_SPACE_THREAD = "createSpaceThread",
@@ -902,13 +917,20 @@ export type PlacedInLobbyEvent = InternalMessage & {
     name: UserNickname
 }
 
+export type RecordState = {
+    enabled: boolean,
+    startedBy: string | null,
+    autoRecordFailed?: boolean
+}
+
 export type JoinedRoom = InternalMessage & {
     userId: UserId,
     name: UserNickname,
     chatId: string,
     owner: boolean,
     icon: string,
-    mediaSessionId: string
+    mediaSessionId: string,
+    recordState?: RecordState | null
 }
 
 export type LeftRoom = InternalMessage & {
@@ -1022,6 +1044,10 @@ export type ParticipantIconUpdated = InternalMessage & {
 
 export type RecordStarted = InternalMessage & {
     startedBy: string;
+}
+
+export type AutoRecordFailed = InternalMessage & {
+    roomId: string;
 }
 
 export enum ConferenceType {
@@ -1399,6 +1425,18 @@ export enum NotificationMode {
     ALL_MESSAGES = "ALL_MESSAGES",
     MENTIONS_ONLY = "MENTIONS_ONLY",
     NOTHING = "NOTHING"
+}
+
+export enum RecordingMode {
+    DEFAULT = "DEFAULT",
+    DO_NOT_RECORD = "DO_NOT_RECORD",
+    RECORD = "RECORD"
+}
+
+export enum AutoRecordJoinMode {
+    DEFAULT = "DEFAULT",
+    WAIT_FOR_RECORD_START = "WAIT_FOR_RECORD_START",
+    JOIN_IMMEDIATELY = "JOIN_IMMEDIATELY"
 }
 
 export type MuteSettings = {
@@ -1809,6 +1847,8 @@ export type SfuSpaceChannel = {
     accessRights: SfuSpaceChannelAccessRights;
     createdAt: number;
     notificationSettings: NotificationMode;
+    recordingMode: RecordingMode;
+    autoRecordJoinMode: AutoRecordJoinMode;
     muteSettings: MuteSettings;
     members: Array<string>;
     threads: Array<SfuSpaceThread>;
@@ -1847,6 +1887,8 @@ export type SfuSpace = {
     icon: string;
     createdAt: number;
     notificationSettings: NotificationMode;
+    recordingMode: RecordingMode;
+    autoRecordJoinMode: AutoRecordJoinMode;
     muteSettings: MuteSettings;
     roles: Array<SfuSpaceRole>;
     members: Array<SfuSpaceMember>;
@@ -1857,6 +1899,7 @@ export type SfuSpace = {
     permissions: Array<SfuSpaceRolePermission>;
     locked: boolean;
     brandingLogo: string;
+    recordMeetingsAvailable: boolean;
 }
 
 export type SpaceCreatedEvent = InternalMessage & {
@@ -1899,6 +1942,28 @@ export type ChannelNotificationSettingsUpdated = InternalMessage & {
     spaceId: string;
     channelId: string;
     value: NotificationMode;
+}
+
+export type ChannelRecordingModeUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    recordingMode: RecordingMode;
+}
+
+export type SpaceRecordingModeUpdated = InternalMessage & {
+    spaceId: string;
+    recordingMode: RecordingMode;
+}
+
+export type ChannelAutoRecordJoinModeUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    autoRecordJoinMode: AutoRecordJoinMode;
+}
+
+export type SpaceAutoRecordJoinModeUpdated = InternalMessage & {
+    spaceId: string;
+    autoRecordJoinMode: AutoRecordJoinMode;
 }
 
 export type ChannelMuted = InternalMessage & {
@@ -2250,6 +2315,11 @@ export type ChatIconUpdated = InternalMessage & {
 export type SpacesBrandingLogoUpdated = InternalMessage & {
     logo: string;
     spaces: Array<string>;
+}
+
+export type OwnerFeaturesUpdated = InternalMessage & {
+    ownerId: string;
+    recordMeetingsAvailable: boolean;
 }
 
 export type CustomDomainAdded = InternalMessage & {
