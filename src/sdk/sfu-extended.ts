@@ -150,6 +150,10 @@ import {
     SpaceRecordingModeUpdated,
     ChannelAutoRecordJoinModeUpdated,
     SpaceAutoRecordJoinModeUpdated,
+    ChannelAssignedNodeUpdated,
+    SpaceAssignedNodeUpdated,
+    MediaNodesListUpdated,
+    MeetingNodeMode,
     ThreadNotificationSettingsUpdated,
     NotificationMode,
     RecordingMode,
@@ -875,6 +879,19 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SpaceEvent.SPACE_AUTO_RECORD_JOIN_MODE_UPDATED, event);
                             }
+                        } else if (data[0].type === SpaceEvent.CHANNEL_ASSIGNED_NODE_UPDATED) {
+                            const event = data[0] as ChannelAssignedNodeUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.CHANNEL_ASSIGNED_NODE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_ASSIGNED_NODE_UPDATED) {
+                            const event = data[0] as SpaceAssignedNodeUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_ASSIGNED_NODE_UPDATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.MEDIA_NODES_LIST_UPDATED) {
+                            const event = data[0] as MediaNodesListUpdated;
+                            this.#notifier.notify(SpaceEvent.MEDIA_NODES_LIST_UPDATED, event);
                         } else if (data[0].type === SpaceEvent.THREAD_NOTIFICATION_SETTINGS_UPDATED) {
                             const event = data[0] as ThreadNotificationSettingsUpdated;
                             if (!promises.resolve(data[0].internalMessageId, event)) {
@@ -3458,6 +3475,40 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.UPDATE_SPACE_AUTO_RECORD_JOIN_MODE, {
                 spaceId: options.spaceId,
                 autoRecordJoinMode: options.autoRecordJoinMode
+            }, resolve, reject);
+        });
+    }
+
+    public updateSpaceAssignedNode(options: {
+        spaceId: string,
+        meetingNodeMode: MeetingNodeMode,
+        meetingNodeName?: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<SpaceAssignedNodeUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_SPACE_ASSIGNED_NODE, {
+                spaceId: options.spaceId,
+                meetingNodeMode: options.meetingNodeMode,
+                meetingNodeName: options.meetingNodeName
+            }, resolve, reject);
+        });
+    }
+
+    public updateChannelAssignedNode(options: {
+        spaceId: string,
+        channelId: string,
+        meetingNodeMode: MeetingNodeMode,
+        meetingNodeName?: string
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelAssignedNodeUpdated>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.UPDATE_CHANNEL_ASSIGNED_NODE, {
+                spaceId: options.spaceId,
+                channelId: options.channelId,
+                meetingNodeMode: options.meetingNodeMode,
+                meetingNodeName: options.meetingNodeName
             }, resolve, reject);
         });
     }

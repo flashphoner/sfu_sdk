@@ -335,6 +335,12 @@ export enum SpaceEvent {
     CHANNEL_AUTO_RECORD_JOIN_MODE_UPDATED = "CHANNEL_AUTO_RECORD_JOIN_MODE_UPDATED",
     /** Used to receive {@link SpaceAutoRecordJoinModeUpdated} */
     SPACE_AUTO_RECORD_JOIN_MODE_UPDATED = "SPACE_AUTO_RECORD_JOIN_MODE_UPDATED",
+    /** Used to receive {@link ChannelAssignedNodeUpdated} */
+    CHANNEL_ASSIGNED_NODE_UPDATED = "CHANNEL_ASSIGNED_NODE_UPDATED",
+    /** Used to receive {@link SpaceAssignedNodeUpdated} */
+    SPACE_ASSIGNED_NODE_UPDATED = "SPACE_ASSIGNED_NODE_UPDATED",
+    /** Used to receive {@link MediaNodesListUpdated} */
+    MEDIA_NODES_LIST_UPDATED = "MEDIA_NODES_LIST_UPDATED",
     /** Used to receive {@link ChannelMuted} */
     CHANNEL_MUTED = "CHANNEL_MUTED",
     /** Used to receive {@link ChannelUnmuted} */
@@ -649,6 +655,8 @@ export enum InternalApi {
     UPDATE_SPACE_RECORDING_MODE = "updateSpaceRecordingMode",
     UPDATE_CHANNEL_AUTO_RECORD_JOIN_MODE = "updateChannelAutoRecordJoinMode",
     UPDATE_SPACE_AUTO_RECORD_JOIN_MODE = "updateSpaceAutoRecordJoinMode",
+    UPDATE_SPACE_ASSIGNED_NODE = "updateSpaceAssignedNode",
+    UPDATE_CHANNEL_ASSIGNED_NODE = "updateChannelAssignedNode",
     MUTE_CHANNEL = "muteChannel",
     UNMUTE_CHANNEL = "unmuteChannel",
     CREATE_SPACE_THREAD = "createSpaceThread",
@@ -1427,6 +1435,12 @@ export enum NotificationMode {
     NOTHING = "NOTHING"
 }
 
+export type MuteSettings = {
+    muteTime: number;
+    mutedUntil?: number;
+    mutedIndefinitely?: boolean;
+}
+
 export enum RecordingMode {
     DEFAULT = "DEFAULT",
     DO_NOT_RECORD = "DO_NOT_RECORD",
@@ -1439,10 +1453,15 @@ export enum AutoRecordJoinMode {
     JOIN_IMMEDIATELY = "JOIN_IMMEDIATELY"
 }
 
-export type MuteSettings = {
-    muteTime: number;
-    mutedUntil?: number;
-    mutedIndefinitely?: boolean;
+export enum MeetingNodeMode {
+    DEFAULT = "DEFAULT",
+    AUTO = "AUTO",
+    SPECIFIC = "SPECIFIC"
+}
+
+export type MediaNodeInfo = {
+    id: string;
+    name?: string;
 }
 
 export type UserSpecificChatInfo = {
@@ -1849,6 +1868,8 @@ export type SfuSpaceChannel = {
     notificationSettings: NotificationMode;
     recordingMode: RecordingMode;
     autoRecordJoinMode: AutoRecordJoinMode;
+    meetingNodeMode: MeetingNodeMode;
+    meetingNodeName?: string;
     muteSettings: MuteSettings;
     members: Array<string>;
     threads: Array<SfuSpaceThread>;
@@ -1889,6 +1910,8 @@ export type SfuSpace = {
     notificationSettings: NotificationMode;
     recordingMode: RecordingMode;
     autoRecordJoinMode: AutoRecordJoinMode;
+    meetingNodeMode: MeetingNodeMode;
+    meetingNodeName?: string;
     muteSettings: MuteSettings;
     roles: Array<SfuSpaceRole>;
     members: Array<SfuSpaceMember>;
@@ -1964,6 +1987,23 @@ export type ChannelAutoRecordJoinModeUpdated = InternalMessage & {
 export type SpaceAutoRecordJoinModeUpdated = InternalMessage & {
     spaceId: string;
     autoRecordJoinMode: AutoRecordJoinMode;
+}
+
+export type ChannelAssignedNodeUpdated = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    meetingNodeMode: MeetingNodeMode;
+    meetingNodeName?: string;
+}
+
+export type SpaceAssignedNodeUpdated = InternalMessage & {
+    spaceId: string;
+    meetingNodeMode: MeetingNodeMode;
+    meetingNodeName?: string;
+}
+
+export type MediaNodesListUpdated = InternalMessage & {
+    nodes: Array<MediaNodeInfo>;
 }
 
 export type ChannelMuted = InternalMessage & {
@@ -2297,6 +2337,7 @@ export type SystemConfig = {
     recorder: RecorderConfig;
     billing: BillingConfig;
     domains: Array<CustomDomain>;
+    availableMediaNodes: Array<MediaNodeInfo>;
 }
 
 export type SystemConfigEvent = InternalMessage & {
