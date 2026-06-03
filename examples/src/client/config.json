@@ -3,7 +3,9 @@
     "url": "ws://127.0.0.1:8080",
     "name": "ROOM1",
     "pin": "1234",
-    "nickName": "Bob"
+    "nickName": "Bob",
+    "turnServer": "",
+    "forceRelay": false
   },
   "media": {
     "audio": {

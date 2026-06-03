@@ -5,7 +5,9 @@ import {
     SfuEvent,
     State,
     StatsType,
-    TransportType
+    TransportType,
+    DEFAULT_CONNECTION_QUALITY_POLICY,
+    evaluateConnectionQuality
 } from "@flashphoner/sfusdk";
 
 export async function createRoom(options: {
@@ -41,6 +43,11 @@ export const constants = {
     SFU_STATE: State,
     SFU_RTC_STATS_TYPE: StatsType,
     SFU_TRANSPORT_TYPE: TransportType
+}
+
+export const connectionQuality = {
+    DEFAULT_CONNECTION_QUALITY_POLICY,
+    evaluateConnectionQuality
 }
 
 export function createFilter() : KalmanFilter {

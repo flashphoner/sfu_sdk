@@ -26,6 +26,8 @@ import {
     RoomState,
     RTCMetricsDescriptionUpdate,
     RTCMetricsTokenRefresh,
+    ServerTrafficData,
+    ServerTrafficUpdate,
     SfuEvent,
     StatsType,
     TracksQualityState,
@@ -37,6 +39,8 @@ import {
 } from "./constants";
 import {Connection} from "./connection";
 import {WebRTCStats} from "./webrtc-stats";
+import {LocalTrafficMonitor, WebRTCConnectionTraffic} from "./local-traffic";
+import {ServerTrafficMonitor} from "./server-traffic";
 import Logger, {Verbosity} from "./logger";
 import {Queue} from 'queue-typescript';
 import {BitrateComponentEventBus, BitrateTest, BitrateTestController, BitrateTestListener} from "./BitrateTest";
@@ -51,10 +55,24 @@ import {
     RTCMetricsServerDescription
 } from '@flashphoner/web-sdk-metrics';
 
+type GatheredIceCandidate = {
+    line: string,
+    sdpMid?: string | null,
+    sdpMLineIndex?: number | null
+};
+
 
 export class Room {
     static readonly #CONTROL_CHANNEL = "control";
     static readonly #BITRATE_CHANNEL = "bitrate";
+    static readonly #TRAFFIC_POLL_INTERVAL = 1000;
+    static readonly #ICE_GATHERING_TIMEOUT = 15000;
+
+    #trafficPollTimer: ReturnType<typeof setInterval> | undefined;
+    #trafficPollInFlight: boolean = false;
+    #trafficListeners: Array<(traffic: WebRTCConnectionTraffic) => void> = [];
+    #localTrafficMonitor: LocalTrafficMonitor;
+    #serverTrafficMonitor: ServerTrafficMonitor;
 
     _webRTCMetricsServerDescription: RTCMetricsServerDescription;
     _mediaSessionId: string;
@@ -97,6 +115,7 @@ export class Room {
         this._userId = userId;
         this.#_creationTime = creationTime;
         this.logger = new Logger();
+        this.#serverTrafficMonitor = new ServerTrafficMonitor(this.logger);
         this._uid = uuidv4();
         // defines usage of the pc as a critical section, must be replaced
         this._crutch = {
@@ -139,6 +158,223 @@ export class Room {
         }
     };
 
+    async #setLocalDescription(description: RTCSessionDescriptionInit): Promise<string> {
+        const requiresRelayCandidate = this.#requiresRelayCandidate();
+        if (!requiresRelayCandidate) {
+            await this.#_pc.setLocalDescription(description);
+            return this.#_pc.localDescription?.sdp || description.sdp || "";
+        }
+
+        const gatheredCandidates = await this.#setLocalDescriptionAndGatherIce(description);
+        let localSdp = this.#_pc.localDescription?.sdp || description.sdp || "";
+        localSdp = Room.#withGatheredCandidates(localSdp, gatheredCandidates);
+        localSdp = Room.#withOnlyRelayCandidates(localSdp);
+        if (!Room.#hasRelayCandidate(localSdp)) {
+            throw new Error("Force relay is enabled, but no relay ICE candidate was gathered from TURN. Check TURN credentials, reachability and transport.");
+        }
+        return localSdp;
+    }
+
+    #setLocalDescriptionAndGatherIce(description: RTCSessionDescriptionInit): Promise<GatheredIceCandidate[]> {
+        const requiresRelayCandidate = this.#requiresRelayCandidate();
+        return new Promise<GatheredIceCandidate[]>((resolve, reject) => {
+            const gatheredCandidates: GatheredIceCandidate[] = [];
+            const candidateErrors: string[] = [];
+            let done = false;
+            let descriptionSet = false;
+
+            const hasRelayCandidate = () => {
+                return Room.#hasRelayCandidate(this.#_pc.localDescription?.sdp) ||
+                    gatheredCandidates.some((candidate) => Room.#isRelayCandidateLine(candidate.line));
+            };
+
+            const candidateErrorSuffix = () => {
+                if (candidateErrors.length === 0) {
+                    return "";
+                }
+                return " Browser ICE errors: " + candidateErrors.join("; ");
+            };
+
+            const finish = (error?: unknown) => {
+                if (done) {
+                    return;
+                }
+                done = true;
+                window.clearTimeout(timeout);
+                this.#_pc.removeEventListener("icegatheringstatechange", onStateChange);
+                this.#_pc.removeEventListener("icecandidate", onCandidate);
+                this.#_pc.removeEventListener("icecandidateerror", onCandidateError);
+                if (error) {
+                    reject(error instanceof Error ? error : new Error(String(error)));
+                    return;
+                }
+                resolve(gatheredCandidates);
+            };
+
+            const onStateChange = () => {
+                if (!descriptionSet) {
+                    return;
+                }
+                if (this.#_pc.iceGatheringState === "complete") {
+                    if (requiresRelayCandidate && !hasRelayCandidate()) {
+                        finish(new Error("Force relay is enabled, but no relay ICE candidate was gathered from TURN." +
+                            candidateErrorSuffix() +
+                            " Check TURN username/password, transport, reachability, and VPN/TUN direct routing."));
+                        return;
+                    }
+                    finish();
+                }
+            };
+
+            const onCandidate = (event: RTCPeerConnectionIceEvent) => {
+                const candidate = event.candidate;
+                if (candidate && candidate.candidate) {
+                    gatheredCandidates.push({
+                        line: candidate.candidate,
+                        sdpMid: candidate.sdpMid,
+                        sdpMLineIndex: candidate.sdpMLineIndex
+                    });
+                    if (requiresRelayCandidate && Room.#isRelayCandidateLine(candidate.candidate)) {
+                        finish();
+                    }
+                    return;
+                }
+
+                if (!requiresRelayCandidate || hasRelayCandidate()) {
+                    finish();
+                }
+            };
+
+            const onCandidateError = (event: RTCPeerConnectionIceErrorEvent) => {
+                candidateErrors.push(Room.#formatIceCandidateError(event));
+            };
+
+            const timeout = window.setTimeout(() => {
+                if (requiresRelayCandidate) {
+                    finish(new Error("Timed out waiting for a relay ICE candidate from TURN." +
+                        candidateErrorSuffix() +
+                        " Check TURN username/password, transport, reachability, and VPN/TUN direct routing."));
+                    return;
+                }
+                finish();
+            }, Room.#ICE_GATHERING_TIMEOUT);
+            this.#_pc.addEventListener("icegatheringstatechange", onStateChange);
+            this.#_pc.addEventListener("icecandidate", onCandidate);
+            this.#_pc.addEventListener("icecandidateerror", onCandidateError);
+
+            this.#_pc.setLocalDescription(description)
+                .then(() => {
+                    descriptionSet = true;
+                    if (this.#_pc.iceGatheringState === "complete" || (requiresRelayCandidate && hasRelayCandidate())) {
+                        onStateChange();
+                    }
+                })
+                .catch(finish);
+        });
+    }
+
+    #requiresRelayCandidate(): boolean {
+        return this.#_pc.getConfiguration().iceTransportPolicy === "relay";
+    }
+
+    static #hasRelayCandidate(sdp?: string): boolean {
+        return /^a=candidate:.* typ relay(?:\s|$)/m.test(sdp || "");
+    }
+
+    static #isRelayCandidateLine(candidateLine?: string): boolean {
+        return /^(?:a=)?candidate:.* typ relay(?:\s|$)/.test(candidateLine || "");
+    }
+
+    static #formatIceCandidateError(event: RTCPeerConnectionIceErrorEvent): string {
+        const parts = [];
+        if (event.url) {
+            parts.push("url=" + event.url);
+        }
+        if (event.errorCode) {
+            parts.push("code=" + event.errorCode);
+        }
+        if (event.errorText) {
+            parts.push("text=" + event.errorText);
+        }
+        if (event.address) {
+            parts.push("address=" + event.address);
+        }
+        if (event.port) {
+            parts.push("port=" + event.port);
+        }
+        return parts.join(" ");
+    }
+
+    static #withGatheredCandidates(sdp: string, candidates: GatheredIceCandidate[]): string {
+        if (!sdp || candidates.length === 0) {
+            return sdp;
+        }
+
+        const lineEnding = sdp.includes("\r\n") ? "\r\n" : "\n";
+        const lines = sdp.split(/\r\n|\n/);
+        const existingCandidates = new Set(lines
+            .filter((line) => line.startsWith("a=candidate:"))
+            .map((line) => line.substring(2)));
+
+        for (const candidate of candidates) {
+            const candidateLine = candidate.line.startsWith("a=") ? candidate.line.substring(2) : candidate.line;
+            if (!candidateLine.startsWith("candidate:") || existingCandidates.has(candidateLine)) {
+                continue;
+            }
+
+            const insertIndex = Room.#findCandidateInsertIndex(lines, candidate);
+            lines.splice(insertIndex, 0, "a=" + candidateLine);
+            existingCandidates.add(candidateLine);
+        }
+
+        return lines.join(lineEnding);
+    }
+
+    static #withOnlyRelayCandidates(sdp: string): string {
+        if (!sdp) {
+            return sdp;
+        }
+
+        const lineEnding = sdp.includes("\r\n") ? "\r\n" : "\n";
+        return sdp
+            .split(/\r\n|\n/)
+            .filter((line) => !line.startsWith("a=candidate:") || Room.#isRelayCandidateLine(line))
+            .join(lineEnding);
+    }
+
+    static #findCandidateInsertIndex(lines: string[], candidate: GatheredIceCandidate): number {
+        let sectionStart = -1;
+        if (candidate.sdpMid !== undefined && candidate.sdpMid !== null) {
+            const midLine = "a=mid:" + candidate.sdpMid;
+            sectionStart = lines.findIndex((line) => line === midLine);
+        }
+
+        if (sectionStart === -1 && candidate.sdpMLineIndex !== undefined && candidate.sdpMLineIndex !== null) {
+            const mediaLineIndexes = lines
+                .map((line, index) => line.startsWith("m=") ? index : -1)
+                .filter((index) => index !== -1);
+            sectionStart = mediaLineIndexes[candidate.sdpMLineIndex] ?? -1;
+        }
+
+        if (sectionStart === -1) {
+            sectionStart = lines.findIndex((line) => line.startsWith("m="));
+        }
+
+        if (sectionStart === -1) {
+            return lines.length > 0 && lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+        }
+
+        let sectionEnd = lines.findIndex((line, index) => index > sectionStart && line.startsWith("m="));
+        if (sectionEnd === -1) {
+            sectionEnd = lines.length > 0 && lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+        }
+
+        const endOfCandidatesIndex = lines.findIndex((line, index) => {
+            return index > sectionStart && index < sectionEnd && line === "a=end-of-candidates";
+        });
+        return endOfCandidatesIndex === -1 ? sectionEnd : endOfCandidatesIndex;
+    }
+
     //TODO refactor types
     public async processEvent(e: InternalMessage): Promise<void> {
         this.logger.info("<==", e);
@@ -171,13 +407,13 @@ export class Room {
                                 const answer = await self.#_pc.createAnswer();
                                 answer.sdp = answer.sdp.replace(/a=sendrecv/g, "a=sendonly");
                                 if (self.#_pc.connectionState !== "closed") {
-                                    await self.#_pc.setLocalDescription(answer);
+                                    const localSdp = await self.#setLocalDescription(answer);
                                     const tid = self._crutch.tid;
                                     self.logger.debug("Sent answer, remote tid " + remoteSdp.info.tid + ", local tid " + tid);
                                     self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
                                         id: self._id,
                                         pin: self._pin,
-                                        sdp: self.#_pc.localDescription.sdp,
+                                        sdp: localSdp,
                                         tid: tid,
                                         sdpType: RemoteSdpType.ANSWER
                                     });
@@ -187,13 +423,13 @@ export class Room {
                                     const offer = await self.#_pc.createOffer();
                                     offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
                                     if (self.#_pc.connectionState !== "closed") {
-                                        await self.#_pc.setLocalDescription(offer);
+                                        const localSdp = await self.#setLocalDescription(offer);
                                         const tid = self._crutch.tid;
                                         self.logger.debug("Sent reoffer,  remote tid " + remoteSdp.info.tid + ", local tid " + tid);
                                         self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
                                             id: self._id,
                                             pin: self._pin,
-                                            sdp: offer.sdp,
+                                            sdp: localSdp,
                                             internalMessageId: "",
                                             sdpType: RemoteSdpType.OFFER,
                                             tid: tid
@@ -245,11 +481,13 @@ export class Room {
             if (promises.promised(operationFailed.internalMessageId)) {
                 if (operationFailed.operation === Operations.ROOM_JOIN) {
                     this.#_state = RoomState.DISPOSED;
+                    this.#stopTrafficPolling();
                     this.#wrappedDataChannel.close();
                 }
                 promises.reject(operationFailed.internalMessageId, operationFailed);
             }
             if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.ROOM_DESTROYED) {
+                this.#stopTrafficPolling();
                 this.notifier.notify(RoomEvent.ENDED);
             } else if (operationFailed.operation === Operations.ROOM_JOIN && operationFailed.error === RoomError.AUTHORIZATION_FAILED) {
                 const evictedEvent: EvictedFromRoom = {
@@ -295,11 +533,15 @@ export class Room {
                     this.#_statCollector.start();
                 }
                 promises.resolve(joinedRoom.internalMessageId, joinedRoom);
+                this.#startTrafficPolling();
             } else {
                 this.notifier.notify(RoomEvent.JOINED, joinedRoom);
             }
         } else if (e.type === RoomEvent.LEFT) {
             const leftRoom = e as LeftRoom;
+            if (leftRoom.userId === this._userId) {
+                this.#stopTrafficPolling();
+            }
             promises.resolve(leftRoom.internalMessageId, leftRoom);
             this.notifier.notify(RoomEvent.LEFT, leftRoom);
         } else if (e.type === RoomEvent.FORCEFULLY_LEFT) {
@@ -359,6 +601,8 @@ export class Room {
                     Authorization: tokenRefresh.authorization,
                 }
             }
+        } else if (e.type === RoomEvent.TRAFFIC_UPDATE || (e as any).message === "TRAFFIC_UPDATE") {
+            this.#handleServerTrafficUpdate(e as ServerTrafficUpdate);
         } else {
             //check this is a room event
             if (Object.values(RoomEvent).includes(e.type as RoomEvent)) {
@@ -427,6 +671,8 @@ export class Room {
                         self.notifier.notify(message.type, msg);
                     }
                 }
+            } else if (message.type === RoomEvent.TRAFFIC_UPDATE || (message as any).message === "TRAFFIC_UPDATE") {
+                self.#handleServerTrafficUpdate(message as ServerTrafficUpdate);
             } else if (promises.promised(message.internalMessageId)) {
                 if (message.type === SfuEvent.ACK) {
                     promises.resolve(message.internalMessageId);
@@ -441,6 +687,7 @@ export class Room {
             }
         }
         this.stats = new WebRTCStats(this.#_pc);
+        this.#localTrafficMonitor = new LocalTrafficMonitor(this.#_pc);
         return new Promise<JoinedRoom>(async (resolve, reject) => {
             if (self.#_state === RoomState.NEW) {
                 try {
@@ -449,14 +696,14 @@ export class Room {
                         offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
                     }
                     offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                    await self.#_pc.setLocalDescription(offer);
+                    const localSdp = await self.#setLocalDescription(offer);
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
                     self._crutch.tid = uuidv4();
                     self.connection.send(InternalApi.JOIN_ROOM, {
                         id: self._id,
                         pin: self._pin,
-                        sdp: offer.sdp,
+                        sdp: localSdp,
                         nickname: nickname,
                         internalMessageId: id,
                         sdpType: RemoteSdpType.OFFER,
@@ -492,7 +739,7 @@ export class Room {
                         offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
                     }
                     offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                    await self.#_pc.setLocalDescription(offer);
+                    const localSdp = await self.#setLocalDescription(offer);
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
                     const localTid = uuidv4();
@@ -502,7 +749,7 @@ export class Room {
                     self.connection.send(InternalApi.UPDATE_ROOM_STATE, {
                         id: self._id,
                         pin: self._pin,
-                        sdp: offer.sdp,
+                        sdp: localSdp,
                         internalMessageId: id,
                         sdpType: RemoteSdpType.OFFER,
                         tid: localTid
@@ -526,6 +773,7 @@ export class Room {
         const self = this;
         return new Promise<void>((resolve, reject) => {
             self.#_state = RoomState.DISPOSED;
+            self.#stopTrafficPolling();
             if (self.#wrappedDataChannel) {
                 self.#wrappedDataChannel.close();
             }
@@ -625,6 +873,7 @@ export class Room {
         const self = this;
         return new Promise<LeftRoom>((resolve, reject) => {
             self.#_state = RoomState.DISPOSED;
+            self.#stopTrafficPolling();
             if (self.#wrappedDataChannel) {
                 self.#wrappedDataChannel.close();
             }
@@ -817,6 +1066,72 @@ export class Room {
 
     public getStats(track: MediaStreamTrack, type: StatsType, callback: Function): void {
         this.stats.getStats(track, type, callback);
+    }
+
+    public async getTraffic(): Promise<WebRTCConnectionTraffic> {
+        if (!this.#localTrafficMonitor) {
+            return LocalTrafficMonitor.emptyTraffic();
+        }
+        return this.#localTrafficMonitor.getTraffic();
+    }
+
+    public addTrafficListener(listener: (traffic: WebRTCConnectionTraffic) => void): void {
+        this.#trafficListeners.push(listener);
+    }
+
+    public removeTrafficListener(listener: (traffic: WebRTCConnectionTraffic) => void): void {
+        const index = this.#trafficListeners.indexOf(listener);
+        if (index > -1) {
+            this.#trafficListeners.splice(index, 1);
+        }
+    }
+
+    public addServerTrafficListener(listener: (traffic: ServerTrafficData) => void): void {
+        this.#serverTrafficMonitor.addListener(listener);
+    }
+
+    public removeServerTrafficListener(listener: (traffic: ServerTrafficData) => void): void {
+        this.#serverTrafficMonitor.removeListener(listener);
+    }
+
+    #handleServerTrafficUpdate(e: ServerTrafficUpdate): void {
+        this.#serverTrafficMonitor.handleUpdate(e);
+    }
+
+    #notifyTrafficListeners(traffic: WebRTCConnectionTraffic): void {
+        this.#trafficListeners.forEach(listener => {
+            try {
+                listener(traffic);
+            } catch (error) {
+                this.logger.error("Traffic listener failed", error);
+            }
+        });
+    }
+
+    #startTrafficPolling(): void {
+        this.#stopTrafficPolling();
+        this.#trafficPollTimer = setInterval(async () => {
+            if (this.#trafficPollInFlight) {
+                return;
+            }
+            this.#trafficPollInFlight = true;
+            try {
+                if (this.#_state !== RoomState.JOINED || !this.#_pc || this.#_pc.connectionState === "closed" || !this.#localTrafficMonitor) {
+                    return;
+                }
+                const traffic = await this.getTraffic();
+                this.#notifyTrafficListeners(traffic);
+            } finally {
+                this.#trafficPollInFlight = false;
+            }
+        }, Room.#TRAFFIC_POLL_INTERVAL);
+    }
+
+    #stopTrafficPolling(): void {
+        if (this.#trafficPollTimer !== undefined) {
+            clearInterval(this.#trafficPollTimer);
+            this.#trafficPollTimer = undefined;
+        }
     }
 
     public async getRemoteTrack(kind: TrackType): Promise<RemoteTrack | undefined> {

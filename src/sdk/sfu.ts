@@ -63,6 +63,13 @@ export class Sfu {
                                 this.#_room.processEvent(data[0]);
                             }
                             break;
+                        case InternalApi.TRAFFIC_UPDATE:
+                            if(this.#_room){
+                                data[0].type = RoomEvent.TRAFFIC_UPDATE;
+                                data[0].roomId = this.#_room.id();
+                                this.#_room.processEvent(data[0]);
+                            }
+                            break;
                         case InternalApi.DEFAULT_METHOD:
                             if (data[0].roomId && data[0].roomId.length > 0) {
                                 //room event

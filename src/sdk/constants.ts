@@ -253,7 +253,9 @@ export enum RoomEvent {
     WEBRTC_METRICS_DESCRIPTION_UPDATE = "WEBRTC_METRICS_DESCRIPTION_UPDATE",
     WEBRTC_METRICS_TOKEN_REFRESH = "WEBRTC_METRICS_TOKEN_REFRESH",
     /** Used to receive {@link ParticipantIconUpdated} */
-    PARTICIPANT_ICON_UPDATED = "PARTICIPANT_ICON_UPDATED"
+    PARTICIPANT_ICON_UPDATED = "PARTICIPANT_ICON_UPDATED",
+    /** Used to receive {@link ServerTrafficUpdate} */
+    TRAFFIC_UPDATE = "TRAFFIC_UPDATE"
 }
 
 /**
@@ -703,7 +705,8 @@ export enum InternalApi {
     REVOKE_USER_SPACES_LICENSE = "revokeUserSpacesLicense",
     GET_OWNER_SPACES_USERS = "getOwnerSpacesUsers",
     UPDATE_BRANDING_LOGO = "updateBrandingLogo",
-    UPDATE_CUSTOM_DOMAIN = "updateCustomDomain"
+    UPDATE_CUSTOM_DOMAIN = "updateCustomDomain",
+    TRAFFIC_UPDATE = "TRAFFIC_UPDATE"
 }
 
 export enum ConnectionError {
@@ -2397,6 +2400,47 @@ export type OperationFailedEvent = InternalMessage & {
 export type ConnectionFailedEvent = InternalMessage & {
     reason: string,
     code?: number
+}
+
+export type ServerTrafficParticipant = {
+    id: string;
+    type: 'local' | 'remote' | 'turn' | 'stun' | string;
+    name: string;
+    ip: string;
+    port: number;
+    protocol: string;
+    active: boolean;
+    inboundBitrate?: number;
+    outboundBitrate?: number;
+    lastActivity: number;
+}
+
+export type ServerTrafficLink = {
+    id: string;
+    from: string;
+    to: string;
+    type: 'direct' | 'relay' | string;
+    active: boolean;
+    inboundBitrate?: number;
+    outboundBitrate?: number;
+    status: 'red' | 'yellow' | 'green' | string;
+}
+
+export type ServerTrafficBadges = {
+    participants: ServerTrafficParticipant[];
+    links: ServerTrafficLink[];
+}
+
+export type ServerTrafficData = {
+    inboundBitrate: number;
+    outboundBitrate: number;
+    ping: number;
+    badges: ServerTrafficBadges;
+}
+
+export type ServerTrafficUpdate = Partial<Omit<InternalMessage, 'type'>> & {
+    type: "TRAFFIC_UPDATE";
+    data: ServerTrafficData[];
 }
 
 export enum ConnectionType {

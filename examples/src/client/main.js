@@ -1,14 +1,217 @@
 const constants = SFU.constants;
 const sfu = SFU;
+const quality = window.ConnectionQualityBadge;
+const CONNECTION_STATUS = quality.CONNECTION_STATUS;
 let localDisplay;
 let cControls;
+
+const updateRouteIndicator = function (badges) {
+    const routeMode = quality.resolveRouteMode(badges);
+    const routeElement = document.getElementById("stat-route");
+    if (routeElement) {
+        routeElement.innerText = routeMode;
+    }
+
+    updateStatusCircle("route-status", routeMode !== "Unknown");
+
+    const routeBadge = routeElement ? routeElement.parentElement : null;
+    if (routeBadge) {
+        routeBadge.classList.remove("bg-secondary", "bg-info", "bg-dark");
+        if (routeMode === "Relay") {
+            routeBadge.classList.add("bg-dark");
+        } else if (routeMode === "Direct") {
+            routeBadge.classList.add("bg-info");
+        } else {
+            routeBadge.classList.add("bg-secondary");
+        }
+    }
+};
+
+const renderConnectionBadges = function (model) {
+    const topologyDiagram = document.getElementById("topology-diagram");
+    if (!topologyDiagram) {
+        return;
+    }
+
+    if (!model || !model.participants || model.participants.length === 0) {
+        topologyDiagram.innerHTML = "<div class='text-muted'>No connection data</div>";
+        return;
+    }
+
+    topologyDiagram.innerHTML = "";
+
+    const chain = document.createElement("div");
+    chain.className = "badge-chain";
+
+    for (let i = 0; i < model.participants.length; i++) {
+        const participant = model.participants[i];
+        chain.appendChild(createNodeBadge(participant));
+
+        if (i < model.participants.length - 1) {
+            chain.appendChild(createLinkBadge(quality.findLinkBetweenParticipants(participant, model.participants[i + 1], model.links)));
+        }
+    }
+
+    topologyDiagram.appendChild(chain);
+};
+
+const getParticipantEyebrow = function (participantType) {
+    if (participantType === "turn") {
+        return "Relay";
+    }
+    if (participantType === "remote") {
+        return "Server";
+    }
+    return "Endpoint";
+};
+
+const createNodeBadge = function (participant) {
+    const node = document.createElement("div");
+    node.className = `badge-node badge-node-${participant.type}`;
+
+    const circle = document.createElement("span");
+    circle.className = `badge-status ${participant.status}`;
+    circle.title = participant.status === 'green' ? 'Connected' : (participant.status === 'yellow' ? 'Connecting' : (participant.status === 'orange' ? 'Degraded' : 'Disconnected'));
+
+    const labelRow = document.createElement("div");
+    labelRow.className = "badge-node-label-row";
+
+    const title = document.createElement("div");
+    title.className = "badge-node-main";
+
+    const eyebrow = document.createElement("span");
+    eyebrow.className = "badge-node-eyebrow";
+    eyebrow.textContent = getParticipantEyebrow(participant.type);
+
+    const label = document.createElement("span");
+    label.className = "badge-node-label";
+    label.textContent = participant.label;
+
+    const address = document.createElement("span");
+    address.className = "badge-node-address";
+    address.textContent = participant.address;
+
+    title.appendChild(eyebrow);
+    title.appendChild(label);
+    title.appendChild(address);
+
+    labelRow.appendChild(circle);
+    labelRow.appendChild(title);
+    node.appendChild(labelRow);
+
+    if (!participant.showTraffic) {
+        return node;
+    }
+
+    const speedContainer = document.createElement("div");
+    speedContainer.className = "badge-node-speeds";
+
+    const inboundValue = quality.formatSpeedValue(participant.inboundSpeed, participant.inboundPacketLossPercent);
+    const outboundValue = quality.formatSpeedValue(participant.outboundSpeed, participant.outboundPacketLossPercent);
+
+    const inbound = document.createElement("div");
+    inbound.className = "badge-node-speed inbound";
+    inbound.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 8L1 4h2V0h4v4h2L5 8z"/></svg><span>' + inboundValue + '</span>';
+
+    const outbound = document.createElement("div");
+    outbound.className = "badge-node-speed outbound";
+    outbound.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 2L9 6H7v4H3V6H1L5 2z"/></svg><span>' + outboundValue + '</span>';
+
+    speedContainer.appendChild(inbound);
+    speedContainer.appendChild(outbound);
+    node.appendChild(speedContainer);
+
+    return node;
+};
+
+const createLinkBadge = function (link) {
+    const linkNode = document.createElement("div");
+    linkNode.className = "badge-link";
+
+    const label = document.createElement("div");
+    label.className = "badge-link-label";
+    label.textContent = link.type === "relay" ? "Relay" : "Direct";
+
+    const line = document.createElement("div");
+    line.className = `badge-link-line ${link.status}`;
+
+    linkNode.appendChild(label);
+    linkNode.appendChild(line);
+    return linkNode;
+};
+
+const parseIceServerEntry = function (value) {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+        return null;
+    }
+
+    let urls = trimmedValue;
+    if (!/^(stun|turn|turns):/i.test(urls)) {
+        urls = "turn:" + urls;
+    }
+
+    const credentialMatch = urls.match(/^(stun|turn|turns):([^@]+)@(.+)$/i);
+    if (!credentialMatch) {
+        return {urls: urls};
+    }
+
+    const server = {
+        urls: credentialMatch[1] + ":" + credentialMatch[3]
+    };
+    const authParts = credentialMatch[2].split(":");
+    const username = authParts.shift() || "";
+    const credential = authParts.join(":");
+
+    if (username) {
+        server.username = username;
+    }
+    if (credential) {
+        server.credential = credential;
+        server.credentialType = "password";
+    }
+
+    return server;
+};
+
+const buildRtcConfiguration = function (roomConfig) {
+    const iceServers = (roomConfig.turnServer || "")
+        .split(/[\n,]+/)
+        .map(parseIceServerEntry)
+        .filter(Boolean);
+    const hasTurnServer = iceServers.some(function (server) {
+        const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+        return urls.some(function (url) {
+            return /^turns?:/i.test(url);
+        });
+    });
+
+    if (iceServers.length === 0 && !roomConfig.forceRelay) {
+        return undefined;
+    }
+    if (roomConfig.forceRelay && !hasTurnServer) {
+        throw new Error("Force relay requires a TURN server. Fill TURN Server, for example turn:user:password@turn.example.com:3478?transport=udp.");
+    }
+
+    const rtcConfiguration = {
+        iceServers: iceServers
+    };
+
+    if (roomConfig.forceRelay) {
+        rtcConfiguration.iceTransportPolicy = "relay";
+    }
+
+    return rtcConfiguration;
+};
 
 const defaultConfig = {
     room: {
         url: "wss://127.0.0.1:8888",
         name: "ROOM1",
         pin: "1234",
-        nickName: "Alice"
+        nickName: "Alice",
+        turnServer: "",
+        forceRelay: false
     },
     media: {
         audio: {
@@ -73,7 +276,6 @@ const scalabilityModes = [
  * Load track configuration and show entrance modal
  */
 const init = function () {
-    //read config
     $.getJSON("config.json", function (config) {
         cControls = createControls(config);
     }).fail(function () {
@@ -83,7 +285,7 @@ const init = function () {
 
     // insert transport values in entrance modal
     const transportSelect = document.getElementById('transport');
-    Object.values(constants.SFU_TRANSPORT_TYPE).forEach(value => {
+    Object.values(constants.SFU_TRANSPORT_TYPE).forEach(function(value) {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = value;
@@ -91,7 +293,7 @@ const init = function () {
     });
     // insert participant view types in entrance modal
     const participantViewTypeSelect = document.getElementById("participantViewType");
-    Object.values(PARTICIPANT_VIEW_TYPE).forEach(value => {
+    Object.values(PARTICIPANT_VIEW_TYPE).forEach(function(value) {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = value;
@@ -109,12 +311,12 @@ async function connect() {
     $('#entranceModal').modal('hide');
     // disable controls
     cControls.muteInput();
-    //create peer connection
-    const pc = new RTCPeerConnection();
     //get config object for room creation
     const roomConfig = cControls.roomConfig();
     //kick off connect to server and local room creation
     try {
+        const rtcConfiguration = buildRtcConfiguration(roomConfig);
+        const pc = rtcConfiguration ? new RTCPeerConnection(rtcConfiguration) : new RTCPeerConnection();
         const session = await sfu.createRoom(roomConfig);
         // Now we connected to the server (if no exception was thrown)
         session.on(constants.SFU_EVENT.FAILED, function (e) {
@@ -165,6 +367,7 @@ async function connect() {
             interval: ABR_QUALITY_CHECK_PERIOD
         };
         initDefaultRemoteDisplay(room, remoteDisplay, displayOptions, abrOptions, roomConfig.participantViewType);
+        bindTrafficWidget(room);
 
         //get configured local video streams
         let streams = cControls.getVideoStreams();
@@ -175,9 +378,36 @@ async function connect() {
         publishPreconfiguredStreams(room, pc, streams);
     } catch (e) {
         console.error(e);
-        displayError(e);
+        displayError(formatError(e));
     }
 }
+
+const formatError = function (event) {
+    if (!event) {
+        return "reason unknown";
+    }
+    if (typeof event === "string") {
+        return event;
+    }
+    if (event.operation && event.error) {
+        return event.operation + " failed: " + formatError(event.error);
+    }
+    if (event.text) {
+        return event.text;
+    }
+    if (event.message) {
+        return (event.name ? event.name + ": " : "") + event.message;
+    }
+    try {
+        const serialized = JSON.stringify(event, Object.getOwnPropertyNames(event));
+        if (serialized && serialized !== "{}") {
+            return serialized;
+        }
+    } catch (ignore) {
+        // Fallback to String below.
+    }
+    return String(event);
+};
 
 /**
  * Display an error message on operation failure
@@ -186,15 +416,8 @@ async function connect() {
  * @param event
  */
 const onOperationFailed = function (prefix, event) {
-    let reason = "reason unknown";
-    if (event.operation && event.error) {
-        reason = event.operation + " failed: " + event.error;
-    } else if (event.text) {
-        reason = event.text;
-    } else {
-        reason = JSON.stringify(event);
-    }
-    console.error(prefix + ": " + reason);
+    const reason = formatError(event);
+    console.error(prefix + ": " + reason, event);
     displayError(reason);
 }
 
@@ -379,6 +602,141 @@ const displayError = function (text) {
     errField.style.color = "red";
     errField.innerText = text;
 }
+
+const bindTrafficWidget = function (room) {
+    const SERVER_TRAFFIC_TTL_MS = 3000;
+    let lastClientTraffic = null;
+    let lastServerTraffic = null;
+    let lastServerTrafficAt = 0;
+    let lastKnownPing = 0;
+
+    const isServerTrafficFresh = function () {
+        return lastServerTraffic && Date.now() - lastServerTrafficAt <= SERVER_TRAFFIC_TTL_MS;
+    };
+
+    const resolvePing = function (clientTraffic, serverTraffic) {
+        if (serverTraffic && typeof serverTraffic.ping === "number" && !Number.isNaN(serverTraffic.ping) && serverTraffic.ping > 0) {
+            return serverTraffic.ping;
+        }
+        if (clientTraffic && typeof clientTraffic.ping === "number" && !Number.isNaN(clientTraffic.ping) && clientTraffic.ping > 0) {
+            return clientTraffic.ping;
+        }
+        return lastKnownPing;
+    };
+
+    const hasActiveRoute = function (traffic) {
+        const links = Array.isArray(traffic && traffic.badges && traffic.badges.links) ? traffic.badges.links : [];
+        if (links.length === 0) {
+            return false;
+        }
+        return links.some(function (link) {
+            return link.active === true || link.connected === true || link.status === CONNECTION_STATUS.GREEN || link.status === CONNECTION_STATUS.YELLOW;
+        });
+    };
+
+    const updatePingMetric = function (clientTraffic, serverTraffic) {
+        const ping = resolvePing(clientTraffic, serverTraffic);
+        if (ping > 0) {
+            lastKnownPing = ping;
+        }
+        const routeActive = hasActiveRoute(serverTraffic) || hasActiveRoute(clientTraffic);
+        const pingQuality = quality.evaluateConnectionBadgeQuality({
+            connected: routeActive || lastKnownPing > 0,
+            ping: ping
+        });
+        document.getElementById("stat-ping").innerText = ping > 0 ? Math.round(ping) + " ms" : (routeActive ? "Connected" : "—");
+        updateStatusCircle("ping-status", ping > 0 ? pingQuality.status : routeActive);
+    };
+
+    const updateClientTraffic = function (traffic) {
+        if (!traffic) {
+            return;
+        }
+
+        lastClientTraffic = traffic;
+        const serverTraffic = isServerTrafficFresh() ? lastServerTraffic : null;
+        const pingTraffic = serverTraffic || lastServerTraffic;
+        const topologyBadges = quality.resolveTopologyBadges(traffic, serverTraffic);
+
+        document.getElementById("stat-outbound").innerText = quality.formatSpeed(traffic.outboundBitrate);
+        document.getElementById("stat-inbound").innerText = quality.formatSpeed(traffic.inboundBitrate);
+        updatePingMetric(traffic, pingTraffic);
+        updateStatusCircle("outbound-status", traffic.outboundBitrate > 0);
+        updateStatusCircle("inbound-status", traffic.inboundBitrate > 0);
+
+        document.getElementById("stat-participants").innerText = topologyBadges.participants.length;
+        updateStatusCircle("participants-status", topologyBadges.participants.length > 0);
+        updateRouteIndicator(topologyBadges);
+        renderConnectionBadges(quality.createParticipantBadgeModel(topologyBadges, traffic, serverTraffic));
+    };
+
+    const updateServerTraffic = function (serverTraffic) {
+        if (!serverTraffic) {
+            return;
+        }
+        lastServerTraffic = serverTraffic;
+        lastServerTrafficAt = Date.now();
+
+        const traffic = lastClientTraffic;
+        if (traffic) {
+            document.getElementById("stat-outbound").innerText = quality.formatSpeed(traffic.outboundBitrate);
+            document.getElementById("stat-inbound").innerText = quality.formatSpeed(traffic.inboundBitrate);
+
+            updateStatusCircle("outbound-status", traffic.outboundBitrate > 0);
+            updateStatusCircle("inbound-status", traffic.inboundBitrate > 0);
+        }
+        updatePingMetric(traffic, serverTraffic);
+
+        const topologyBadges = quality.resolveTopologyBadges(lastClientTraffic, serverTraffic);
+        document.getElementById("stat-participants").innerText = topologyBadges.participants.length;
+        updateStatusCircle("participants-status", topologyBadges.participants.length > 0);
+        updateRouteIndicator(topologyBadges);
+
+        const badgeModel = quality.createParticipantBadgeModel(topologyBadges, lastClientTraffic, serverTraffic);
+        renderConnectionBadges(badgeModel);
+    };
+
+    const clientListener = function (traffic) {
+        updateClientTraffic(traffic);
+    };
+
+    room.addTrafficListener(clientListener);
+
+    room.getTraffic().then(function (traffic) {
+        updateClientTraffic(traffic);
+    });
+
+    room.addServerTrafficListener(updateServerTraffic);
+
+    const cleanup = function () {
+        room.removeTrafficListener(clientListener);
+        room.removeServerTrafficListener(updateServerTraffic);
+    };
+    room.on(constants.SFU_ROOM_EVENT.LEFT, function (participant) {
+        if (participant && participant.userId === room.userId()) {
+            cleanup();
+        }
+    });
+    room.on(constants.SFU_ROOM_EVENT.ENDED, cleanup);
+};
+
+const updateStatusCircle = function (elementId, isActive) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.classList.remove("active", "warning", "orange", "inactive");
+        if (isActive === CONNECTION_STATUS.YELLOW || isActive === "warning") {
+            element.classList.add("warning");
+        } else if (isActive === CONNECTION_STATUS.ORANGE) {
+            element.classList.add("orange");
+        } else if (isActive === CONNECTION_STATUS.RED) {
+            element.classList.add("inactive");
+        } else if (isActive) {
+            element.classList.add("active");
+        } else {
+            element.classList.add("inactive");
+        }
+    }
+};
 
 /**
  * Entrance modal cancelled, we do not enter to a room

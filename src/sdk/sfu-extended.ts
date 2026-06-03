@@ -364,6 +364,28 @@ export class SfuExtended {
             (name: string, data: InternalMessage[]) => {
                 this.#logger.debug("onMessage: ", data[0]);
                 switch (name) {
+                    case InternalApi.TRAFFIC_UPDATE: {
+                        const roomId = data[0].roomId;
+                        if (roomId && roomId.length > 0) {
+                            const room = this.#rooms[roomId];
+                            if (room) {
+                                data[0].type = RoomEvent.TRAFFIC_UPDATE;
+                                room.processEvent(data[0]);
+                            } else {
+                                this.#logger.warn("TRAFFIC_UPDATE for unknown roomId dropped: " + roomId);
+                            }
+                        } else {
+                            const rooms = Object.values(this.#rooms);
+                            if (rooms.length === 1) {
+                                data[0].type = RoomEvent.TRAFFIC_UPDATE;
+                                data[0].roomId = rooms[0].id();
+                                rooms[0].processEvent(data[0]);
+                            } else {
+                                this.#logger.warn("TRAFFIC_UPDATE without roomId dropped for rooms count: " + rooms.length);
+                            }
+                        }
+                        break;
+                    }
                     case InternalApi.DEFAULT_METHOD:
                         //filter messages
                         //TODO(naz): refactor this part

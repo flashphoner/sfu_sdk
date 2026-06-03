@@ -9,6 +9,8 @@ const createControls = function (config) {
             roomName: document.getElementById("roomName"),
             roomPin: document.getElementById("roomPin"),
             nickName: document.getElementById("nickName"),
+            turnServer: document.getElementById("turnServer"),
+            forceRelay: document.getElementById("forceRelay"),
             enter: document.getElementById("startButton"),
             transport: document.getElementById("transport"),
             participantViewType: document.getElementById("participantViewType"),
@@ -74,6 +76,8 @@ const createControls = function (config) {
     controls.entrance.roomName.value = config.room.name;
     controls.entrance.roomPin.value = config.room.pin;
     controls.entrance.nickName.value = config.room.nickName;
+    controls.entrance.turnServer.value = config.room.turnServer || "";
+    controls.entrance.forceRelay.checked = Boolean(config.room.forceRelay);
 
     const addAudioTrackRow = async function (track) {
         const stream = await getMedia([track]);
@@ -174,6 +178,8 @@ const createControls = function (config) {
             roomName: controls.entrance.roomName.value,
             pin: controls.entrance.roomPin.value,
             nickname: controls.entrance.nickName.value,
+            turnServer: controls.entrance.turnServer.value.trim(),
+            forceRelay: controls.entrance.forceRelay.checked,
             transport: controls.entrance.transport.value,
             participantViewType: controls.entrance.participantViewType.value,
         };

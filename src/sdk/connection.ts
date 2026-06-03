@@ -207,10 +207,11 @@ export class Connection implements IRTCMetricsSender {
                     name = InternalApi.BINARY_DATA;
                 } else {
                     let obj = JSON.parse(event.data) as {
-                        message: string,
+                        message?: string,
+                        type?: string,
                         data: Array<InternalMessage>
                     };
-                    name = obj.message;
+                    name = obj.message || (obj.type === InternalApi.TRAFFIC_UPDATE ? obj.type : undefined);
                     msg = obj.data;
                 }
                 switch (name) {
