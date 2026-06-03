@@ -533,7 +533,9 @@ export class Room {
                     this.#_statCollector.start();
                 }
                 promises.resolve(joinedRoom.internalMessageId, joinedRoom);
-                this.#startTrafficPolling();
+                if (this.#trafficListeners.length > 0) {
+                    this.#startTrafficPolling();
+                }
             } else {
                 this.notifier.notify(RoomEvent.JOINED, joinedRoom);
             }
@@ -1077,12 +1079,18 @@ export class Room {
 
     public addTrafficListener(listener: (traffic: WebRTCConnectionTraffic) => void): void {
         this.#trafficListeners.push(listener);
+        if (this.#_state === RoomState.JOINED) {
+            this.#startTrafficPolling();
+        }
     }
 
     public removeTrafficListener(listener: (traffic: WebRTCConnectionTraffic) => void): void {
         const index = this.#trafficListeners.indexOf(listener);
         if (index > -1) {
             this.#trafficListeners.splice(index, 1);
+        }
+        if (this.#trafficListeners.length === 0) {
+            this.#stopTrafficPolling();
         }
     }
 
