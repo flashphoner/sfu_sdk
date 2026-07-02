@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import {ChannelSendPolicy, ChatType, MessageAttachmentType} from "../../src/sdk/constants";
 import {createFileFromPath} from "./fsUtils";
+import {v4 as uuidv4} from 'uuid';
+
 export const url = "ws://127.0.0.1:8080/";
 export const wrongWsUrl = "ws://127.0.0.1:8081/";
 export const TEST_USER_0 = {
@@ -150,12 +152,28 @@ export const TEST_PICTURE_ATTACHMENT = {
     id: "94b8526d-3972-420b-ba42-35ec484a928d"
 }
 
+export const newPictureUniqueId = () => {
+    const id = uuidv4();
+    return {
+        attachment: {...TEST_PICTURE_ATTACHMENT, id},
+        data: {...TEST_PICTURE_ATTACHMENT_DATA, id}
+    };
+};
+
 export const TEST_BIG_PICTURE_ATTACHMENT = {
     type: MessageAttachmentType.picture,
     name: PICTURE_2M_FILE_NAME,
     size: fs.readFileSync(path.resolve(__dirname, PICTURE_2M_FILE_PATH)).length,
     id: "fe6269ce-5401-48c7-ac1e-b03c9af19cfe"
 }
+
+export const newBigPictureUniqueId = () => {
+    const id = uuidv4();
+    return {
+        attachment: {...TEST_BIG_PICTURE_ATTACHMENT, id},
+        data: {...TEST_BIG_PICTURE_ATTACHMENT_DATA, id}
+    };
+};
 
 export const TEST_PDF_ATTACHMENT = {
     type: MessageAttachmentType.file,
@@ -185,6 +203,21 @@ export const TEST_PDF_ATTACHMENT_DATA = {
 export const ATTACHMENTS = [TEST_PICTURE_ATTACHMENT, TEST_PDF_ATTACHMENT];
 
 export const ATTACHMENTS_PAYLOAD = [TEST_PICTURE_ATTACHMENT_DATA, TEST_PDF_ATTACHMENT_DATA]
+
+export const newAttachmentsUniqueId = () => {
+    const attachmentId = uuidv4();
+    const pdfAttachmentId = uuidv4();
+    return {
+        attachments: [
+            {...TEST_PICTURE_ATTACHMENT, id: attachmentId},
+            {...TEST_PDF_ATTACHMENT, id: pdfAttachmentId}
+        ],
+        data: [
+            {...TEST_PICTURE_ATTACHMENT_DATA, id: attachmentId},
+            {...TEST_PDF_ATTACHMENT_DATA, id: pdfAttachmentId}
+        ]
+    }
+};
 
 export const UPDATED_PMI_SETTINGS = {
     allowJoinAtAnyTime: true,

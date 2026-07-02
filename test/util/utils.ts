@@ -4,7 +4,7 @@ import {TEST_USER_0, TEST_USER_1, url} from "./constants";
 import {Verbosity} from "../../src/sdk/logger";
 const { URL } = require('url');
 import {v4 as uuidv4} from 'uuid';
-import {MessageAttachmentType} from "../../src/sdk/constants";
+import {MessageAttachmentType, SfuEvent} from "../../src/sdk/constants";
 
 export type WaitCondition = (room: RoomExtended) => boolean;
 
@@ -21,6 +21,55 @@ export function waitForRoomEvent<T>(event: RoomEvent, room: RoomExtended, condit
             resolve(selector(room));
         }
     });
+}
+
+export function waitForEvent<T = any>(
+    sfu: SfuExtended,
+    event: SfuEvent,
+    match?: (payload: T) => boolean,
+    timeoutMs = 5000
+): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        let timer: ReturnType<typeof setTimeout>;
+        const handler = (msg: any) => {
+            if (!match || match(msg as T)) {
+                sfu.off(event, handler);
+                clearTimeout(timer);
+                resolve(msg as T);
+            }
+        };
+        timer = setTimeout(() => {
+            sfu.off(event, handler);
+            reject(new Error(`waitForEvent: '${String(event)}' not received within ${timeoutMs}ms`));
+        }, timeoutMs);
+        sfu.on(event, handler);
+    });
+}
+
+export async function waitUntil(
+    predicate: () => Promise<boolean> | boolean,
+    {timeoutMs = 15000, intervalMs = 200}: {timeoutMs?: number; intervalMs?: number} = {}
+): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (!(await predicate())) {
+        if (Date.now() >= deadline) {
+            throw new Error(`waitUntil: condition not met within ${timeoutMs}ms`);
+        }
+        await new Promise(r => setTimeout(r, intervalMs));
+    }
+}
+
+export async function waitForAttachmentsStored<T>(
+    read: () => Promise<T>,
+    ready: (r: T) => boolean,
+    opts?: {timeoutMs?: number; intervalMs?: number}
+): Promise<T> {
+    let last!: T;
+    await waitUntil(async () => {
+        last = await read();
+        return ready(last);
+    }, opts);
+    return last;
 }
 
 const logger = (msg: string, obj?: any) => {
@@ -46,6 +95,42 @@ export async function waitForUsers() {
     const bob = await connect(TEST_USER_0);
     const alice = await connect(TEST_USER_1);
     return {bob, alice};
+}
+
+export async function clearFriends(...clients: SfuExtended[]) {
+    for (const sfu of clients) {
+        try {
+            const c: any = await sfu.getContacts();
+            for (const contact of (c.contacts || [])) {
+                if (contact.friend) {
+                    try { await sfu.removeFriend({userId: contact.userId}); } catch (e) {}
+                }
+            }
+            for (const inv of (c.outgoingFriendInvites || [])) {
+                try { await sfu.revokeFriendInvite({inviteId: inv.inviteId}); } catch (e) {}
+            }
+            for (const inv of (c.incomingFriendInvites || [])) {
+                try { await sfu.rejectFriendInvite({inviteId: inv.inviteId}); } catch (e) {}
+            }
+        } catch (e) {
+        }
+    }
+}
+
+export async function clearChats(...clients: SfuExtended[]) {
+    for (const sfu of clients) {
+        try {
+            const chats: any = await sfu.getUserChats();
+            for (const chat of Object.values(chats || {})) {
+                try {
+                    await sfu.deleteChat({id: (chat as any).id});
+                }
+                catch (e) {
+                }
+            }
+        } catch (e) {
+        }
+    }
 }
 
 export async function waitForUser() {

@@ -18,7 +18,7 @@ import {
     UserPresenceStatusUpdated
 } from "../../../src/sdk/constants";
 import {SfuExtended} from "../../../src";
-import {connect, isValidUrl, waitForUsers} from "../../util/utils";
+import {clearChats, clearFriends, connect, isValidUrl, waitForEvent, waitForUsers} from "../../util/utils";
 
 describe("contacts", () => {
     let bob: SfuExtended;
@@ -27,6 +27,8 @@ describe("contacts", () => {
         const users = await waitForUsers();
         bob = users.bob;
         alice = users.alice;
+        await clearChats(bob, alice);
+        await clearFriends(bob, alice);
     })
     afterEach(async () => {
         await bob.disconnect();
@@ -750,9 +752,17 @@ describe("contacts", () => {
                 });
             };
 
+            const newContactForAlice = waitForEvent<NewContact>(
+                alice, SfuEvent.NEW_CONTACT, e => e.contact.userId === TEST_USER_0.username);
+            const newContactForBob = waitForEvent<NewContact>(
+                bob, SfuEvent.NEW_CONTACT, e => e.contact.userId === TEST_USER_1.username);
+
             const chat = await bob.createChat({
                 members: [TEST_USER_1.username]
             });
+
+            await newContactForAlice;
+            await newContactForBob;
 
             bob.deleteChat({id: chat.id});
             await waitEvents();
@@ -923,25 +933,19 @@ describe("contacts", () => {
                 await bob.deleteChat({id: chat.id});
             });
             it('user should be notified when contact changes status', async () => {
-                const waitEvent = async () => {
-                    return new Promise<void>((resolve) => {
-                        const bobHandler = (msg) => {
-                            const event = msg as UserPresenceStatusUpdated;
-                            expect(event.userId).toEqual(TEST_USER_1.username);
-                            expect(event.status).toEqual(PresenceStatus.IDLE);
-                            bob.off(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
-                            resolve();
-                        }
-                        bob.on(SfuEvent.USER_PRESENCE_STATUS_UPDATED, bobHandler);
-                    });
-                };
+                const newContactForAlice = waitForEvent<NewContact>(
+                    alice, SfuEvent.NEW_CONTACT, e => e.contact.userId === TEST_USER_0.username);
+                const idleForBob = waitForEvent<UserPresenceStatusUpdated>(
+                    bob, SfuEvent.USER_PRESENCE_STATUS_UPDATED,
+                    e => e.userId === TEST_USER_1.username && e.status === PresenceStatus.IDLE);
 
                 const chat = await bob.createChat({
                     members: [TEST_USER_1.username]
                 });
+                await newContactForAlice;
 
                 alice.updatePresenceStatus(PresenceStatus.IDLE);
-                await waitEvent();
+                await idleForBob;
 
                 const bobContacts = await bob.getContacts();
                 expect(bobContacts.contacts.some((item) => item.userId === TEST_USER_1.username && item.nickname === TEST_USER_1.nickname && item.status === PresenceStatus.IDLE)).toBeTruthy();

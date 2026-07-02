@@ -1,0 +1,95 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongo
+    restart: always
+    command: ["--bind_ip_all"]
+    networks:
+      external-net:
+        ipv4_address: ${MONGO_IP}
+    volumes:
+      - ./mongo/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: always
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      external-net:
+        ipv4_address: ${MINIO_IP}
+
+  zapp-server:
+    image: ${ZAPP_SERVER_IMAGE}
+    container_name: zapp-server
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "31000-31100:31000-31100/udp"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      external-net:
+        ipv4_address: ${ZAPP_SERVER_IP}
+    volumes:
+      - ./zapp-server/conf:/opt/zapp-server/conf
+      - ./zapp-server/logs:/opt/zapp-server/logs
+    entrypoint:
+      - bash
+      - -c
+      - |
+        # Copy vesrsion file to show it
+        cp /opt/zapp-server/version /opt/zapp-server/logs/
+        # Set a proper permissions
+        chown -R zapp-server:zapp-server /opt/zapp-server/conf
+        chown -R zapp-server:zapp-server /opt/zapp-server/logs
+        # Set a variables
+        LOG_FILE=/opt/zapp-server/logs/logs.log
+        # Create S3 buckets
+        echo "[init] creating S3 buckets" >> $$LOG_FILE
+        chown -R zapp-server:zapp-server $$LOG_FILE
+        ok=0
+        for i in $$(seq 1 10); do
+            if /opt/zapp-server/tools/bucketsCreator.sh \
+                --url=mongodb://admin:Abcd1111@$MONGO_IP:27017 \
+                --databaseName=zapp_alpha_test \
+                --bucketsGroupName="test-compose" >> $$LOG_FILE 2>&1
+            then
+                echo "[init] buckets created"
+                ok=1
+                break
+            fi
+            echo "[init] bucketsCreator attempt $$i failed, retrying in 3s..."  >> $$LOG_FILE
+            sleep 3
+        done
+        if [ "$$ok" != "1" ]; then
+            echo "[init] ERROR: failed to create buckets after 10 attempts"  >> $$LOG_FILE
+            exit 1
+        fi
+        echo "[init] initialization done"  >> $$LOG_FILE
+        echo ""  >> $$LOG_FILE
+        # Start the server
+        /opt/zapp-server/bin/start.sh
+
+
+networks:
+  external-net:
+    driver: bridge
+    internal: false
+    ipam:
+      config:
+        - subnet: ${EXT_NET_SUB}.0/24

@@ -1,5 +1,5 @@
 import {SfuExtended, SpaceEvent} from "../../../src";
-import {connect, isValidUrl, waitForUsers} from "../../util/utils";
+import {connect, isValidUrl, waitForEvent, waitForUsers} from "../../util/utils";
 import {
     ALLOWS_TO_CREATE_INVITE,
     ALLOWS_TO_MANAGE_CATEGORIES,
@@ -29,7 +29,9 @@ import {
     ConferenceType,
     MeetingHistoryItem,
     Message,
-    MessageTargetEntityType, MessageType,
+    MessageTargetEntityType,
+    MessageType,
+    NewContact,
     NewSpaceCategoryEvent,
     NewSpaceChannelEvent,
     NewSpaceRoleAdded,
@@ -1222,7 +1224,13 @@ describe("spaces", () => {
                 const space = await bob.createSpace({name: TEST_SPACE_NAME});
                 const invite = await bob.generateNewSpaceInvite({spaceId: space.id, lifespan: 10000})
 
+                const newContactForAlice = waitForEvent<NewContact>(
+                    alice, SfuEvent.NEW_CONTACT, e => e.contact.userId === TEST_USER_0.username);
+
                 await alice.joinSpaceByInviteCode(invite.inviteCode);
+
+                await newContactForAlice;
+
                 const waitUpdateEvent = async () => {
                     return new Promise<void>((resolve) => {
                         alice.on(SpaceEvent.USER_SPACE_NICKNAME_UPDATED, (msg) => {

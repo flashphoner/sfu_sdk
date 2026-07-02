@@ -3,3 +3,6 @@ dist
 .idea
 examples/sfu.js
 .DS_Store
+compose/zapp-server/conf/
+compose/zapp-server/logs/
+compose/.env

@@ -1,5 +1,5 @@
 import {SfuExtended} from "../../../../src";
-import {generateAttachments, waitForUsers} from "../../../util/utils";
+import {generateAttachments, waitForUsers, waitForAttachmentsStored} from "../../../util/utils";
 import {
     AttachmentType,
     MessageAttachmentType,
@@ -51,9 +51,10 @@ describe("Listing", () => {
         const handler = alice.getSendingAttachmentsHandler(payload, status.id);
         await handler.sendAttachments();
 
-        const result = await alice.listAttachments({
-            sectionType: 'Direct', offset: -1, pageSize: -1
-        });
+        const result = await waitForAttachmentsStored(
+            () => alice.listAttachments({sectionType: 'Direct', offset: -1, pageSize: -1}),
+            r => r.result.items.some(it => it.id === id)
+        );
 
         expect(result).toBeTruthy();
         expect(result.result.items.length).toBe(1);
@@ -92,9 +93,10 @@ describe("Listing", () => {
         const handler = alice.getSendingAttachmentsHandler(attachments.payload, status.id);
         await handler.sendAttachments();
 
-        const result = await alice.listAttachments({
-            sectionType: 'Direct', offset: -1, pageSize: -1
-        });
+        const result = await waitForAttachmentsStored(
+            () => alice.listAttachments({sectionType: 'Direct', offset: -1, pageSize: -1}),
+            r => attachments.metadata.every(m => r.result.items.some(it => it.id === m.id))
+        );
 
         expect(result).toBeTruthy();
         expect(result.result.items.length).toBe(attachmentsCount);
@@ -132,9 +134,10 @@ describe("Listing", () => {
         const handler = alice.getSendingAttachmentsHandler(attachments.payload, status.id);
         await handler.sendAttachments();
 
-        const result = await alice.listAttachments({
-            sectionType: 'Direct', offset: -1, pageSize: -1
-        });
+        const result = await waitForAttachmentsStored(
+            () => alice.listAttachments({sectionType: 'Direct', offset: -1, pageSize: -1}),
+            r => attachments.metadata.every(m => r.result.items.some(it => it.id === m.id))
+        );
 
         expect(result).toBeTruthy();
         expect(result.result.items.length).toBe(attachmentsCount);
@@ -148,9 +151,10 @@ describe("Listing", () => {
             attachmentIdsToDelete: [attachmentId]
         });
 
-        const editedResult = await alice.listAttachments({
-            sectionType: 'Direct', offset: -1, pageSize: -1
-        });
+        const editedResult = await waitForAttachmentsStored(
+            () => alice.listAttachments({sectionType: 'Direct', offset: -1, pageSize: -1}),
+            r => !r.result.items.some(it => it.id === attachmentId)
+        );
 
         expect(editedResult).toBeTruthy();
         expect(editedResult.result.items.length).toBe(attachmentsCount-1);
@@ -190,6 +194,10 @@ describe("Listing", () => {
 
         const pageSize = 3
 
+        await waitForAttachmentsStored(
+            () => alice.listAttachments({sectionType: 'Direct', offset: -1, pageSize: -1}),
+            r => attachments.metadata.every(m => r.result.items.some(it => it.id === m.id))
+        );
         const result = await alice.listAttachments({
             sectionType: 'Direct', offset: 0, pageSize: pageSize
         });
@@ -230,7 +238,10 @@ describe("Listing", () => {
         const handler = alice.getSendingAttachmentsHandler(attachments.payload, status.id);
         await handler.sendAttachments();
 
-        const result = await alice.getAttachmentsSize(AttachmentType.DIRECT)
+        const result = await waitForAttachmentsStored(
+            () => alice.getAttachmentsSize(AttachmentType.DIRECT),
+            r => Number(r.result[AttachmentType.DIRECT]) >= size * attachmentsCount
+        );
 
         expect(result).toBeTruthy();
         expect(result.result[AttachmentType.DIRECT]).toBeTruthy();

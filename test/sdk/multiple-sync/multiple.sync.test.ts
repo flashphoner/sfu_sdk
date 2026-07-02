@@ -1,5 +1,5 @@
 import {SfuEvent, SfuExtended} from "../../../src";
-import {connect} from "../../util/utils";
+import {clearFriends, connect} from "../../util/utils";
 import {
     CALENDAR_EVENT,
     TEST_PRIVATE_CHANNEL_WITH_LIST,
@@ -103,6 +103,7 @@ describe("multiple-sync", () => {
         beforeEach(async () => {
             aliceFirstInstance = await connect(TEST_USER_1);
             aliceSecondInstance = await connect(TEST_USER_1);
+            await clearFriends(bobFirstInstance, aliceFirstInstance);
         })
         afterEach(async () => {
             await aliceFirstInstance.disconnect();

@@ -1,6 +1,6 @@
 import {v4 as uuidv4} from 'uuid';
 import {SfuEvent, SfuExtended} from "../../../src";
-import {connect, waitForUsers} from "../../util/utils";
+import {clearFriends, connect, waitForUsers} from "../../util/utils";
 import {
     decryptPrivateKey,
     decryptWithPrivateKey,
@@ -24,6 +24,7 @@ describe("encryption", () => {
         const users = await waitForUsers();
         bob = users.bob;
         alice = users.alice;
+        await clearFriends(bob, alice);
     })
     afterEach(async () => {
         await bob.disconnect();

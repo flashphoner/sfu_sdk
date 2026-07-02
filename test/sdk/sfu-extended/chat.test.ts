@@ -6,10 +6,11 @@ import {
     EVERYONE_TAG,
     iconFile,
     MESSAGE_REACTION,
+    newAttachmentsUniqueId,
+    newBigPictureUniqueId,
+    newPictureUniqueId,
     PDF_FILE_NAME,
     PICTURE_FILE_NAME,
-    TEST_BIG_PICTURE_ATTACHMENT,
-    TEST_BIG_PICTURE_ATTACHMENT_DATA,
     TEST_PDF_ATTACHMENT,
     TEST_PDF_ATTACHMENT_DATA,
     TEST_PICTURE_ATTACHMENT,
@@ -1172,13 +1173,12 @@ describe("chat", () => {
                 const chat = await bob.createChat({});
                 const messages = 3;
                 for (let i = 0; i < messages; i++) {
+                    const testPic = newBigPictureUniqueId();
                     const status = await bob.sendMessage({
                         targetEntityType: MessageTargetEntityType.CHAT,
                         targetEntityId: {chatId: chat.id},
                         body: MESSAGE_BODY,
-                        attachments: [
-                            TEST_BIG_PICTURE_ATTACHMENT
-                        ]
+                        attachments: [testPic.attachment]
                     });
                     expect(status).toBeTruthy();
                     expect(status.id).toBeTruthy();
@@ -1189,7 +1189,7 @@ describe("chat", () => {
                     const attachmentsData = [];
                     attachmentsData.push({
                         id: status.attachments[0].id,
-                        payload: TEST_BIG_PICTURE_ATTACHMENT_DATA.payload
+                        payload: testPic.data.payload
                     })
                     const handler = await bob.getSendingAttachmentsHandler(attachmentsData, status.id);
                     const result = await handler.sendAttachments();
@@ -1480,17 +1480,18 @@ describe("chat", () => {
             it("Should send few messages and search message attachments based on boundaries", async () => {
                 const chat = await bob.createChat({});
                 for (let i = 0; i < 5; i++) {
+                    const testPic = newPictureUniqueId();
                     const status = await bob.sendMessage({
                         targetEntityType: MessageTargetEntityType.CHAT,
                         targetEntityId: {chatId: chat.id},
                         body: MESSAGE_BODY,
-                        attachments: [TEST_PICTURE_ATTACHMENT]
+                        attachments: [testPic.attachment]
                     });
 
                     const attachmentData = [];
                     attachmentData.push({
                         id: status.attachments[0].id,
-                        payload: TEST_PICTURE_ATTACHMENT_DATA
+                        payload: testPic.data
                     });
                     const handler = bob.getSendingAttachmentsHandler(attachmentData, status.id);
                     await handler.sendAttachments();
@@ -1526,11 +1527,12 @@ describe("chat", () => {
             });
             it("Should search message attachments in chat by file type", async () => {
                 const chat = await bob.createChat({});
+                const testAttachments = newAttachmentsUniqueId();
                 const status = await bob.sendMessage({
                     targetEntityType: MessageTargetEntityType.CHAT,
                     targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
-                    attachments: ATTACHMENTS
+                    attachments: testAttachments.attachments
                 });
                 expect(status).toBeTruthy();
                 expect(status.id).toBeTruthy();
@@ -1538,7 +1540,7 @@ describe("chat", () => {
                 expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
                 expect(status.attachments).toBeTruthy();
 
-                const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
+                const handler = bob.getSendingAttachmentsHandler(testAttachments.data, status.id);
                 await handler.sendAttachments();
 
                 const searchResult = await bob.searchMessageAttachments({
@@ -1551,11 +1553,11 @@ describe("chat", () => {
                     sortOrder: SortOrder.ASC
                 });
                 expect(searchResult.attachmentsInfo.length).toBe(1);
-                expect(searchResult.attachmentsInfo[0].id).toEqual(TEST_PICTURE_ATTACHMENT.id);
-                expect(searchResult.attachmentsInfo[0].name).toEqual(TEST_PICTURE_ATTACHMENT.name);
-                expect(searchResult.attachmentsInfo[0].type).toEqual(TEST_PICTURE_ATTACHMENT.type);
+                expect(searchResult.attachmentsInfo[0].id).toEqual(testAttachments.attachments[0].id);
+                expect(searchResult.attachmentsInfo[0].name).toEqual(testAttachments.attachments[0].name);
+                expect(searchResult.attachmentsInfo[0].type).toEqual(testAttachments.attachments[0].type);
                 expect(searchResult.attachmentsInfo[0].mediaType).toEqual(MessageAttachmentMediaType.media);
-                expect(searchResult.attachmentsInfo[0].size).toEqual(TEST_PICTURE_ATTACHMENT.size);
+                expect(searchResult.attachmentsInfo[0].size).toEqual(testAttachments.attachments[0].size);
                 expect(searchResult.attachmentsInfo[0].from).toEqual(TEST_USER_0.username);
                 expect(searchResult.attachmentsInfo[0].date).toEqual(status.date);
 
@@ -1564,18 +1566,19 @@ describe("chat", () => {
             });
             it("Should send message with multiple attachments and should check attachments media type", async () => {
                 const chat = await bob.createChat({});
+                const testAttachments = newAttachmentsUniqueId();
                 const status = await bob.sendMessage({
                     targetEntityType: MessageTargetEntityType.CHAT,
                     targetEntityId: {chatId: chat.id},
                     body: MESSAGE_BODY,
-                    attachments: ATTACHMENTS
+                    attachments: testAttachments.attachments
                 });
                 expect(status.attachments[0].name).toEqual(PICTURE_FILE_NAME);
                 expect(status.attachments[0].mediaType).toEqual(MessageAttachmentMediaType.media);
                 expect(status.attachments[1].name).toEqual(PDF_FILE_NAME);
                 expect(status.attachments[1].mediaType).toEqual(MessageAttachmentMediaType.other);
 
-                const handler = bob.getSendingAttachmentsHandler(ATTACHMENTS_PAYLOAD, status.id);
+                const handler = bob.getSendingAttachmentsHandler(testAttachments.data, status.id);
                 const messageStatus = await handler.sendAttachments();
                 expect(messageStatus.attachments[0].name).toEqual(PICTURE_FILE_NAME);
                 expect(messageStatus.attachments[0].type).toEqual(ATTACHMENTS[0].type);

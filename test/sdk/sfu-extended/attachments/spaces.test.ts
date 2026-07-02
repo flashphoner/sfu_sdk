@@ -1,5 +1,5 @@
 import {SfuExtended} from "../../../../src";
-import {generateAttachments, waitForUsers} from "../../../util/utils";
+import {generateAttachments, waitForUsers, waitForAttachmentsStored} from "../../../util/utils";
 import {TEST_SPACE_NAME, TEST_USER_0} from "../../../util/constants";
 import {
     AttachmentType,
@@ -47,9 +47,10 @@ describe("Listing", () => {
         const handler = bob.getSendingAttachmentsHandler(attachments.payload, status.id);
         await handler.sendAttachments();
 
-        const result = await bob.listAttachments({
-            sectionType: 'Spaces', spaceId: space.id, offset: -1, pageSize: -1
-        });
+        const result = await waitForAttachmentsStored(
+            () => bob.listAttachments({sectionType: 'Spaces', spaceId: space.id, offset: -1, pageSize: -1}),
+            r => attachments.metadata.every(m => r.result.items.some(it => it.id === m.id))
+        );
 
         expect(result).toBeTruthy();
         expect(result.result.items.length).toBe(attachmentsCount);
@@ -92,7 +93,10 @@ describe("Listing", () => {
         const handler = bob.getSendingAttachmentsHandler(attachments.payload, status.id);
         await handler.sendAttachments();
 
-        const result = await bob.getAttachmentsSize(AttachmentType.SPACE)
+        const result = await waitForAttachmentsStored(
+            () => bob.getAttachmentsSize(AttachmentType.SPACE),
+            r => Number(r.result[AttachmentType.SPACE]) >= size * attachmentsCount
+        );
 
         expect(result).toBeTruthy();
         expect(result.result[AttachmentType.SPACE]).toBeTruthy();

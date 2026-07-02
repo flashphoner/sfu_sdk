@@ -1,0 +1,26 @@
+users:
+  admin: {username: admin, password: 21232f297a57a5a743894a0e4a801fc3, active: true}
+apps:
+  sfuZClientApp: {name: sfuZClientApp, key: sfuZClientApp, url: 'http://localhost:8081/apps/EchoApp',
+    handler: com.flashphoner.zapp.handler.SFUZClientHandler, callback: com.flashphoner.sfu.handler.SFUCallbackHandler}
+  sfuZUserManagementApp: {name: sfuZUserManagementApp, key: sfuZUserManagementApp,
+    url: 'http://localhost:8081/apps/EchoApp', handler: com.flashphoner.zapp.handler.SFUZUserManagement,
+    callback: com.flashphoner.sfu.handler.SFUCallbackHandler}
+  sfuZExamplesManagementApp: {name: sfuZExamplesManagementApp, key: sfuZExamplesManagementApp,
+    url: 'http://localhost:8081/apps/EchoApp', handler: com.flashphoner.zapp.handler.SFUZExamplesManagement,
+    callback: com.flashphoner.sfu.handler.SFUCallbackHandler}
+  sfuZAttachmentsTransferHandler: {name: sfuZAttachmentsTransferHandler, key: SFUZAttachmentsTransferHandlerApp,
+    url: 'http://localhost:8081/apps/EchoApp', handler: com.flashphoner.zapp.handler.SFUZAttachmentsTransferHandler,
+    callback: com.flashphoner.sfu.handler.SFUCallbackHandler}
+  sfuApp: {name: sfuApp, key: sfuApp, url: 'http://localhost:8081/apps/EchoApp', handler: com.flashphoner.sfu.handler.SFUHandler,
+    callback: com.flashphoner.sfu.handler.SFUCallbackHandler}
+restMethods:
+  defaultApp: [OnMessageEvent, XcapStatusEvent, sendDtmf, DataStatusEvent, ConnectionStatusEvent,
+    sessionDebug, pauseStream, playStream, StreamTranscodingGroupEvent, hangup, hold,
+    StreamStatusEvent, MessageStatusEvent, OnCallEvent, RecordingStatusEvent, ErrorStatusEvent,
+    StreamsStatEvent, OnTransferEvent, availableStream, SessionDebugStatusEvent, BugReportStatusEvent,
+    connect, subscribe, CallStatusEvent, StreamEvent, sendMessage, publishStream,
+    RegistrationStatusEvent, OnDataEvent, sendXcapRequest, unPublishStream, call,
+    transfer, answer, stopStream, StreamKeepAliveEvent, SubscriptionStatusEvent, unhold,
+    TransferStatusEvent, snapshot, pushLogs, submitBugReport]
+profiles: []

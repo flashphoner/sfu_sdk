@@ -1,0 +1,25 @@
+!!com.flashphoner.zapp.storage.yaml.permissions.RolePermissionRoot
+permissions:
+- displayName: GENERAL SPACE PERMISSIONS
+  name: GENERAL_PERMISSIONS
+  permissions:
+  - {description: Allows members to view changes by default (excluding private channels),
+    displayName: View channels, name: ALLOWS_TO_VIEW_CHANNELS, position: 0}
+  - {description: 'Allows members to create, edit or delete channels', displayName: Manage
+      channels, name: ALLOWS_TO_MANAGE_CHANNELS, position: 1}
+  - {description: 'Allows members to create, edit or delete categories', displayName: Manage
+      categories, name: ALLOWS_TO_MANAGE_CATEGORIES, position: 2}
+  - {description: Allows members to create new roles and edit or delete roles lower
+      than their highest role. Also members to change permissions of individual channels
+      that they have access to, displayName: Manage roles, name: ALLOWS_TO_MANAGE_ROLES,
+    position: 3}
+  - {description: 'Allows members to change this server''s name, switch regions and
+      add bots to this space', displayName: Manage space, name: ALLOWS_TO_MANAGE_SPACE,
+    position: 4}
+  position: 0
+- displayName: MEMBERSHIP PERMISSIONS
+  name: MEMBERSHIP_PERMISSIONS
+  permissions:
+  - {description: Allows members to invite new people to this space, displayName: Create
+      invite, name: ALLOWS_TO_CREATE_INVITE, position: 0}
+  position: 1

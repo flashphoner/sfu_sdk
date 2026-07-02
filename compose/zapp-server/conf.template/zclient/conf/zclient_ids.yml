@@ -1,0 +1,38 @@
+!!com.flashphoner.zapp.storage.yaml.id.MeetingIdRoot
+ids:
+  b36fa1db-05ec-4363-9a34-951e2b1f37da:
+    expireAt: -1
+    id: '100001'
+    settings: {accessCode: p@ssw0rd, allowJoinAtAnyTime: true, useAccessCode: true,
+      useLocalAutoRecord: false, useMuteAudioOnJoin: false, useOwnerVideo: true, useParticipantsVideo: true,
+      useWaitingRoom: true}
+    type: PERSONAL
+    uuid: b36fa1db-05ec-4363-9a34-951e2b1f37da
+    owner: bob
+  452a7d2b-7fd6-46fd-98b3-29bdeae1d081:
+    expireAt: -1
+    id: '100002'
+    settings: {accessCode: p@ssw0rd, allowJoinAtAnyTime: true, useAccessCode: true,
+      useLocalAutoRecord: false, useMuteAudioOnJoin: false, useOwnerVideo: true, useParticipantsVideo: true,
+      useWaitingRoom: true}
+    type: PERSONAL
+    uuid: 452a7d2b-7fd6-46fd-98b3-29bdeae1d081
+    owner: alice
+  a110aa35-430e-4049-811f-fb87afe04b9e:
+    expireAt: -1
+    id: '100003'
+    settings: {accessCode: p@ssw0rd, allowJoinAtAnyTime: true, useAccessCode: true,
+      useLocalAutoRecord: false, useMuteAudioOnJoin: false, useOwnerVideo: true, useParticipantsVideo: true,
+      useWaitingRoom: true}
+    type: PERSONAL
+    uuid: a110aa35-430e-4049-811f-fb87afe04b9e
+    owner: kiri
+  e0483d79-60dd-4302-a0bf-30269c987e3a:
+    expireAt: -1
+    id: '100004'
+    settings: {accessCode: p@ssw0rd, allowJoinAtAnyTime: true, useAccessCode: true,
+      useLocalAutoRecord: false, useMuteAudioOnJoin: false, useOwnerVideo: true, useParticipantsVideo: true,
+      useWaitingRoom: true}
+    type: PERSONAL
+    uuid: e0483d79-60dd-4302-a0bf-30269c987e3a
+    owner: john
