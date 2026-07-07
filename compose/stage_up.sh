@@ -39,10 +39,10 @@ sed -i "s|\${ZAPP_SERVER_IP}|$ZAPP_SERVER_IP|" ./zapp-server/conf/app.yaml
 sed -i "s|\${MONGO_IP}|$MONGO_IP|" ./zapp-server/conf/app.yaml
 
 # S3 storage configuration substitution for zapp-server
-sed -i "s|\${S3_ACCESS_KEY}|$S3_ACCESS_KEY|" ./zapp-server/conf/zclient/conf/zclient_settings.yml
-sed -i "s|\${S3_SECRET_KEY}|$S3_SECRET_KEY|" ./zapp-server/conf/zclient/conf/zclient_settings.yml
-sed -i "s|\${S3_REGION}|$S3_REGION|" ./zapp-server/conf/zclient/conf/zclient_settings.yml
-sed -i "s|\${S3_ENDPOINT}|$S3_ENDPOINT|" ./zapp-server/conf/zclient/conf/zclient_settings.yml
+sed -i "s|\${S3_ACCESS_KEY}|$S3_ACCESS_KEY|" ./zapp-server/conf/zclient_settings.yml
+sed -i "s|\${S3_SECRET_KEY}|$S3_SECRET_KEY|" ./zapp-server/conf/zclient_settings.yml
+sed -i "s|\${S3_REGION}|$S3_REGION|" ./zapp-server/conf/zclient_settings.yml
+sed -i "s|\${S3_ENDPOINT}|$S3_ENDPOINT|" ./zapp-server/conf/zclient_settings.yml
 
 # Prevuious instances cleanup
 ./stage_down.sh

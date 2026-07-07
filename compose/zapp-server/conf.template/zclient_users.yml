@@ -1,0 +1,55 @@
+!!com.flashphoner.zapp.aaa.data.ConfigRoot
+users:
+  bob:
+    email: bob@flashphoner.com
+    id: bob
+    meetingId: b36fa1db-05ec-4363-9a34-951e2b1f37da
+    nickName: bob
+    password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
+    pendingRegistration: false
+    permissions: [!!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_CREATE', !!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_JOIN',
+      !!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_DESTROY', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'SEND_MESSAGE',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'USER_LIST', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'USER_CALENDAR',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ADD_CALENDAR_EVENT', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'REMOVE_CALENDAR_EVENT',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ROOT']
+  alice:
+    email: alice@flashphoner.com
+    id: alice
+    meetingId: 452a7d2b-7fd6-46fd-98b3-29bdeae1d081
+    nickName: alice
+    password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
+    pendingRegistration: false
+    permissions: [!!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_CREATE', !!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_JOIN',
+      !!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_DESTROY', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'SEND_MESSAGE',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'USER_LIST', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'USER_CALENDAR',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ADD_CALENDAR_EVENT', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'REMOVE_CALENDAR_EVENT',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ROOT']
+  kiri:
+    email: kiri@flashphoner.com
+    id: kiri
+    meetingId: a110aa35-430e-4049-811f-fb87afe04b9e
+    nickName: kiri
+    password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
+    pendingRegistration: false
+    permissions: [!!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_CREATE', !!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_JOIN',
+      !!com.flashphoner.sfu.aaa.model.OperationType 'ROOM_DESTROY', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'SEND_MESSAGE',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'USER_LIST', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'USER_CALENDAR',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ADD_CALENDAR_EVENT', !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'REMOVE_CALENDAR_EVENT',
+      !!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ROOT']
+  john:
+    email: john@flashphoner.com
+    id: john
+    meetingId: e0483d79-60dd-4302-a0bf-30269c987e3a
+    nickName: john
+    password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
+    pendingRegistration: true
+    permissions: [!!com.flashphoner.zapp.aaa.model.ZAppOperationType 'ROOT']
+  recorder@flashphoner.com:
+    email: recorder@flashphoner.com
+    id: recorder@flashphoner.com
+    meetingId: ''
+    nickName: recorder
+    password: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
+    pendingRegistration: true
+    permissions: []
+
