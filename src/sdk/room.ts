@@ -162,11 +162,13 @@ export class Room {
         const requiresRelayCandidate = this.#requiresRelayCandidate();
         if (!requiresRelayCandidate) {
             await this.#_pc.setLocalDescription(description);
-            return this.#_pc.localDescription?.sdp || description.sdp || "";
+            // zapp-1249 this.#_pc.localDescription?.sdp does not return sdp with our attribute a=content, we should return sdp with our changes
+            return description?.sdp || this.#_pc.localDescription?.sdp || "";
         }
 
         const gatheredCandidates = await this.#setLocalDescriptionAndGatherIce(description);
-        let localSdp = this.#_pc.localDescription?.sdp || description.sdp || "";
+        // zapp-1249 this.#_pc.localDescription?.sdp does not contain our attribute a=content, use our own sdp as base and merge gathered relay candidates into it
+        let localSdp = description?.sdp || this.#_pc.localDescription?.sdp || "";
         localSdp = Room.#withGatheredCandidates(localSdp, gatheredCandidates);
         localSdp = Room.#withOnlyRelayCandidates(localSdp);
         if (!Room.#hasRelayCandidate(localSdp)) {
