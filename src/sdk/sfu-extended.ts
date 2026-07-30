@@ -283,6 +283,7 @@ export class SfuExtended {
      * @param options.username - The user's username (optional if `authToken` is provided).
      * @param options.password - The user's password (optional if `authToken` is provided).
      * @param options.authToken - The authentication token for direct login (optional if `username` and `password` are provided).
+     * @param options.kcToken - A Keycloak access token for the primary login; requires `username`, ignored unless Keycloak auth is enabled on the server.
      *
      * After successfully connection user contacts will receive an {@link SfuEvent.USER_PRESENCE_STATUS_UPDATED} with {@link UserPresenceStatusUpdated}
      */
@@ -295,6 +296,7 @@ export class SfuExtended {
         binaryChunkSize?: number
         failedProbesThreshold?: number,
         authToken?: string,
+        kcToken?: string,
         pingInterval?: number,
         device?: string,
         details?: ConnectionDetails
@@ -322,7 +324,8 @@ export class SfuExtended {
                 password: options.password,
                 nickname: options.nickname,
                 device: options.device,
-                details: options.details
+                details: options.details,
+                kcToken: options.kcToken
             }
         };
         const self = this;
