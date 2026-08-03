@@ -5,6 +5,10 @@ meetingIdFrom: 1000000
 meetingIdTo: 9999999
 tokenExpirationTimeInSec: 604800
 verifyLoggingInByEmail: false
+authz:
+  enforcement: OFF
+  requireSignedLinks: true
+  serviceAccounts: []
 mongoConnectionTimeoutInSec: 5
 mongoKeepAliveIntervalInSec: 15
 mongoElectionTimeoutMillis: 10000
