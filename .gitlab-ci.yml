@@ -1,0 +1,95 @@
+# CI/CD @flashphoner/sfusdk (SFU SDK) → версионируемые tar.gz/tgz в MinIO (bucket `builds`).
+# Правки CI — на ИСТОЧНИКЕ (gitlab.flashphoner.com), затем зеркало в gitlab2 (wcs/sfu-sdk),
+# где и запускается пайплайн. TeamCity (конфиг SFU-SDK-1.0, линия 2.0) не задет — он .gitlab-ci.yml
+# не читает и продолжает публиковать в artifactory.
+#
+# Раскладка (общая для группы, как у server/billing/desktop/website):
+#   wcs/sfu-sdk/releases/                — сборки из master
+#   wcs/sfu-sdk/branches/<ветка>/        — сборки из веток
+# Имена: sfu-sdk-2.0.<N>.tgz (npm pack) и sfu-sdk-2.0.<N>-examples.tar.gz + подвижные -2.0-latest.
+# Номер <N> — общий счётчик: max(MinIO, TeamCity, Artifactory)+1, продолжает нумерацию TeamCity.
+#
+# CI-vars (gitlab2, проект wcs/sfu-sdk): MINIO_ENDPOINT/MINIO_ACCESS_KEY/MINIO_SECRET_KEY,
+# TEAMCITY_USER/TEAMCITY_PASSWORD, ARTIFACTORY_USER/ARTIFACTORY_PASSWORD_B64.
+
+include:
+  - project: 'infra/ci-templates-k8s-stage'
+    ref: main
+    file: '/build-number.yml'
+
+stages:
+  - prepare
+  - package
+
+variables:
+  NPM_REGISTRY: "https://artifactory.flashphoner.com:4873/"
+  MC_URL: "https://dl.min.io/client/mc/release/linux-amd64/mc"
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+
+build-number:
+  extends: .build-number
+  variables:
+    BUILD_PRODUCT: "sfu-sdk"
+    BUILD_MINIO_PREFIX: "wcs/sfu-sdk"
+    BUILD_LINE: "2.0"                     # линия версии пакета (package.json 2.0.x)
+    ARTIFACTORY_PROJECT: "SFU-SDK"
+    TC_MASTER_BUILDTYPES: "Sdk_Sfu_Version_10_SfuSdk10"   # id исторический, публикует линию 2.0
+    TC_PRODUCT: "SFU-SDK"                 # веточные конфиги: "SFU-SDK | <ветка>"
+    TC_ID_PREFIX: "Sdk_Sfu"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+# Сборка библиотеки (tsc) + упаковка npm-пакета и примеров.
+package-sdk:
+  stage: package
+  tags: [docker, stage]
+  image: node:18
+  needs:
+    - job: build-number
+      artifacts: true
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+      - .npm/
+  script:
+    # artifactory отдаёт leaf без интермедиата → strict-ssl off (как в остальных npm-сборках).
+    - npm config set strict-ssl false
+    - npm config set registry "$NPM_REGISTRY"
+    # --ignore-scripts: postinstall тянет нативный wrtc (get-node-wrtc.sh), для tsc он не нужен.
+    - npm ci --ignore-scripts --no-audit --no-fund
+    # Версия пакета = номер сборки: он попадает и в имя tgz, и внутрь package.json.
+    - |
+      node -e '
+        const f="package.json", p=require("./"+f);
+        p.version=process.env.BUILD_VERSION;
+        require("fs").writeFileSync(f, JSON.stringify(p,null,2)+"\n");
+        console.log("package version =", p.version);
+      '
+    - npm run build
+    - |
+      set -e
+      test -d dist || { echo "tsc не дал dist/"; exit 1; }
+      npm pack                                   # → flashphoner-sfusdk-<version>.tgz
+      mv flashphoner-sfusdk-*.tgz "sfu-sdk-${BUILD_VERSION}.tgz"
+      tar czf "sfu-sdk-${BUILD_VERSION}-examples.tar.gz" -C examples .
+      ls -lh sfu-sdk-${BUILD_VERSION}*
+    - |
+      set -e
+      command -v mc >/dev/null 2>&1 || { curl -fsSL -o /usr/local/bin/mc "$MC_URL" && chmod +x /usr/local/bin/mc; }
+      # у групповых MINIO_* бывает хвостовой пробел → mc: invalid port ":9000 "
+      EP="$(printf %s "$MINIO_ENDPOINT" | tr -d '[:space:]')"
+      AK="$(printf %s "$MINIO_ACCESS_KEY" | tr -d '[:space:]')"
+      SK="$(printf %s "$MINIO_SECRET_KEY" | tr -d '[:space:]')"
+      mc alias set m "$EP" "$AK" "$SK"
+      D="builds/${BUILD_DEST}"
+      mc cp "sfu-sdk-${BUILD_VERSION}.tgz"              "m/$D/"
+      mc cp "sfu-sdk-${BUILD_VERSION}-examples.tar.gz"  "m/$D/"
+      mc cp "sfu-sdk-${BUILD_VERSION}.tgz"              "m/$D/sfu-sdk-${BUILD_LINE}-latest.tgz"
+      mc cp "sfu-sdk-${BUILD_VERSION}-examples.tar.gz"  "m/$D/sfu-sdk-${BUILD_LINE}-examples-latest.tar.gz"
+      mc cp build-meta.json                             "m/$D/sfu-sdk-${BUILD_VERSION}.meta.json"
+      echo "=== опубликовано в $D ==="; mc ls "m/$D/"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
