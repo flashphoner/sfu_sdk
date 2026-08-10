@@ -39,7 +39,7 @@
     "wrtc": "^0.4.7"
   },
   "dependencies": {
-    "@flashphoner/web-sdk-metrics": "^1.0.0",
+    "@flashphoner/web-sdk-metrics": "1.0.1-zapp-1238",
     "@types/pako": "^2.0.4",
     "async-mutex": "^0.4.0",
     "collections": "^5.1.13",

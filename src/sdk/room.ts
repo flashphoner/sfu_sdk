@@ -55,6 +55,10 @@ import {
     RTCMetricsServerDescription
 } from '@flashphoner/web-sdk-metrics';
 
+// Metrics-batch attribute key carrying the SFU room id. WCS convention shared with the ingest backend,
+// which reads attributes["roomId"] to enumerate a room's sessions. Opaque to web-sdk-metrics itself.
+const ATTR_ROOM_ID = "roomId";
+
 type GatheredIceCandidate = {
     line: string,
     sdpMid?: string | null,
@@ -518,6 +522,7 @@ export class Room {
                 if (this._webRTCMetricsServerDescription && !this.#_statCollector) {
                     const builder: RTCMetricsCollectorBuilder = new RTCMetricsCollectorBuilder()
                         .id(this._mediaSessionId)
+                        .attribute(ATTR_ROOM_ID, this._id)
                         .logger(this.logger)
                         .peerConnection(this.#_pc)
                         .websocketSender(this.connection)
