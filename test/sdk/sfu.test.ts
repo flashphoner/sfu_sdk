@@ -1,4 +1,5 @@
 import {RoomState, Sfu, SfuEvent} from "../../src";
+import {url} from "../util/constants";
 
 describe("sfu", () => {
     it("should connect", (done) => {
@@ -8,7 +9,7 @@ describe("sfu", () => {
            done();
        });
        sfu.connect({
-           url: "ws://127.0.0.1:8080/",
+           url,
            nickname: "test",
            logGroup: "test"
        });
@@ -21,7 +22,7 @@ describe("sfu", () => {
             done();
         });
         sfu.connect({
-            url: "ws://127.0.0.1:8080/",
+            url,
             nickname: "test",
             logGroup: "test"
         });
@@ -29,7 +30,7 @@ describe("sfu", () => {
     it("should create room", async () => {
         const sfu = new Sfu();
         await sfu.connect({
-            url: "ws://127.0.0.1:8080/",
+            url,
             nickname: "test",
             logGroup: "test"
         });

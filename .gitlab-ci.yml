@@ -16,10 +16,14 @@ include:
   - project: 'infra/ci-templates-k8s-stage'
     ref: main
     file: '/build-number.yml'
+  - project: 'infra/ci-templates-k8s-stage'
+    ref: main
+    file: '/structure-test.yml'
 
 stages:
   - prepare
   - package
+  - test
 
 variables:
   NPM_REGISTRY: "https://artifactory.flashphoner.com:4873/"
@@ -93,3 +97,64 @@ package-sdk:
       echo "=== опубликовано в $D ==="; mc ls "m/$D/"
   rules:
     - if: '$CI_COMMIT_BRANCH'
+
+# Прогон сьюта SDK против эфемерной структуры (см. шаблон structure-test.yml). Заменяет шаг
+# TeamCity, который поднимал compose-стенд из образов dockerhub:5000 и падал, если образа ветки
+# и latest не оказалось: подбор «ветка карточки, иначе релиз» и досборку недостающего делает
+# контрол-плейн структур. Структура живёт сутки после создания — упавший прогон есть где разобрать.
+structure-test:
+  extends: .structure-test
+  image: node:18
+  needs: []
+  variables:
+    ALLURE_LAUNCH_PREFIX: "SDK Test launch"
+    ALLURE_LAUNCH_TAGS: "SDK Tests"
+    ALLURE_RESULTS: "allure-results"
+    # Стенд БЕЗ биллинга — как compose/docker-compose.yml этого репозитория (mongodb + minio +
+    # zapp-server, биллинга нет). Под него написаны тесты, и в TeamCity они проходят именно так.
+    # С биллингом zapp-node включает billing-клиент, а профиль в dev не создаётся (account/init
+    # требует аутентификации, Keycloak в dev не настроен → 401), и сьют виснет на
+    # «Billing profile is loading» — 59 broken в первом прогоне были именно этим.
+    STRUCTURE_BILLING: "false"
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+      - .npm/
+  script:
+    - !reference [.structure-test, script]
+    - npm config set strict-ssl false
+    - npm config set registry "$NPM_REGISTRY"
+    # БЕЗ --ignore-scripts (в отличие от package-sdk): тестам нужен нативный wrtc.node,
+    # его тянет postinstall → get-node-wrtc.sh.
+    - npm ci --no-audit --no-fund
+    # SFU_TEST_URL экспортирован шаблоном (wss://<хост структуры>/) — тесты идут на неё, а не на
+    # локальный compose.
+    # Репортёр и таймаут добавляем ФЛАГАМИ, а не в jest.config.js/package.json: конфиг общий с
+    # TeamCity, и менять там что-либо ради структуры нельзя.
+    #   --reporters=jest-allure2-reporter — пишет allure-results/, дальше их забирает allurectl.
+    #     Взят именно РЕПОРТЁР, а не окружение allure-jest: последнее собирает результаты через
+    #     handleTestEvent, а это circus-only API, и под jest-jasmine2 (он выставлен в jest.config.js)
+    #     молча не пишет ничего. Переводить сьют на circus нельзя: 25 тестов написаны как
+    #     `it(..., async (done) => {})`, что circus отвергает. Репортёры от runner'а не зависят.
+    #   --testTimeout — стенд за ingress и TLS отвечает медленнее локального compose на петле,
+    #     и тесты, укладывавшиеся в дефолтные 5с на агенте, здесь в них не влезают.
+    - npm test -- --reporters=jest-allure2-reporter --testTimeout=30000
+  after_script:
+    # Вывод пишем и в файл: лог джобы обрезается лимитом раннера (4 МБ), а дампы упавших
+    # jest-кейсов его выбирают целиком — без артефакта итог выгрузки просто не виден.
+    - structure-ctl allure-upload 2>&1 | tee allure-upload.log || true
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - allure-results/
+      - allure-upload.log
+  rules:
+    # Веточный прогон — по кнопке: структура + возможная досборка образов стоят минут, зря
+    # дёргать раннер на каждый пуш не нужно. Из YouTrack джоба запускается триггером.
+    - if: '$CI_COMMIT_BRANCH'
+      when: manual
+      allow_failure: true

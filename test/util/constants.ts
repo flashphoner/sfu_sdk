@@ -4,8 +4,14 @@ import {ChannelSendPolicy, ChatType, MessageAttachmentType} from "../../src/sdk/
 import {createFileFromPath} from "./fsUtils";
 import {v4 as uuidv4} from 'uuid';
 
-export const url = "ws://127.0.0.1:8080/";
-export const wrongWsUrl = "ws://127.0.0.1:8081/";
+// Signaling under test. The default is the local compose stand (compose/stage_up.sh), so running the
+// suite by hand or on TeamCity is unchanged. SFU_TEST_URL points the same suite at an ephemeral
+// structure — a full URL, not a host, because outside the cluster the node answers on wss://<host>/
+// (ingress, 443) rather than on port 8080. wrongWsUrl must stay a port nothing listens on: it is what
+// the "should not connect" cases dial, so it is derived separately and never falls back to the
+// signaling port. #OPS-70
+export const url = process.env.SFU_TEST_URL || "ws://127.0.0.1:8080/";
+export const wrongWsUrl = process.env.SFU_TEST_WRONG_URL || "ws://127.0.0.1:8081/";
 export const TEST_USER_0 = {
     username: "bob",
     email: "bob@flashphoner.com",
