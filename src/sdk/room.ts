@@ -166,13 +166,11 @@ export class Room {
         const requiresRelayCandidate = this.#requiresRelayCandidate();
         if (!requiresRelayCandidate) {
             await this.#_pc.setLocalDescription(description);
-            // zapp-1249 this.#_pc.localDescription?.sdp does not return sdp with our attribute a=content, we should return sdp with our changes
-            return description?.sdp || this.#_pc.localDescription?.sdp || "";
+            return this.#_pc.localDescription?.sdp || description.sdp || "";
         }
 
         const gatheredCandidates = await this.#setLocalDescriptionAndGatherIce(description);
-        // zapp-1249 this.#_pc.localDescription?.sdp does not contain our attribute a=content, use our own sdp as base and merge gathered relay candidates into it
-        let localSdp = description?.sdp || this.#_pc.localDescription?.sdp || "";
+        let localSdp = this.#_pc.localDescription?.sdp || description.sdp || "";
         localSdp = Room.#withGatheredCandidates(localSdp, gatheredCandidates);
         localSdp = Room.#withOnlyRelayCandidates(localSdp);
         if (!Room.#hasRelayCandidate(localSdp)) {
@@ -701,11 +699,11 @@ export class Room {
             if (self.#_state === RoomState.NEW) {
                 try {
                     const offer = await self.#_pc.createOffer();
-                    if (config) {
-                        offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
-                    }
                     offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                    const localSdp = await self.#setLocalDescription(offer);
+                    let localSdp = await self.#setLocalDescription(offer);
+                    if (config) {
+                        localSdp = self.#applyContentTypeConfig(localSdp, config);
+                    }
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
                     self._crutch.tid = uuidv4();
@@ -744,11 +742,11 @@ export class Room {
                     }
 
                     const offer = await self.#_pc.createOffer();
-                    if (config) {
-                        offer.sdp = self.#applyContentTypeConfig(offer.sdp, config);
-                    }
                     offer.sdp = offer.sdp.replace(/a=sendrecv/g, "a=sendonly");
-                    const localSdp = await self.#setLocalDescription(offer);
+                    let localSdp = await self.#setLocalDescription(offer);
+                    if (config) {
+                        localSdp = self.#applyContentTypeConfig(localSdp, config);
+                    }
                     const id = uuidv4();
                     promises.add(id, resolve, reject);
                     const localTid = uuidv4();
