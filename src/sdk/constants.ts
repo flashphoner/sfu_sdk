@@ -146,6 +146,18 @@ export enum SfuEvent {
     RECORDS_DELETED = "RECORDS_DELETED",
     REMOVE_RECORDS_RESULT = "REMOVE_RECORDS_RESULT",
     REMOVE_STORAGE_ATTACHMENTS_RESULT = "REMOVE_STORAGE_ATTACHMENTS_RESULT",
+    /** Used to receive {@link ChatsSyncSummaryEvent} */
+    CHATS_SYNC_SUMMARY = "CHATS_SYNC_SUMMARY",
+    /** Used to receive {@link MessagesDifferenceEvent} */
+    MESSAGES_DIFFERENCE = "MESSAGES_DIFFERENCE",
+    /** Used to receive {@link MessageCursorEvent} */
+    MESSAGE_CURSOR = "MESSAGE_CURSOR",
+    /**
+     * Server event stating that every journal record of the entity up to its cursor meant for this
+     * client has been sent already, see {@link MessagesCursorAdvancedEvent}. Surfaces to the client as
+     * a {@link MessageCursorEvent} with the watermark flag.
+     */
+    MESSAGES_CURSOR_ADVANCED = "MESSAGES_CURSOR_ADVANCED",
 }
 
 /**
@@ -576,6 +588,8 @@ export enum InternalApi {
     GET_STORAGE_SECTIONS = "getStorageSections",
     GET_FIRST_AND_LAST_MESSAGE = "getFirstAndLastMessage",
     GET_UNREAD_MESSAGES_COUNT = "getUnreadMessagesCount",
+    GET_CHATS_SYNC_SUMMARY = "getChatsSyncSummary",
+    GET_MESSAGES_DIFFERENCE = "getMessagesDifference",
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
     RENAME_CHAT = "renameChat",
@@ -1314,7 +1328,9 @@ export type Message = {
 }
 
 export type SfuMessageEvent = InternalMessage & {
-    message: Message
+    message: Message,
+    /** Journal seq of the change, see {@link MessageCursorEvent}. 0 or absent when the change was not journaled. */
+    cursor?: number
 }
 
 export type MessageStatusEvent = InternalMessage & {
@@ -1365,6 +1381,8 @@ export type AddedRemovedReactionOnMessage = InternalMessage & {
     messageId: string;
     reactedUser: string;
     reaction: string;
+    /** Journal seq of the change, see {@link MessageCursorEvent}. 0 or absent when the change was not journaled. */
+    cursor?: number;
 }
 
 export type ControlMessage = {
@@ -1587,6 +1605,131 @@ export type ChatSearchResultEvent = InternalMessage & {
     messages: Array<Message>
 }
 
+/**
+ * Default page size of a {@link MessagesDifferenceEvent}. Sending 0 to the server means "use the server default",
+ * which is the same value.
+ */
+export const DEFAULT_MESSAGES_DIFFERENCE_LIMIT = 200;
+
+/**
+ * Maximum number of intervals of {@link GetMessagesDifferenceConfig.cachedRanges}. A longer list is an error
+ * of the response rather than a silent truncation: truncating declares a coverage narrower than it is, which
+ * loses changes without any sign of the loss.
+ */
+export const MAX_CACHED_RANGES = 32;
+
+/**
+ * One interval of the locally cached history, both bounds are server dates of messages
+ * ({@link Message.date}) and both are inclusive.
+ */
+export type CachedRange = {
+    /** Server date of the oldest cached message of the interval, 0 — the interval reaches the beginning */
+    from: number;
+    /** Server date of the newest one, 0 — the interval reaches the present, allowed in the last interval only */
+    to: number;
+}
+
+/**
+ * Config of the getMessagesDifference operation
+ *
+ * @param sinceCursor last cursor known to the client for this entity, 0 to read the journal from the beginning
+ * @param limit maximum number of messages in a single response, 0 to use the server default
+ */
+export type GetMessagesDifferenceConfig = {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    sinceCursor?: number;
+    limit?: number;
+    /**
+     * Intervals of the history the client holds, sorted by {@link CachedRange.from} and non overlapping,
+     * at most {@link MAX_CACHED_RANGES} of them. A change is sent when the date of its message falls into
+     * one of the intervals, so a client that caches its entities in full leaves the field out.
+     *
+     * An empty list is the same as no field at all: both mean the whole history, there is no way to declare
+     * an empty coverage. A client holding nothing of an entity has nowhere to apply the response and should
+     * not ask for a difference at all.
+     */
+    cachedRanges?: Array<CachedRange>;
+}
+
+/**
+ * Catch up state of a single entity: messages changed after the requested cursor, with their actual state.
+ *
+ * Messages are deduplicated by id and ordered by their journal seq. Apply them by replacing the local
+ * copy with the same id, then store {@link newCursor} as the new cursor of the entity.
+ */
+export type MessagesDifferenceEvent = InternalMessage & {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    messages: Array<Message>;
+    /** Cursor to store after the whole response is applied. Never decreases. */
+    newCursor: number;
+    /**
+     * Response was truncated, either by limit or by the internal selection cap of the server, request the
+     * next page with sinceCursor = newCursor
+     */
+    hasMore: boolean;
+    /** Client is behind the journal retention, messages are empty, a full loadMessages is required */
+    resyncRequired: boolean;
+}
+
+/**
+ * Current server cursor of a single entity. currentCursor === 0 means the entity has no journal records yet.
+ */
+export type ChatCursor = {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    currentCursor: number;
+}
+
+/**
+ * Current cursors of every chat, channel and thread of the user
+ */
+export type ChatsSyncSummaryEvent = InternalMessage & {
+    cursors: Array<ChatCursor>;
+}
+
+/**
+ * Journal seq of a live message change. Emitted for every message event that the server journals,
+ * regardless of whether the event resolved a pending promise or was notified to subscribers.
+ *
+ * Not a server event type: SfuExtended derives it from the cursor field of the live events, which lets the
+ * cursor of an entity move between reconnects instead of freezing until the next MESSAGES_DIFFERENCE.
+ */
+export type MessageCursorEvent = {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    /** Message the change belongs to, absent for a watermark: it stands for no single change */
+    messageId?: string;
+    /** Journal seq of the change, always >= 1 (events with cursor 0 are not emitted) */
+    cursor: number;
+    /** Live event this cursor came from */
+    sourceEvent: SfuEvent;
+    /**
+     * The server states that every journal record up to {@link cursor} meant for this client has already
+     * been sent, so the cursor may jump straight to it, see {@link SfuEvent.MESSAGES_CURSOR_ADVANCED}.
+     *
+     * Without it a cursor only ever moves to the record right after the local one: records numbered in
+     * between may be on their way rather than addressed to somebody else, and a client that jumped over
+     * an event it has not received yet would never ask for it again.
+     */
+    watermark?: boolean;
+}
+
+/**
+ * Journal seq the entity has reached, sent to the members a change did not reach.
+ *
+ * Journal records are numbered per entity but addressed personally — a delivery status goes to the author
+ * of the message alone, a private message to its recipient alone — so a client sees a sequence with holes
+ * and cannot tell a record that was never meant for it from one that is late. This event answers that: it
+ * is the server confirming everything meant for this client up to the cursor has been sent.
+ */
+export type MessagesCursorAdvancedEvent = InternalMessage & {
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    cursor: number;
+}
+
 export type UserPmiSettings = InternalMessage & {
     pmiSettings: {
         allowJoinAtAnyTime: boolean,
@@ -1632,14 +1775,18 @@ export type UserTimezoneChangedEvent = InternalMessage & {
 export type MessageEdited = InternalMessage & {
     targetEntityType: MessageTargetEntityType;
     targetEntityId: MessageTargetEntityId;
-    message: Message
+    message: Message,
+    /** Journal seq of the change, see {@link MessageCursorEvent}. 0 or absent when the change was not journaled. */
+    cursor?: number
 }
 
 export type MessageDeleted = InternalMessage & {
     targetEntityType: MessageTargetEntityType;
     targetEntityId: MessageTargetEntityId;
     messageId: string,
-    state: MessageState
+    state: MessageState,
+    /** Journal seq of the change, see {@link MessageCursorEvent}. 0 or absent when the change was not journaled. */
+    cursor?: number
 }
 
 export type SignUpStatus = InternalMessage & {

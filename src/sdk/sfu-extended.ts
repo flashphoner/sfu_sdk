@@ -25,7 +25,10 @@ import {
     ChatReceivePolicy,
     ChatSearchResultEvent,
     ChatsEvent,
+    ChatsSyncSummaryEvent,
     ChatType,
+    GetMessagesDifferenceConfig,
+    MessagesDifferenceEvent,
     ConnectionDetails,
     ConnectionFailedEvent,
     CreatedRoom,
@@ -41,6 +44,7 @@ import {
     MessageAttachmentData,
     MessageAttachmentMediaType,
     MessageAttachmentsSearchResult,
+    MessageCursorEvent,
     MessageDeleted,
     MessageEdited,
     MessageStatus,
@@ -65,6 +69,7 @@ import {
     SpaceInviteCreated,
     SfuSpaceRole,
     State,
+    MessagesCursorAdvancedEvent,
     UpdateChatEvent,
     UpdateMessagesDeliveryStatusEvent,
     UserCalendarEvent,
@@ -200,6 +205,7 @@ import {
     RecordSortField,
 } from "./constants";
 import {Notifier} from "./notifier";
+import {MessagesSyncOptions, MessagesSynchronizer, SyncEntity} from "./messages-sync";
 import {RoomExtended} from "./room-extended";
 import {SendingAttachmentsHandler} from "./sending-attachments-handler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
@@ -208,7 +214,7 @@ import {AttachmentsTransferManager} from "./attachments-transfer-manager";
 import { uploadFile } from './file-upload';
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
-export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact;
+export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact | MessageCursorEvent;
 
 export type EventUnion = SfuEvent | SpaceEvent | MeetingSyncEvent;
 
@@ -264,6 +270,36 @@ export class SfuExtended {
 
     #emmitBinaryAction(data: any) {
         this.#connection.sendBinaryData(data);
+    }
+
+    /**
+     * Emit the journal seq carried by a live message event as a separate {@link SfuEvent.MESSAGE_CURSOR}.
+     *
+     * The payloads of the live events themselves are left untouched: subscribers of {@link SfuEvent.MESSAGE}
+     * keep receiving a {@link Message}, and an event answering an own action still goes to the pending promise
+     * rather than to the subscribers. The cursor is taken before that branching, so a change made by this very
+     * client moves the cursor just like a change made by anybody else.
+     *
+     * @param raw the event as it came from the server, the cursor is read from its top level
+     * @param entity entity the change belongs to, taken from the message itself for SFU_MESSAGE and
+     *               SEND_MESSAGE_SYNC and from the top level of the event for the rest
+     * @param watermark the cursor covers every record up to it rather than one change of its own, see
+     *                  {@link MessageCursorEvent.watermark}
+     */
+    #emitMessageCursor(raw: any, sourceEvent: SfuEvent, entity: SyncEntity, messageId: string,
+                       watermark?: boolean) {
+        const cursor = raw && raw.cursor;
+        if (!Number.isFinite(cursor) || cursor <= 0 || !entity || !entity.targetEntityType) {
+            return; //no journal seq: best effort on the server, or a storage without a journal
+        }
+        this.#notifier.notify(SfuEvent.MESSAGE_CURSOR, {
+            targetEntityType: entity.targetEntityType,
+            targetEntityId: entity.targetEntityId,
+            messageId,
+            cursor,
+            sourceEvent,
+            watermark: !!watermark
+        } as MessageCursorEvent);
     }
 
     #checkAuthenticated() {
@@ -394,9 +430,15 @@ export class SfuExtended {
                         //TODO(naz): refactor this part
                         if (data[0].type === InternalApi.MESSAGE) {
                             const message = (data[0] as SfuMessageEvent).message;
+                            //the entity of a new message lives in the message, the event has no top level one
+                            this.#emitMessageCursor(data[0], SfuEvent.MESSAGE, message, message ? message.id : undefined);
                             this.#notifier.notify(SfuEvent.MESSAGE, message);
                         } else if (data[0].type === InternalApi.MESSAGE_STATE) {
                             const messageState = data[0] as MessageStatusEvent;
+                            //the answer to an own sendMessage and editMessage: carries the seq of the journal
+                            //record of that change, a state of anything unjournaled carries no cursor at all
+                            this.#emitMessageCursor(data[0], SfuEvent.MESSAGE_STATE, messageState.status,
+                                messageState.status ? messageState.status.id : undefined);
                             if (!!messageState.waitingUploadingAttachments) {
                                 this.#uploadingAttachmentState[messageState.status.id] = messageState.messageWithUploadingAttachments;
                             }
@@ -417,6 +459,11 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, updateEvent)) {
                                 this.#notifier.notify(SfuEvent.UPDATE_MESSAGES_DELIVERY_STATUS, updateEvent);
                             }
+                        } else if (data[0].type === SfuEvent.MESSAGES_CURSOR_ADVANCED) {
+                            //carries no change of its own: only the cursor, and only for the synchronizer
+                            const advanced = data[0] as MessagesCursorAdvancedEvent;
+                            this.#emitMessageCursor(advanced, SfuEvent.MESSAGES_CURSOR_ADVANCED, advanced,
+                                undefined, true);
                         } else if (data[0].type === InternalApi.SFU_ATTACHMENT_REQUEST_ACK) {
                             const ack = data[0] as AttachmentRequestAck;
                             const request = ack.attachmentRequest as AttachmentRequest;
@@ -506,6 +553,16 @@ export class SfuExtended {
                             const messagesEvent = data[0] as ChatSearchResultEvent;
                             promises.resolve(data[0].internalMessageId, messagesEvent.messages);
                             this.#notifier.notify(SfuEvent.CHAT_SEARCH_RESULT, messagesEvent);
+                        } else if (data[0].type === SfuEvent.CHATS_SYNC_SUMMARY) {
+                            const event = data[0] as ChatsSyncSummaryEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHATS_SYNC_SUMMARY, event);
+                            }
+                        } else if (data[0].type === SfuEvent.MESSAGES_DIFFERENCE) {
+                            const event = data[0] as MessagesDifferenceEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.MESSAGES_DIFFERENCE, event);
+                            }
                         } else if (data[0].type === RoomEvent.CREATED) {
                             const state = data[0] as CreatedRoom;
                             const room = new RoomExtended(this.#connection, state.roomId, state.owner, state.name, state.pin, this.user().username, this.user().nickname, state.creationTime, state.config, state.waitingRoomEnabled, this.#loggerPrefix, state.conferenceType, this.user().webRTCMetricsServerDescription);
@@ -646,21 +703,26 @@ export class SfuExtended {
                             }
                         } else if (data[0].type === SfuEvent.CHAT_MESSAGE_EDITED) {
                             const message = data[0] as MessageEdited;
+                            this.#emitMessageCursor(message, SfuEvent.CHAT_MESSAGE_EDITED, message,
+                                message.message ? message.message.id : undefined);
                             if (!promises.resolve(data[0].internalMessageId, message)) {
                                 this.#notifier.notify(SfuEvent.CHAT_MESSAGE_EDITED, message);
                             }
                         } else if (data[0].type === SfuEvent.CHAT_MESSAGE_DELETED) {
                             const message = data[0] as MessageDeleted;
+                            this.#emitMessageCursor(message, SfuEvent.CHAT_MESSAGE_DELETED, message, message.messageId);
                             if (!promises.resolve(data[0].internalMessageId, message)) {
                                 this.#notifier.notify(SfuEvent.CHAT_MESSAGE_DELETED, message);
                             }
                         } else if (data[0].type === SfuEvent.REACTION_ON_MESSAGE_ADDED) {
                             const event = data[0] as AddedRemovedReactionOnMessage;
+                            this.#emitMessageCursor(event, SfuEvent.REACTION_ON_MESSAGE_ADDED, event, event.messageId);
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SfuEvent.REACTION_ON_MESSAGE_ADDED, event);
                             }
                         } else if (data[0].type === SfuEvent.REACTION_ON_MESSAGE_REMOVED) {
                             const event = data[0] as AddedRemovedReactionOnMessage;
+                            this.#emitMessageCursor(event, SfuEvent.REACTION_ON_MESSAGE_REMOVED, event, event.messageId);
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SfuEvent.REACTION_ON_MESSAGE_REMOVED, event);
                             }
@@ -720,6 +782,9 @@ export class SfuExtended {
                             }
                         } else if (data[0].type === SfuEvent.SEND_MESSAGE_SYNC) {
                             const message = (data[0] as SfuMessageEvent).message;
+                            //the entity of a new message lives in the message, the event has no top level one
+                            this.#emitMessageCursor(data[0], SfuEvent.SEND_MESSAGE_SYNC, message,
+                                message ? message.id : undefined);
                             this.#notifier.notify(SfuEvent.SEND_MESSAGE_SYNC, message);
                         } else if (data[0].type === SfuEvent.AUTHENTICATION_STATUS) {
                             const event = data[0] as AuthenticationStatusEvent;
@@ -1491,6 +1556,65 @@ export class SfuExtended {
         return new Promise<Array<Message>>(function (resolve, reject) {
             self.#emmitAction(InternalApi.LOAD_MESSAGES, params, resolve, reject);
         });
+    };
+
+    /**
+     * Get the current server cursor of every chat, channel and thread of the user in a single request.
+     *
+     * Compare the returned cursors with the ones kept locally to find out which entities changed while
+     * the client was away, then pull those with {@link getMessagesDifference}.
+     */
+    public getChatsSyncSummary() {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatsSyncSummaryEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_CHATS_SYNC_SUMMARY, {}, resolve, reject);
+        });
+    };
+
+    /**
+     * Get the actual state of every message of an entity changed after the given cursor.
+     *
+     * Messages come deduplicated by id and ordered by their journal seq, apply them by replacing the local
+     * copy with the same id. Store {@link MessagesDifferenceEvent.newCursor} once the whole response is applied,
+     * request the next page with sinceCursor = newCursor while hasMore is set, and fall back to a full
+     * {@link loadMessages} when resyncRequired is set.
+     *
+     * Delivery status changes are journaled as well, but only those of the messages falling into the cache
+     * of the client are sent, so pass the intervals of the locally held history when there are any.
+     *
+     * @param config.sinceCursor last cursor known to the client, 0 to read the journal from the beginning
+     * @param config.limit maximum number of messages in the response, 0 to use the server default
+     * @param config.cachedRanges intervals of the locally held history, left out by a client that caches
+     *                            its entities in full, see {@link GetMessagesDifferenceConfig.cachedRanges}
+     */
+    public getMessagesDifference(config: GetMessagesDifferenceConfig) {
+        this.#checkAuthenticated();
+        const self = this;
+        const payload: GetMessagesDifferenceConfig = {
+            targetEntityType: config.targetEntityType,
+            targetEntityId: config.targetEntityId,
+            sinceCursor: config.sinceCursor ? config.sinceCursor : 0,
+            limit: config.limit ? config.limit : 0
+        };
+        //an empty list is the same as no field at all, so it is not sent
+        if (config.cachedRanges && config.cachedRanges.length > 0) {
+            payload.cachedRanges = config.cachedRanges;
+        }
+        return new Promise<MessagesDifferenceEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_MESSAGES_DIFFERENCE, payload, resolve, reject);
+        });
+    };
+
+    /**
+     * Create a catch up synchronization layer on top of this connection.
+     *
+     * The synchronizer pulls the cursor summary and the difference of the diverging entities on every
+     * connect and reconnect, leaving the live stream untouched. Persisting messages and cursors is up to
+     * the passed {@link MessagesSyncStore}.
+     */
+    public createMessagesSynchronizer(options: MessagesSyncOptions): MessagesSynchronizer {
+        return new MessagesSynchronizer(this, options);
     };
 
     /**

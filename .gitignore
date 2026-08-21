@@ -6,3 +6,4 @@ examples/sfu.js
 compose/zapp-server/conf/
 compose/zapp-server/logs/
 compose/.env
+.dev/
