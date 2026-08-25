@@ -212,6 +212,7 @@ import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 import {AttachmentsTransferManager} from "./attachments-transfer-manager";
 import { uploadFile } from './file-upload';
+import { resolveServerUrl } from './server-url';
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
 export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact | MessageCursorEvent;
@@ -4215,6 +4216,17 @@ export class SfuExtended {
     }
 
 
+    /* The upload url is composed by the server from its own address, so it is pointed back at the host
+       the client is connected to; the download url returned in the response carries the same address. */
+    async #uploadIcon(uploadUrl: string, icon?: File): Promise<string> {
+        const downloadUrl = await uploadFile({
+            url: this.resolveServerUrl(uploadUrl),
+            file: icon
+        });
+
+        return this.resolveServerUrl(downloadUrl);
+    }
+
     private async updateSpaceIconRequest(options: {
         id: string;
         name?: string;
@@ -4259,10 +4271,7 @@ export class SfuExtended {
                 return null;
             }
 
-            return uploadFile({
-                url: uploadUrl,
-                file: options.icon
-            });
+            return this.#uploadIcon(uploadUrl, options.icon);
         } catch (error) {
             throw new Error(error.error);
         }
@@ -4309,10 +4318,7 @@ export class SfuExtended {
                 return null;
             }
 
-            return uploadFile({
-                url: uploadUrl,
-                file: options.icon
-            });
+            return this.#uploadIcon(uploadUrl, options.icon);
         } catch (error) {
             throw new Error(error.error);
         }
@@ -4362,7 +4368,7 @@ export class SfuExtended {
                 return null;
             }
 
-            return uploadFile({url: uploadUrl, file: options.icon});
+            return this.#uploadIcon(uploadUrl, options.icon);
         } catch (error) {
             throw new Error(error.error);
         }
@@ -4403,10 +4409,7 @@ export class SfuExtended {
                 return null;
             }
 
-            return uploadFile({
-                url: uploadUrl,
-                file: options.icon
-            });
+            return this.#uploadIcon(uploadUrl, options.icon);
         } catch (error) {
             throw new Error(error.error);
         }
@@ -4436,6 +4439,17 @@ export class SfuExtended {
 
     public server() {
         return this.#_server;
+    }
+
+    /**
+     * Points a url issued by the server at the host this client is connected to.
+     *
+     * Icon urls are built by the server from its own configured address, which may be a bare IP the
+     * client cannot reach or validate against the certificate. Urls with a named host are returned
+     * unchanged.
+     */
+    public resolveServerUrl(url: string): string {
+        return resolveServerUrl(url, this.#_server);
     }
 
     public state() {
