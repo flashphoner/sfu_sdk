@@ -1880,6 +1880,8 @@ export type RecordsDeletedEvent = InternalMessage & {
 
 export type RemoveRecordsResult = InternalMessage & {
     deletedSize: number;
+    releasedIds: Array<string>;
+    failedIds: Array<string>;
 }
 
 export type AttachmentListItem = {

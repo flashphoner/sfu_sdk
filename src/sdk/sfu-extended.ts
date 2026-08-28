@@ -1877,6 +1877,13 @@ export class SfuExtended {
         })
     }
 
+    /**
+     * Removes the meeting records of the Storage section.
+     *
+     * A record of a meeting in a personal chat is kept by both participants: the call gives up the caller's copy
+     * and frees their storage, and the record itself is deleted once nobody keeps it. Any other record is deleted
+     * for everyone, and only its owner may do that.
+     */
     public removeRecords(records: Array<{
         id: string,
         record: string,
@@ -4178,7 +4185,8 @@ export class SfuExtended {
      * In global meetings – the meeting owner
      * In channel meetings – the space owner
      * In group direct chats – the chat creator
-     * In personal direct chats – no one
+     * In personal direct chats – every participant, but only for themselves: the recording stays available to the
+     * other side and leaves the storage once both participants have removed it
      *
      * Users will receive {@link MeetingRecordDeleted} for global meetings and {@link MessageEdited} for others, because it's system message
      */
