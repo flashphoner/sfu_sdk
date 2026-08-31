@@ -5,6 +5,15 @@ meetingIdFrom: 1000000
 meetingIdTo: 9999999
 tokenExpirationTimeInSec: 604800
 verifyLoggingInByEmail: false
+authMode: SELF_ISSUER
+selfIssuer:
+  # The address the tests reach this stand at; the compose file publishes 8081 on the host.
+  issuer: http://127.0.0.1:8081
+  # Loopback would not need it, but the address in this template is edited more often than the validator is read.
+  allowInsecureIssuer: true
+  newDevice:
+    # There is no mail.properties in a conf.template, so the sign-in form would stop at a code nobody receives.
+    emailCodeEnabled: false
 authz:
   enforcement: OFF
   requireSignedLinks: true
