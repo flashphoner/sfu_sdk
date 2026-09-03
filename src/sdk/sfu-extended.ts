@@ -212,7 +212,7 @@ import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 import {AttachmentsTransferManager} from "./attachments-transfer-manager";
 import { uploadFile } from './file-upload';
-import { resolveServerUrl } from './server-url';
+import { resolveServerTemplate, resolveServerUrl } from './server-url';
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
 export type NotifyUnion = InternalMessage | Message | MessageStatus | AttachmentStatus | Calendar | UserSpecificChatInfo | ChatMap | Chat | ArrayBuffer | CalendarEvent | Attachment | UserInfo | Array<SfuSpace> | Contact | MessageCursorEvent;
@@ -4218,9 +4218,19 @@ export class SfuExtended {
     public async getSystemConfig() {
         this.#checkAuthenticated();
         const self = this;
-        return new Promise<SystemConfig>(function (resolve, reject) {
+        const config = await new Promise<SystemConfig>(function (resolve, reject) {
             self.#emmitAction(InternalApi.GET_SYSTEM_CONFIG, {}, resolve, reject);
         });
+
+        /* The templates carry the address the server sees for itself, the same as icon urls do. */
+        if (config?.endpoints) {
+            config.endpoints = Object.fromEntries(
+                Object.entries(config.endpoints)
+                    .map(([name, template]) => [name, resolveServerTemplate(template, this.#_url)])
+            );
+        }
+
+        return config;
     }
 
 
@@ -4450,14 +4460,11 @@ export class SfuExtended {
     }
 
     /**
-     * Points a url issued by the server at the host this client is connected to.
-     *
-     * Icon urls are built by the server from its own configured address, which may be a bare IP the
-     * client cannot reach or validate against the certificate. Urls with a named host are returned
-     * unchanged.
+     * Rebuilds a url issued by the server against the connection this client holds, so that it is
+     * reachable and loadable from here. See resolveServerUrl in ./server-url for the rules.
      */
     public resolveServerUrl(url: string): string {
-        return resolveServerUrl(url, this.#_server);
+        return resolveServerUrl(url, this.#_url);
     }
 
     public state() {

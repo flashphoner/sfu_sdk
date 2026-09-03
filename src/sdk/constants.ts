@@ -2490,6 +2490,7 @@ export type SystemConfig = {
     billing: BillingConfig;
     domains: Array<CustomDomain>;
     availableMediaNodes: Array<MediaNodeInfo>;
+    endpoints: Record<string, string>;
 }
 
 export type SystemConfigEvent = InternalMessage & {
