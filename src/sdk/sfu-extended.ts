@@ -67,6 +67,7 @@ import {
     SortOrder,
     SfuSpace,
     SpaceInviteCreated,
+    SpaceInviteUpdated,
     SfuSpaceRole,
     State,
     MessagesCursorAdvancedEvent,
@@ -877,6 +878,11 @@ export class SfuExtended {
                             const event = data[0] as SpaceInviteCreated;
                             if (!promises.resolve(data[0].internalMessageId, event.invite)) {
                                 this.#notifier.notify(SpaceEvent.SPACE_INVITE_CREATED, event);
+                            }
+                        } else if (data[0].type === SpaceEvent.SPACE_INVITE_UPDATED) {
+                            const event = data[0] as SpaceInviteUpdated;
+                            if (!promises.resolve(data[0].internalMessageId, event.invite)) {
+                                this.#notifier.notify(SpaceEvent.SPACE_INVITE_UPDATED, event);
                             }
                         } else if (data[0].type === SpaceEvent.SPACE_INVITE_REVOKED) {
                             const event = data[0] as SpaceInviteRevoked;

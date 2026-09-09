@@ -313,6 +313,8 @@ export enum SpaceEvent {
     REMOVED_MEMBER_FROM_THREAD = "REMOVED_MEMBER_FROM_THREAD",
     /** Used to receive {@link SpaceInviteCreated} */
     SPACE_INVITE_CREATED = "SPACE_INVITE_CREATED",
+    /** Used to receive {@link SpaceInviteUpdated} */
+    SPACE_INVITE_UPDATED = "SPACE_INVITE_UPDATED",
     /** Used to receive {@link SpaceInviteRevoked} */
     SPACE_INVITE_REVOKED = "SPACE_INVITE_REVOKED",
     /** Used to receive {@link NewSpaceRoleAdded} */
@@ -2264,6 +2266,11 @@ export type SpaceThreadDeleted = InternalMessage & {
 }
 
 export type SpaceInviteCreated = InternalMessage & {
+    spaceId: string;
+    invite: SfuSpaceInvite
+}
+
+export type SpaceInviteUpdated = InternalMessage & {
     spaceId: string;
     invite: SfuSpaceInvite
 }
