@@ -5,6 +5,7 @@ import {
     AddedRoleToMember,
     Attachment,
     ATTACHMENT_CHUNK_SIZE,
+    ATTACHMENT_REQUEST_TIMEOUT_MS,
     AttachmentRequest,
     AttachmentRequestAck,
     AttachmentState,
@@ -244,6 +245,7 @@ export class SfuExtended {
     #uploadingAttachmentState: MessageWithUploadingAttachmentState = {}
     #attachmentsTransferManager: AttachmentsTransferManager = new AttachmentsTransferManager(this.#notifier);
     #binaryChunkSize: number;
+    #transferPingOptions: {pingInterval?: number, failedProbesThreshold?: number} = {};
     #logger: Logger = new Logger();
     #loggerPrefix: PrefixFunction;
     #signUpId: string = '';
@@ -261,13 +263,14 @@ export class SfuExtended {
         this.#logger.setVerbosity(logLevel ? logLevel : Verbosity.ERROR);
     }
 
-    #emmitAction(action: InternalApi, data: object, resolve: Function, reject: Function) {
+    #emmitAction(action: InternalApi, data: object, resolve: Function, reject: Function): string {
         const id = uuidv4();
         promises.add(id, resolve, reject);
         this.#connection.send(action, {
             ...data,
             internalMessageId: id
         });
+        return id;
     }
 
     #emmitBinaryAction(data: any) {
@@ -350,6 +353,8 @@ export class SfuExtended {
             return Promise.reject(new Error(ConnectionError.CONNECTION_ALREADY_ESTABLISHED));
         }
         this.#_state = State.PENDING;
+        this.#attachmentsTransferManager.dropIdle();
+        this.#transferPingOptions = {pingInterval: options.pingInterval, failedProbesThreshold: options.failedProbesThreshold};
         const connectionConfig = {
             url: options.url,
             appName: InternalApi.Z_APP,
@@ -1177,11 +1182,12 @@ export class SfuExtended {
             },
             (e) => {
                 self.#_state = State.FAILED;
+                self.#attachmentsTransferManager.dropIdle();
                 self.#notifier.notify(SfuEvent.CONNECTION_FAILED, e as InternalMessage);
             },
             (e) => {
                 self.#_state = State.DISCONNECTED;
-                self.disconnect();
+                self.#teardown(false);
                 self.#uploadingAttachmentState = {};
                 const event: ConnectionFailedEvent = {
                     reason: e.reason,
@@ -1211,16 +1217,25 @@ export class SfuExtended {
      * After disconnection user contacts will receive an {@link SfuEvent.USER_PRESENCE_STATUS_UPDATED} with {@link UserPresenceStatusUpdated}
      */
     public async disconnect() {
+        await this.#teardown(true);
+    };
+
+    async #teardown(closeTransfers: boolean) {
         for (const [key, value] of Object.entries(this.#rooms)) {
             value.leaveRoom();
         }
         this.#_user = undefined;
+        if (closeTransfers) {
+            void this.#attachmentsTransferManager.close();
+        } else {
+            this.#attachmentsTransferManager.dropIdle();
+        }
         if (this.#_state !== State.DISCONNECTED) {
             await this.#connection.close();
             this.#_state = State.DISCONNECTED;
         }
         this.#rooms = {};
-    };
+    }
 
     /**
      * Sign up for new users
@@ -2134,7 +2149,7 @@ export class SfuExtended {
         } catch (e) {
             throw e;
         }
-        return await this.#attachmentsTransferManager.download(result, this.#_url);
+        return await this.#attachmentsTransferManager.download(result, {url: this.#_url, ...this.#transferPingOptions});
     }
 
     private downloadAttachment(attachment: AttachmentRequest) {
@@ -2151,7 +2166,7 @@ export class SfuExtended {
             throw new Error('Empty attachment id');
         }
         return new Promise<Attachment>(function (resolve, reject) {
-            self.#emmitAction(InternalApi.GET_ATTACHMENT, {
+            const id = self.#emmitAction(InternalApi.GET_ATTACHMENT, {
                 targetEntityType: targetEntityType,
                 targetEntityId: targetEntityId,
                 messageId: messageId,
@@ -2159,6 +2174,7 @@ export class SfuExtended {
                 name: name,
                 size: self.#binaryChunkSize
             }, resolve, reject);
+            setTimeout(() => promises.reject(id, new Error(ChatError.DOWNLOADING_ATTACHMENT_FAILED)), ATTACHMENT_REQUEST_TIMEOUT_MS);
         })
     }
 
@@ -4160,7 +4176,12 @@ export class SfuExtended {
         pageRequest?: {
             page: number,
             pageSize: number,
-        }
+        },
+        /**
+         * When true, only meetings that still have a recording are returned. Backs the "Rec" filter of the
+         * meetings History list; omit or set false to return the full history.
+         */
+        recordedOnly?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;

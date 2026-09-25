@@ -808,6 +808,14 @@ export enum ExamplesError {
 }
 
 export const ATTACHMENT_CHUNK_SIZE = 100000;
+export const ATTACHMENT_REQUEST_TIMEOUT_MS = 30000;
+export const ATTACHMENTS_TRANSFER_POOL_SIZE = 3;
+export const ATTACHMENTS_TRANSFER_MAX_CLIENTS = 6;
+export const ATTACHMENTS_TRANSFER_STALLED_MS = 3000;
+export const ATTACHMENTS_TRANSFER_IDLE_TIMEOUT_MS = 30000;
+export const ATTACHMENTS_TRANSFER_CONNECT_TIMEOUT_MS = 10000;
+export const ATTACHMENTS_TRANSFER_FIRST_CHUNK_TIMEOUT_MS = 600000;
+export const ATTACHMENTS_TRANSFER_RESPONSE_TIMEOUT_MS = 120000;
 
 export type InternalMessage = {
     type: SfuEvent | RoomEvent | SpaceEvent | MeetingSyncEvent | InternalApi | ExamplesEvent,
