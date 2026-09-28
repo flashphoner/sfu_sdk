@@ -82,6 +82,8 @@ export enum SfuEvent {
     CHAT_MESSAGES_COUNT = "CHAT_MESSAGES_COUNT",
     /** Used to receive {@link FirstAndLastChatMessage} */
     FIRST_AND_LAST_CHAT_MESSAGE = "FIRST_AND_LAST_CHAT_MESSAGE",
+    /** Used to receive {@link ChannelPreviewEvent} */
+    CHANNEL_PREVIEW = "CHANNEL_PREVIEW",
     /** Used to receive {@link UnreadMessagesCountEvent} */
     UNREAD_MESSAGES_COUNT = "UNREAD_MESSAGES_COUNT",
     /** Used to receive {@link UnreadMessagesCountUpdate} */
@@ -148,6 +150,8 @@ export enum SfuEvent {
     REMOVE_STORAGE_ATTACHMENTS_RESULT = "REMOVE_STORAGE_ATTACHMENTS_RESULT",
     /** Used to receive {@link ChatsSyncSummaryEvent} */
     CHATS_SYNC_SUMMARY = "CHATS_SYNC_SUMMARY",
+    /** Used to receive {@link ChatCursorEvent} */
+    CHAT_CURSOR = "CHAT_CURSOR",
     /** Used to receive {@link MessagesDifferenceEvent} */
     MESSAGES_DIFFERENCE = "MESSAGES_DIFFERENCE",
     /** Used to receive {@link MessageCursorEvent} */
@@ -589,8 +593,10 @@ export enum InternalApi {
     GET_ATTACHMENTS_SIZE = "getAttachmentsSize",
     GET_STORAGE_SECTIONS = "getStorageSections",
     GET_FIRST_AND_LAST_MESSAGE = "getFirstAndLastMessage",
+    GET_CHANNEL_PREVIEW = "getChannelPreview",
     GET_UNREAD_MESSAGES_COUNT = "getUnreadMessagesCount",
     GET_CHATS_SYNC_SUMMARY = "getChatsSyncSummary",
+    GET_CHAT_CURSOR = "getChatCursor",
     GET_MESSAGES_DIFFERENCE = "getMessagesDifference",
     CREATE_CHAT = "createChat",
     DELETE_CHAT = "deleteChat",
@@ -1700,6 +1706,11 @@ export type ChatsSyncSummaryEvent = InternalMessage & {
 }
 
 /**
+ * Current cursor of a single chat, channel or thread, see {@link SfuExtended.getChatCursor}
+ */
+export type ChatCursorEvent = InternalMessage & ChatCursor;
+
+/**
  * Journal seq of a live message change. Emitted for every message event that the server journals,
  * regardless of whether the event resolved a pending promise or was notified to subscribers.
  *
@@ -1824,6 +1835,23 @@ export type FirstAndLastChatMessage = InternalMessage & {
     firstMessageDate: number;
     lastMessageId: string;
     lastMessageDate: number;
+}
+
+/**
+ * The newest message of a thread the user may see, null for a thread without one
+ */
+export type ThreadPreview = {
+    threadId: string;
+    message: Message | null;
+}
+
+/**
+ * The newest message of every thread of a channel, see {@link SfuExtended.getChannelPreview}
+ */
+export type ChannelPreviewEvent = InternalMessage & {
+    spaceId: string;
+    channelId: string;
+    threads: Array<ThreadPreview>;
 }
 
 export type UnreadMessagesCountEvent = InternalMessage & {

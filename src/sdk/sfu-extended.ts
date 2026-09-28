@@ -26,6 +26,7 @@ import {
     ChatReceivePolicy,
     ChatSearchResultEvent,
     ChatsEvent,
+    ChatCursorEvent,
     ChatsSyncSummaryEvent,
     ChatType,
     GetMessagesDifferenceConfig,
@@ -34,6 +35,7 @@ import {
     ConnectionFailedEvent,
     CreatedRoom,
     FirstAndLastChatMessage,
+    ChannelPreviewEvent,
     InternalApi,
     InternalMessage,
     LastReadMessageUpdated,
@@ -565,6 +567,11 @@ export class SfuExtended {
                             if (!promises.resolve(data[0].internalMessageId, event)) {
                                 this.#notifier.notify(SfuEvent.CHATS_SYNC_SUMMARY, event);
                             }
+                        } else if (data[0].type === SfuEvent.CHAT_CURSOR) {
+                            const event = data[0] as ChatCursorEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHAT_CURSOR, event);
+                            }
                         } else if (data[0].type === SfuEvent.MESSAGES_DIFFERENCE) {
                             const event = data[0] as MessagesDifferenceEvent;
                             if (!promises.resolve(data[0].internalMessageId, event)) {
@@ -742,6 +749,11 @@ export class SfuExtended {
                             const info = data[0] as FirstAndLastChatMessage;
                             if (!promises.resolve(data[0].internalMessageId, info)) {
                                 this.#notifier.notify(SfuEvent.FIRST_AND_LAST_CHAT_MESSAGE, info);
+                            }
+                        } else if (data[0].type === SfuEvent.CHANNEL_PREVIEW) {
+                            const event = data[0] as ChannelPreviewEvent;
+                            if (!promises.resolve(data[0].internalMessageId, event)) {
+                                this.#notifier.notify(SfuEvent.CHANNEL_PREVIEW, event);
                             }
                         } else if (data[0].type === SfuEvent.UNREAD_MESSAGES_COUNT) {
                             const event = data[0] as UnreadMessagesCountEvent;
@@ -1595,6 +1607,26 @@ export class SfuExtended {
     };
 
     /**
+     * Get the current server cursor of a single chat, channel or thread.
+     *
+     * For an entity the client is about to load and holds no cursor of, when the summary of
+     * {@link getChatsSyncSummary} does not list it. currentCursor === 0 means the entity has no journal records yet.
+     */
+    public getChatCursor(params: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChatCursorEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_CHAT_CURSOR, {
+                targetEntityType: params.targetEntityType,
+                targetEntityId: params.targetEntityId
+            }, resolve, reject);
+        });
+    };
+
+    /**
      * Get the actual state of every message of an entity changed after the given cursor.
      *
      * Messages come deduplicated by id and ordered by their journal seq, apply them by replacing the local
@@ -1964,6 +1996,29 @@ export class SfuExtended {
             self.#emmitAction(InternalApi.GET_FIRST_AND_LAST_MESSAGE, {
                 targetEntityType: options.targetEntityType,
                 targetEntityId: options.targetEntityId
+            }, resolve, reject);
+        });
+    }
+
+    /**
+     * Get the newest message of every thread of a channel the user belongs to, in a single request.
+     *
+     * Meant for a list of threads: it is filled without loading every thread. A private message is skipped
+     * unless the requester is its author or its addressee, and the request leaves delivery statuses as they are.
+     *
+     * @param options.spaceId space of the channel
+     * @param options.channelId channel whose threads are previewed
+     */
+    public getChannelPreview(options: {
+        spaceId: string,
+        channelId: string,
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<ChannelPreviewEvent>(function (resolve, reject) {
+            self.#emmitAction(InternalApi.GET_CHANNEL_PREVIEW, {
+                spaceId: options.spaceId,
+                channelId: options.channelId
             }, resolve, reject);
         });
     }

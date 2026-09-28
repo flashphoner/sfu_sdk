@@ -22,12 +22,15 @@ import {
 } from "./sdk/messages-sync";
 export type {
     CachedRange,
+    ChannelPreviewEvent,
     ChatCursor,
+    ChatCursorEvent,
     ChatsSyncSummaryEvent,
     GetMessagesDifferenceConfig,
     MessageCursorEvent,
     MessagesDifferenceEvent,
-    MessageTargetEntityId
+    MessageTargetEntityId,
+    ThreadPreview
 } from "./sdk/constants";
 export type {
     CachedWindow,

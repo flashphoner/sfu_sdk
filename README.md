@@ -93,10 +93,13 @@ monotonic per entity number, `seq`, and the client keeps the last one it has see
 every reconnect the client asks for the current cursors of all its entities, and pulls the difference of those
 that diverged.
 
-Two operations back this up:
+Three operations back this up:
 
 * `getChatsSyncSummary()` returns the current server cursor of every chat, channel and thread of the user in
   a single request.
+* `getChatCursor(params)` returns the current server cursor of a single chat, channel or thread, for an entity
+  the summary does not list — one that appeared after the summary was fetched. `currentCursor === 0` means the
+  entity has no journal records yet.
 * `getMessagesDifference(config)` returns the actual state of every message of an entity changed after
   `config.sinceCursor`, deduplicated by id and ordered by `seq`, together with the `newCursor` to store,
   `hasMore` when the response was truncated by `limit`, and `resyncRequired` when the client fell behind the
