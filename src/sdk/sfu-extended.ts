@@ -5,6 +5,13 @@ import {
     AddedRoleToMember,
     Attachment,
     ATTACHMENT_CHUNK_SIZE,
+    AttachmentCancelAck,
+    AttachmentUploadState,
+    HTTP_ATTACHMENTS_UPLOAD_PARALLELISM,
+    HTTP_ATTACHMENTS_LINKS_REFRESH_MS,
+    HTTP_ATTACHMENTS_LINK_REASK_TIMEOUT_MS,
+    SendingMessageDraft,
+    UploadingAttachmentInfo,
     ATTACHMENT_REQUEST_TIMEOUT_MS,
     AttachmentRequest,
     AttachmentRequestAck,
@@ -44,6 +51,7 @@ import {
     LoadMessagesWithMentionsResult,
     Message,
     MessageAttachment,
+    MessageState,
     MessageAttachmentData,
     MessageAttachmentMediaType,
     MessageAttachmentsSearchResult,
@@ -207,15 +215,18 @@ import {
     RemoveStorageAttachmentsResult,
     AttachmentSortField,
     RecordSortField,
+    ATTACHMENT_CLEANUP_INCOMPLETE_ERROR,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {MessagesSyncOptions, MessagesSynchronizer, SyncEntity} from "./messages-sync";
 import {RoomExtended} from "./room-extended";
-import {SendingAttachmentsHandler} from "./sending-attachments-handler";
+import {SendingAttachmentsHandler} from "./attachments/sending-attachments-handler";
+import {AttachmentSendQueueMember, AttachmentSendScheduler} from "./attachments/attachment-send-scheduler";
 import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
-import {AttachmentsTransferManager} from "./attachments-transfer-manager";
-import { uploadFile } from './file-upload';
+import {AttachmentsTransferManager} from "./attachments/attachments-transfer-manager";
+import { uploadFile } from './attachments/file-upload';
+import { uploadAttachmentBody, HttpUpload, UPLOAD_ABORTED, UPLOAD_NETWORK_FAILURE } from './attachments/attachment-http-uploader';
 import { resolveServerTemplate, resolveServerUrl } from './server-url';
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
@@ -246,6 +257,10 @@ export class SfuExtended {
     #notifier: Notifier<EventUnion, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
     #uploadingAttachmentState: MessageWithUploadingAttachmentState = {}
     #attachmentsTransferManager: AttachmentsTransferManager = new AttachmentsTransferManager(this.#notifier);
+    #attachmentDownloadCancels: Set<string> = new Set();
+    // a cancel with no getMessageAttachment in flight must not poison a future one
+    #attachmentDownloadsInFlight: Map<string, number> = new Map();
+    #attachmentSendScheduler: AttachmentSendScheduler = new AttachmentSendScheduler(HTTP_ATTACHMENTS_UPLOAD_PARALLELISM);
     #binaryChunkSize: number;
     #transferPingOptions: {pingInterval?: number, failedProbesThreshold?: number} = {};
     #logger: Logger = new Logger();
@@ -695,7 +710,9 @@ export class SfuExtended {
                                 }
                             }
                         } else if (data[0].type === SfuEvent.ACK && promises.promised(data[0].internalMessageId)) {
-                            promises.resolve(data[0].internalMessageId);
+                            /* Plain ACK consumers branch on resolving with nothing: only the cancel ack has a payload. */
+                            const cancelAck = data[0] as AttachmentCancelAck;
+                            promises.resolve(data[0].internalMessageId, cancelAck.cancelledKind ? cancelAck : undefined);
                         } else if (data[0].roomId && data[0].roomId.length > 0) {
                             //room event
                             const room = this.#rooms[data[0].roomId];
@@ -1442,7 +1459,7 @@ export class SfuExtended {
                                 this.#notifier.notify(SfuEvent.RESET_PASSWORD_REQUEST_STATUS, status);
                             }
                         } else if (data[0].type === SfuEvent.ACK && promises.promised(data[0].internalMessageId)) {
-                            promises.resolve(data[0].internalMessageId);
+                            promises.resolve(data[0].internalMessageId, undefined);
                             self.#resetPasswordId = '';
                             self.disconnect();
                         } else if (data[0].type === RoomEvent.OPERATION_FAILED && promises.promised(data[0].internalMessageId)) {
@@ -1680,12 +1697,15 @@ export class SfuExtended {
      * @param msg.to to send a private message
      */
     public sendMessage(msg: {
+        id?: string,
         body?: string,
         to?: string,
         parentId?: string,
         targetEntityType: MessageTargetEntityType,
         targetEntityId: MessageTargetEntityId,
-        attachments?: Array<MessageAttachment>
+        attachments?: Array<MessageAttachment>,
+        /** Upload by server-issued links; with a client-supplied id a repeat re-issues them idempotently. */
+        httpAttachments?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1697,12 +1717,14 @@ export class SfuExtended {
                 reject(new Error(ChatError.CAN_NOT_SEND_MESSAGE_WITHOUT_CONTENT));
             } else {
                 self.#emmitAction(InternalApi.SEND_MESSAGE, {
+                    id: msg.id,
                     to: msg.to,
                     parentId: msg.parentId,
                     body: msg.body,
                     targetEntityType: msg.targetEntityType,
                     targetEntityId: msg.targetEntityId,
-                    attachments: msg.attachments
+                    attachments: msg.attachments,
+                    httpAttachments: msg.httpAttachments
                 }, resolve, reject);
             }
         });
@@ -1722,7 +1744,8 @@ export class SfuExtended {
         messageId: string,
         body: string,
         attachmentsToSend?: Array<MessageAttachment>,
-        attachmentIdsToDelete?: string[]
+        attachmentIdsToDelete?: string[],
+        httpAttachments?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1733,7 +1756,8 @@ export class SfuExtended {
                 targetEntityId: msg.targetEntityId,
                 body: msg.body,
                 attachments: msg.attachmentsToSend,
-                attachmentIdsToDelete: msg.attachmentIdsToDelete
+                attachmentIdsToDelete: msg.attachmentIdsToDelete,
+                httpAttachments: msg.httpAttachments
             }, resolve, reject);
         });
     }
@@ -2054,11 +2078,21 @@ export class SfuExtended {
      *
      * Can't cancel sent attachment
      */
-    public getSendingAttachmentsHandler(attachments: Array<MessageAttachmentData>, messageId: string) {
+    public getSendingAttachmentsHandler(attachments: Array<MessageAttachmentData>, messageId: string,
+                                        message?: SendingMessageDraft) {
         const self = this;
         const messageWithAttachmentsState = self.#uploadingAttachmentState[messageId];
         if (!messageWithAttachmentsState) {
             return;
+        }
+        if (messageWithAttachmentsState.attachmentsInfo.some((info) => !!info.uploadUrl)) {
+            if (!messageWithAttachmentsState.attachmentsInfo.every((info) => !!info.uploadUrl)) {
+                throw new Error("The server issued upload links for only a part of the attachments");
+            }
+            if (!message) {
+                throw new Error("The HTTP transfer needs the message draft to finalize with");
+            }
+            return new SendingAttachmentsHandler(this.#sendHttpAttachments(attachments, messageId, message));
         }
 
         const messageTransferId = messageWithAttachmentsState.messageTransferId;
@@ -2192,19 +2226,596 @@ export class SfuExtended {
         return new SendingAttachmentsHandler(sendAttachments());
     }
 
+    #sendHttpAttachments(attachments: Array<MessageAttachmentData>, messageId: string, message: SendingMessageDraft) {
+        const self = this;
+        const cancelRequested = new Set<string>();
+        const pendingCancels: Array<Promise<unknown>> = [];
+        const activeUploads: { [id: string]: HttpUpload } = {};
+        let cancelledAll = false;
+        let stateStale = false;
+        let promiseForWaitResultMessageStatus: {resolve: Function, reject: Function};
+        let resultMessageStatus: MessageStatus;
+        let delivered = false;
+        let sendInFlight: Promise<MessageStatus> | undefined;
+        const queueKey = message.targetEntityType + "|" + [message.to, message.targetEntityId.chatId,
+            message.targetEntityId.spaceId, message.targetEntityId.channelId,
+            message.targetEntityId.threadId].map((part) => part ?? "").join("|");
+        let queueMember: AttachmentSendQueueMember | undefined;
+        let detachRequested = message.kind === "edit";
+        let connectionLostInFlight = false;
+        let linksIssuedAt = Date.now();
+
+        const activeSpecs = () => message.attachments.filter((spec) => !cancelRequested.has(spec.id));
+        const payloadOf = (id: string) => attachments.find((data) => data.id === id);
+
+        const notifyProgress = (spec: MessageAttachment, state: AttachmentState, uploadedSize: number) => {
+            self.#notifier.notify(SfuEvent.MESSAGE_ATTACHMENT_STATE, {
+                targetEntityType: message.targetEntityType,
+                targetEntityId: message.targetEntityId,
+                messageId: messageId,
+                id: spec.id,
+                name: spec.name,
+                state: state,
+                uploadedSize: uploadedSize
+            } as AttachmentStatus);
+        };
+
+        async function reissueLinks(): Promise<MessageStatus | undefined> {
+            /* An empty list would reach the server as a plain send or a legacy edit and deliver it. */
+            if (cancelledAll || !activeSpecs().length) {
+                linksIssuedAt = 0;
+                return undefined;
+            }
+            const status = await (message.kind === "edit"
+                ? self.editMessage({
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    messageId: messageId,
+                    body: message.body,
+                    attachmentsToSend: activeSpecs(),
+                    attachmentIdsToDelete: message.attachmentIdsToDelete,
+                    httpAttachments: true
+                })
+                : self.sendMessage({
+                    id: messageId,
+                    body: message.body,
+                    to: message.to,
+                    parentId: message.parentId,
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    attachments: activeSpecs(),
+                    httpAttachments: true
+                }));
+            linksIssuedAt = Date.now();
+            return status;
+        }
+
+        function uploadInfoOf(attachmentId: string): UploadingAttachmentInfo {
+            const state = self.#uploadingAttachmentState[messageId];
+            const info = state ? state.attachmentsInfo.find((candidate) => candidate.id === attachmentId) : undefined;
+            if (!info || !info.uploadUrl) {
+                throw new Error("No upload link for attachment " + attachmentId);
+            }
+            return info;
+        }
+
+        /* Runs before the body: the server pipeline starts on the body and must find the poster staged. */
+        async function uploadPosterOf(spec: MessageAttachment, data: MessageAttachmentData, info: UploadingAttachmentInfo): Promise<void> {
+            if (!data.poster || !info.posterUploadUrl) {
+                return;
+            }
+            const upload = uploadAttachmentBody({
+                url: resolveServerUrl(info.posterUploadUrl, self.#_url),
+                body: data.poster,
+                stallTimeoutMs: 20000
+            });
+            activeUploads[spec.id + "#poster"] = upload;
+            try {
+                const result = await upload.promise;
+                if (result.status !== 200) {
+                    self.#logger.info("Poster of attachment " + spec.id + " was refused with " + result.status
+                        + ", the server will extract its own");
+                }
+            } catch (e) {
+                if (connectionLostInFlight) {
+                    throw new Error(UPLOAD_NETWORK_FAILURE);
+                }
+                self.#logger.info("Poster of attachment " + spec.id + " was not uploaded, the server will extract its own");
+            } finally {
+                if (activeUploads[spec.id + "#poster"] === upload) {
+                    delete activeUploads[spec.id + "#poster"];
+                }
+            }
+        }
+
+        async function uploadOne(spec: MessageAttachment): Promise<void> {
+            if (cancelRequested.has(spec.id)) {
+                return;
+            }
+            const info = uploadInfoOf(spec.id);
+            if (info.uploadState === AttachmentUploadState.READY || info.uploadState === AttachmentUploadState.PENDING) {
+                /* PENDING means the server holds the body and runs the pipeline: a re-PUT gets ALREADY_STORED. */
+                notifyProgress(spec, AttachmentState.UPLOADED, spec.size);
+                return;
+            }
+            const data = payloadOf(spec.id);
+            if (!data) {
+                throw new Error("No payload for attachment " + spec.id);
+            }
+            await uploadPosterOf(spec, data, info);
+            if (cancelRequested.has(spec.id)) {
+                return;
+            }
+            let lastReported = 0;
+            const upload = uploadAttachmentBody({
+                url: resolveServerUrl(info.uploadUrl, self.#_url),
+                body: data.payload,
+                onProgress: (uploadedBytes) => {
+                    if (uploadedBytes - lastReported >= 1048576 || uploadedBytes >= spec.size) {
+                        lastReported = uploadedBytes;
+                        notifyProgress(spec, AttachmentState.PENDING, uploadedBytes);
+                    }
+                }
+            });
+            activeUploads[spec.id] = upload;
+            try {
+                const result = await upload.promise;
+                if (result.status !== 200) {
+                    const reason = result.response && result.response.error ? result.response.error : String(result.status);
+                    throw new Error("Upload of attachment " + spec.id + " refused: " + reason);
+                }
+                info.uploadState = AttachmentUploadState.PENDING;
+                notifyProgress(spec, AttachmentState.UPLOADED, spec.size);
+            } catch (e) {
+                if (e instanceof Error && e.message === UPLOAD_ABORTED && cancelRequested.has(spec.id)) {
+                    return;
+                }
+                if (e instanceof Error && e.message === UPLOAD_ABORTED && connectionLostInFlight) {
+                    throw new Error(UPLOAD_NETWORK_FAILURE);
+                }
+                throw e;
+            } finally {
+                if (activeUploads[spec.id] === upload) {
+                    delete activeUploads[spec.id];
+                }
+            }
+        }
+
+        async function uploadPending(): Promise<void> {
+            const member = queueMember;
+            if (!member) {
+                throw new Error("The http send has no queue member");
+            }
+            const queue = activeSpecs();
+            let next = 0;
+            const walk: { failure?: { error: unknown } } = {};
+            const worker = async () => {
+                while (next < queue.length && !walk.failure) {
+                    const spec = queue[next++];
+                    if (cancelRequested.has(spec.id)) {
+                        continue;
+                    }
+                    const releaseSlot = await member.acquireSlot();
+                    /* a slot or free pass granted after a failure: a PUT here would be a zombie racing the retry */
+                    if ((member.state === "settled" && !delivered) || walk.failure || connectionLostInFlight) {
+                        if (connectionLostInFlight) {
+                            walk.failure = walk.failure ?? {error: new Error(UPLOAD_NETWORK_FAILURE)};
+                        }
+                        releaseSlot();
+                        return;
+                    }
+                    try {
+                        await refreshStaleLinks();
+                        await uploadOne(spec);
+                    } catch (e) {
+                        if (!walk.failure) {
+                            walk.failure = {error: e};
+                            self.#attachmentSendScheduler.releaseSlotWaiters(member);
+                        }
+                    } finally {
+                        releaseSlot();
+                    }
+                }
+            };
+            await Promise.all(new Array(Math.min(HTTP_ATTACHMENTS_UPLOAD_PARALLELISM, queue.length)).fill(0).map(worker));
+            if (walk.failure) {
+                throw walk.failure.error;
+            }
+        }
+
+        function finalize(): Promise<MessageStatus> {
+            return new Promise<MessageStatus>(function (resolve, reject) {
+                promises.reject(messageId, new Error("The finalize was superseded by a retry"));
+                promises.add(messageId, resolve, reject);
+                self.#connection.send(InternalApi.SEND_MESSAGE_WITH_ATTACHMENTS, {
+                    id: messageId,
+                    internalMessageId: messageId,
+                    body: message.body,
+                    to: message.to,
+                    parentId: message.parentId,
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    attachments: activeSpecs(),
+                    httpAttachments: true
+                });
+            });
+        }
+
+        function abortActiveUploads() {
+            for (const id of Object.keys(activeUploads)) {
+                activeUploads[id].abort();
+            }
+        }
+
+        /* uuid-keyed asks get no disconnect sweep: a dead ws would hang the await and block the chat queue. */
+        async function withConnectionGuard<T>(work: Promise<T>): Promise<T> {
+            work.catch(() => undefined);
+            let settled = false;
+            const barrier = (async () => {
+                while (!settled && !connectionLostInFlight) {
+                    await self.#attachmentSendScheduler.nextChange();
+                }
+                if (!settled) {
+                    throw new Error(UPLOAD_NETWORK_FAILURE);
+                }
+                return undefined as T;
+            })();
+            try {
+                return await Promise.race([work, barrier]);
+            } finally {
+                settled = true;
+                self.#attachmentSendScheduler.bump();
+            }
+        }
+
+        let staleRefresh: Promise<unknown> | undefined;
+        function refreshStaleLinks(): Promise<unknown> {
+            if (Date.now() - linksIssuedAt <= HTTP_ATTACHMENTS_LINKS_REFRESH_MS) {
+                return Promise.resolve();
+            }
+            if (!staleRefresh) {
+                /* the guard covers a dead ws only: a silent server would keep the acquired slot forever */
+                let reaskTimer: ReturnType<typeof setTimeout>;
+                const timedOut = new Promise<never>((_resolve, reject) => {
+                    reaskTimer = setTimeout(() => reject(new Error(UPLOAD_NETWORK_FAILURE)), HTTP_ATTACHMENTS_LINK_REASK_TIMEOUT_MS);
+                });
+                timedOut.catch(() => undefined);
+                staleRefresh = Promise.race([withConnectionGuard(reissueLinks()), timedOut]).finally(() => {
+                    clearTimeout(reaskTimer);
+                    staleRefresh = undefined;
+                });
+            }
+            return staleRefresh;
+        }
+
+        function settleDelivered(result: MessageStatus) {
+            delivered = true;
+            queueMember?.settle();
+            resultMessageStatus = result;
+            if (promiseForWaitResultMessageStatus) {
+                promiseForWaitResultMessageStatus.resolve(result);
+            }
+        }
+
+        async function runSend(): Promise<MessageStatus> {
+            self.#checkAuthenticated();
+            const gateEscape = () => cancelledAll || !activeSpecs().length || connectionLostInFlight;
+            if (queueMember) {
+                await queueMember.awaitByteTurn(gateEscape);
+                if (connectionLostInFlight) {
+                    throw new Error(UPLOAD_NETWORK_FAILURE);
+                }
+                if (Date.now() - linksIssuedAt > HTTP_ATTACHMENTS_LINKS_REFRESH_MS) {
+                    stateStale = true;
+                }
+            }
+            if (stateStale) {
+                try {
+                    await withConnectionGuard(reissueLinks());
+                } catch (refusal) {
+                    /* The lost answer may have been the delivery: the idempotent finalize returns the stored state. */
+                    if (queueMember) {
+                        queueMember.markBytesDone();
+                        await queueMember.awaitDeliveryTurn(gateEscape);
+                        if (connectionLostInFlight) {
+                            throw new Error(UPLOAD_NETWORK_FAILURE);
+                        }
+                    }
+                    let stored;
+                    try {
+                        stored = await finalize();
+                    } catch (e) {
+                        throw refusal;
+                    }
+                    settleDelivered(stored);
+                    return stored;
+                }
+                stateStale = false;
+            }
+            try {
+                await uploadPending();
+            } catch (e) {
+                if (!(e instanceof Error) || e.message !== UPLOAD_NETWORK_FAILURE) {
+                    throw e;
+                }
+                try {
+                    await withConnectionGuard(reissueLinks());
+                } catch (refusal) {
+                    if (queueMember) {
+                        queueMember.markBytesDone();
+                        await queueMember.awaitDeliveryTurn(gateEscape);
+                        if (connectionLostInFlight) {
+                            throw new Error(UPLOAD_NETWORK_FAILURE);
+                        }
+                    }
+                    let stored;
+                    try {
+                        stored = await finalize();
+                    } catch (e) {
+                        throw refusal;
+                    }
+                    settleDelivered(stored);
+                    return stored;
+                }
+                await uploadPending();
+            }
+            if (pendingCancels.length) {
+                await withConnectionGuard(Promise.allSettled(pendingCancels.splice(0)));
+                await uploadPending();
+            }
+            if (queueMember) {
+                queueMember.markBytesDone();
+                await queueMember.awaitDeliveryTurn(gateEscape);
+                if (connectionLostInFlight) {
+                    throw new Error(UPLOAD_NETWORK_FAILURE);
+                }
+            }
+            /* Cancel acks must land before this fork, or a refused cancel-all sticks as DELIVERY_CANCELLED. */
+            while (pendingCancels.length) {
+                await withConnectionGuard(Promise.allSettled(pendingCancels.splice(0)));
+                await uploadPending();
+                if (queueMember) {
+                    await queueMember.awaitDeliveryTurn(gateEscape);
+                    if (connectionLostInFlight) {
+                        throw new Error(UPLOAD_NETWORK_FAILURE);
+                    }
+                }
+            }
+            if (message.kind !== "edit" && (cancelledAll || !activeSpecs().length)) {
+                const cancelledStatus = {
+                    id: messageId,
+                    targetEntityType: message.targetEntityType,
+                    targetEntityId: message.targetEntityId,
+                    state: MessageState.DELIVERY_CANCELLED
+                } as MessageStatus;
+                settleDelivered(cancelledStatus);
+                return cancelledStatus;
+            }
+            const result = await finalize();
+            settleDelivered(result);
+            return result;
+        }
+
+        return {
+            send: () => {
+                if (delivered) {
+                    return Promise.resolve(resultMessageStatus);
+                }
+                if (sendInFlight) {
+                    return sendInFlight;
+                }
+                if (!queueMember || queueMember.state === "settled") {
+                    queueMember = self.#attachmentSendScheduler.enqueue(detachRequested ? null : queueKey);
+                }
+                connectionLostInFlight = false;
+                const onConnectionLost = () => {
+                    connectionLostInFlight = true;
+                    abortActiveUploads();
+                    promises.reject(messageId, new Error(UPLOAD_NETWORK_FAILURE));
+                    queueMember?.poke();
+                };
+                self.#notifier.add(SfuEvent.DISCONNECTED, onConnectionLost);
+                self.#notifier.add(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+                sendInFlight = runSend().catch((e) => {
+                    stateStale = true;
+                    abortActiveUploads();
+                    queueMember?.settle();
+                    detachRequested = message.kind === "edit";
+                    if (promiseForWaitResultMessageStatus) {
+                        promiseForWaitResultMessageStatus.reject(e);
+                        promiseForWaitResultMessageStatus = undefined;
+                    }
+                    throw e;
+                }).finally(() => {
+                    sendInFlight = undefined;
+                    self.#notifier.remove(SfuEvent.DISCONNECTED, onConnectionLost);
+                    self.#notifier.remove(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+                });
+                return sendInFlight;
+            },
+            cancel: (attachment: MessageAttachment) => {
+                if (delivered) {
+                    return Promise.reject(new Error(ChatError.CAN_NOT_CANCEL_SENDING_ATTACHMENT));
+                }
+                const remaining = activeSpecs();
+                const isLast = remaining.length <= 1 && (!remaining.length || remaining[0].id === attachment.id);
+                if (isLast && message.kind === "edit") {
+                    return Promise.reject(new Error(ChatError.CAN_NOT_CANCEL_SENDING_ATTACHMENT));
+                }
+                try {
+                    self.#checkAuthenticated();
+                } catch (e) {
+                    return Promise.reject(e);
+                }
+                cancelRequested.add(attachment.id);
+                queueMember?.poke();
+                const upload = activeUploads[attachment.id];
+                if (upload) {
+                    upload.abort();
+                }
+                const posterUpload = activeUploads[attachment.id + "#poster"];
+                if (posterUpload) {
+                    posterUpload.abort();
+                }
+                const cancelCall = new Promise<AttachmentStatus>(function (resolve, reject) {
+                    const cancelledStatus = () => ({
+                        targetEntityType: message.targetEntityType,
+                        targetEntityId: message.targetEntityId,
+                        messageId: messageId,
+                        id: attachment.id,
+                        name: attachment.name,
+                        state: AttachmentState.CANCELLED,
+                        uploadedSize: 0
+                    } as AttachmentStatus);
+                    /* A dead ws never answers: the cancel stands, the server sweeps an unnamed upload on delivery. */
+                    let askId: string;
+                    const onConnectionLost = () => {
+                        promises.resolve(askId, cancelledStatus());
+                    };
+                    const watchConnection = () => {
+                        self.#notifier.add(SfuEvent.DISCONNECTED, onConnectionLost);
+                        self.#notifier.add(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+                    };
+                    const settle = (outcome: Function) => (value?: unknown) => {
+                        self.#notifier.remove(SfuEvent.DISCONNECTED, onConnectionLost);
+                        self.#notifier.remove(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+                        outcome(value);
+                    };
+                    if (isLast) {
+                        /* The server refuses to drop the last attachment alone: the whole send goes. */
+                        cancelledAll = true;
+                        if (queueMember) {
+                            self.#attachmentSendScheduler.releaseSlotWaiters(queueMember);
+                            queueMember.poke();
+                        }
+                        askId = self.#emmitAction(InternalApi.CANCEL_SENDING_MESSAGE, {
+                            id: messageId,
+                            targetEntityType: message.targetEntityType,
+                            targetEntityId: message.targetEntityId
+                        }, settle(() => resolve(cancelledStatus())), settle((refusal: unknown) => {
+                            cancelledAll = false;
+                            cancelRequested.delete(attachment.id);
+                            reject(refusal);
+                        }));
+                        watchConnection();
+                        return;
+                    }
+                    askId = self.#emmitAction(InternalApi.CANCEL_SENDING_ATTACHMENT, {
+                        messageId: messageId,
+                        attachmentId: attachment.id
+                    }, settle(resolve), settle((refusal: unknown) => {
+                        if ((refusal as OperationFailedEvent)?.error === ATTACHMENT_CLEANUP_INCOMPLETE_ERROR) {
+                            self.#emmitAction(InternalApi.CANCEL_SENDING_ATTACHMENT, {
+                                messageId: messageId,
+                                attachmentId: attachment.id
+                            }, () => undefined, () => undefined);
+                            resolve(cancelledStatus());
+                            return;
+                        }
+                        cancelRequested.delete(attachment.id);
+                        reject(refusal);
+                    }));
+                    watchConnection();
+                });
+                pendingCancels.push(cancelCall.catch(() => undefined));
+                return cancelCall;
+            },
+            waitAndGetMessageStatus: () => new Promise<MessageStatus>(function (resolve, reject) {
+                if (resultMessageStatus) {
+                    resolve(resultMessageStatus);
+                } else {
+                    promiseForWaitResultMessageStatus = {resolve, reject};
+                }
+            }),
+            sendOutOfQueue: () => {
+                detachRequested = true;
+                queueMember?.detach();
+            },
+            abandonSend: () => {
+                cancelledAll = true;
+                message.attachments.forEach((spec) => cancelRequested.add(spec.id));
+                abortActiveUploads();
+                if (queueMember) {
+                    self.#attachmentSendScheduler.releaseSlotWaiters(queueMember);
+                    queueMember.poke();
+                }
+            },
+            getAttachmentsData: () => {
+                return attachments;
+            }
+        };
+    }
+
+    /**
+     * Cancels a pending HTTP send with its uploaded bodies; refused once delivered or on the legacy upload.
+     * `editAttachmentIds` limit it to the edit holding those files; an `abandoned` cancel is refused with
+     * `SENDING_FINALIZING_ERROR` while the uploaded message is being delivered.
+     */
+    public cancelSendingMessage(msg: {
+        targetEntityType: MessageTargetEntityType,
+        targetEntityId: MessageTargetEntityId,
+        messageId: string,
+        editAttachmentIds?: string[],
+        abandoned?: boolean
+    }) {
+        this.#checkAuthenticated();
+        const self = this;
+        return new Promise<AttachmentCancelAck>(function (resolve, reject) {
+            const onConnectionLost = () => {
+                promises.reject(askId, new Error("The connection was lost before the cancel was answered"));
+            };
+            const settle = (outcome: Function) => (value?: unknown) => {
+                self.#notifier.remove(SfuEvent.DISCONNECTED, onConnectionLost);
+                self.#notifier.remove(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+                outcome(value);
+            };
+            const askId = self.#emmitAction(InternalApi.CANCEL_SENDING_MESSAGE, {
+                id: msg.messageId,
+                targetEntityType: msg.targetEntityType,
+                targetEntityId: msg.targetEntityId,
+                ...(msg.editAttachmentIds?.length ? {attachments: msg.editAttachmentIds.map((id) => ({id}))} : {}),
+                ...(msg.abandoned ? {abandoned: true} : {})
+            }, settle(resolve), settle(reject));
+            self.#notifier.add(SfuEvent.DISCONNECTED, onConnectionLost);
+            self.#notifier.add(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+        });
+    }
+
     /**
      * Load attachment from server
      *
      * On client side should receive {@link SfuEvent.MESSAGE_ATTACHMENT_STATE} with {@link AttachmentStatus} to show progress
      */
     public async getMessageAttachment(attachment: AttachmentRequest) {
-        let result;
+        const cancelKey = `${attachment.messageId}#${attachment.attachmentId}`;
+        this.#attachmentDownloadsInFlight.set(cancelKey, (this.#attachmentDownloadsInFlight.get(cancelKey) ?? 0) + 1);
         try {
-            result = await this.downloadAttachment(attachment);
-        } catch (e) {
-            throw e;
+            const result = await this.downloadAttachment(attachment);
+            if (this.#attachmentDownloadCancels.delete(cancelKey)) {
+                throw new Error(ChatError.DOWNLOADING_ATTACHMENT_CANCELLED);
+            }
+            return await this.#attachmentsTransferManager.download(result, {url: this.#_url, ...this.#transferPingOptions});
+        } finally {
+            const left = (this.#attachmentDownloadsInFlight.get(cancelKey) ?? 1) - 1;
+            if (left > 0) {
+                this.#attachmentDownloadsInFlight.set(cancelKey, left);
+            } else {
+                this.#attachmentDownloadsInFlight.delete(cancelKey);
+            }
+            this.#attachmentDownloadCancels.delete(cancelKey);
         }
-        return await this.#attachmentsTransferManager.download(result, {url: this.#_url, ...this.#transferPingOptions});
+    }
+
+    /** The download's promise rejects with DOWNLOADING_ATTACHMENT_CANCELLED; best effort, a no-op when idle. */
+    public cancelAttachmentDownload(attachment: {messageId: string, attachmentId: string}) {
+        const {messageId, attachmentId} = attachment;
+        if (this.#attachmentsTransferManager.cancelDownload(messageId, attachmentId)) {
+            return;
+        }
+        const cancelKey = `${messageId}#${attachmentId}`;
+        if (this.#attachmentDownloadsInFlight.has(cancelKey)) {
+            this.#attachmentDownloadCancels.add(cancelKey);
+        }
     }
 
     private downloadAttachment(attachment: AttachmentRequest) {

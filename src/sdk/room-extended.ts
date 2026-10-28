@@ -15,6 +15,7 @@ import {
     RoomConfigEvent,
     RoomEvent,
     RoomExtendedConfig,
+    RoomExtendedParticipantConfig,
     RoomNameUpdated,
     RoomScreenSharingConfigEvent,
     StopScreenSharingEvent,
@@ -476,118 +477,134 @@ export class RoomExtended extends Room {
     }
 
     public async processEvent(e: InternalMessage) {
-        if (e.type === RoomEvent.ROOM_CONFIG) {
-            const roomConfigEvent = (e as RoomConfigEvent);
-            this.#config.locked = roomConfigEvent.config.locked;
-            this.#config.initialAudioMuted = roomConfigEvent.config.initialAudioMuted;
-            this.#config.initialVideoMuted = roomConfigEvent.config.initialVideoMuted;
-            this.#config.initialScreenSharingMuted = roomConfigEvent.config.initialScreenSharingMuted;
-            this.#config.audioMuted = roomConfigEvent.config.audioMuted;
-            this.#config.videoMuted = roomConfigEvent.config.videoMuted;
-            this.#config.screenSharingMuted = roomConfigEvent.config.screenSharingMuted;
-            this.#config.chatMuted = roomConfigEvent.config.chatMuted;
-            this.#config.canChangeNickname = roomConfigEvent.config.canChangeNickname;
-            this.#config.screenSharingConfig = roomConfigEvent.config.screenSharingConfig;
-            this.#resolveOrNotify(e, e.type, roomConfigEvent);
-        } else if (e.type === RoomEvent.ROOM_LOCKED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.locked = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_INITIAL_AUDIO_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.initialAudioMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_INITIAL_VIDEO_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.initialVideoMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_INITIAL_SCREEN_SHARING_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.initialScreenSharingMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_AUDIO_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.audioMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_VIDEO_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.videoMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.screenSharingMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.STOP_SCREEN_SHARING) {
-            const event = e as StopScreenSharingEvent;
-            this.#resolveOrNotify(e, e.type, event);
-        } else if (e.type === RoomEvent.ROOM_CHAT_MUTED) {
-            const value = (e as BooleanEvent).value;
-            this.#config.chatMuted = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_CAN_CHANGE_NICKNAME) {
-            const value = (e as BooleanEvent).value;
-            this.#config.canChangeNickname = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_MULTIPLE_SHARES) {
-            const value = (e as BooleanEvent).value;
-            this.#config.screenSharingConfig.multipleShares = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_EVERYONE_CAN_SHARE) {
-            const value = (e as BooleanEvent).value;
-            this.#config.screenSharingConfig.everyoneCanShare = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_EVERYONE_CAN_DO_SUBSEQUENT_SHARE) {
-            const value = (e as BooleanEvent).value;
-            this.#config.screenSharingConfig.everyoneCanDoSubsequentShare = value;
-            this.#resolveOrNotify(e, e.type, value);
-        } else if (e.type === RoomEvent.PARTICIPANT_CONFIG) {
-            const pConfig = e as ParticipantConfigEvent;
-            this.#config.participantsConfig[pConfig.userId] = pConfig.config;
-            this.#resolveOrNotify(e, e.type, e);
-        } else if (e.type === RoomEvent.SCREEN_SHARING_CONFIG) {
-            const screenSharingConfigEvent = e as RoomScreenSharingConfigEvent;
-            this.#config.screenSharingConfig.multipleShares = screenSharingConfigEvent.config.multipleShares;
-            this.#config.screenSharingConfig.everyoneCanShare = screenSharingConfigEvent.config.everyoneCanShare;
-            this.#config.screenSharingConfig.everyoneCanDoSubsequentShare = screenSharingConfigEvent.config.everyoneCanDoSubsequentShare;
-            this.#resolveOrNotify(e, e.type, screenSharingConfigEvent);
-        } else if (e.type === RoomEvent.PARTICIPANT_AUDIO_MUTED) {
-            const mutedEvent = e as ParticipantAVSMutedEvent;
-            this.#config.participantsConfig[mutedEvent.userId].audioMuted = mutedEvent.value;
-            this.#resolveOrNotify(e, e.type, mutedEvent.value);
-        } else if (e.type === RoomEvent.PARTICIPANT_VIDEO_MUTED) {
-            const mutedEvent = e as ParticipantAVSMutedEvent;
-            this.#config.participantsConfig[mutedEvent.userId].videoMuted = mutedEvent.value;
-            this.#resolveOrNotify(e, e.type, mutedEvent.value);
-        } else if (e.type === RoomEvent.PARTICIPANT_SCREEN_SHARING_MUTED) {
-            const mutedEvent = e as ParticipantAVSMutedEvent;
-            this.#config.participantsConfig[mutedEvent.userId].screenSharingMuted = mutedEvent.value;
-            this.#resolveOrNotify(e, e.type, mutedEvent.value);
-        } else if (e.type === RoomEvent.STOP_TRACK) {
-            const event = e as StopTrackEvent;
-            this.#resolveOrNotify(e, e.type, event);
-        } else if (e.type === RoomEvent.WAITING_ROOM_UPDATE) {
-            const waitingRoomUpdate = e as WaitingRoomUpdate;
-            this.#waitingRoomEnabled = waitingRoomUpdate.enabled;
-            if (promises.promised(e.internalMessageId)) {
-                promises.resolve(e.internalMessageId, waitingRoomUpdate);
+        try {
+            if (e.type === RoomEvent.ROOM_CONFIG) {
+                const roomConfigEvent = (e as RoomConfigEvent);
+                this.#config.locked = roomConfigEvent.config.locked;
+                this.#config.initialAudioMuted = roomConfigEvent.config.initialAudioMuted;
+                this.#config.initialVideoMuted = roomConfigEvent.config.initialVideoMuted;
+                this.#config.initialScreenSharingMuted = roomConfigEvent.config.initialScreenSharingMuted;
+                this.#config.audioMuted = roomConfigEvent.config.audioMuted;
+                this.#config.videoMuted = roomConfigEvent.config.videoMuted;
+                this.#config.screenSharingMuted = roomConfigEvent.config.screenSharingMuted;
+                this.#config.chatMuted = roomConfigEvent.config.chatMuted;
+                this.#config.canChangeNickname = roomConfigEvent.config.canChangeNickname;
+                this.#config.screenSharingConfig = roomConfigEvent.config.screenSharingConfig;
+                /* ROOM_CONFIG on join is the only place the forced mutes of the people who were
+                 * already in the room arrive: ROOM_AVAILABLE strips participantsConfig, and
+                 * PARTICIPANT_*_MUTED is a one-off that was sent long before we joined. Dropping
+                 * it here left config().participantsConfig empty for exactly those participants,
+                 * so a mute set before an owner joined was invisible to that owner. Falling back
+                 * to {} keeps the map a map for the other branches. #zapp-1348 */
+                this.#config.participantsConfig = roomConfigEvent.config.participantsConfig ?? {};
+                this.#resolveOrNotify(e, e.type, roomConfigEvent);
+            } else if (e.type === RoomEvent.ROOM_LOCKED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.locked = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_INITIAL_AUDIO_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.initialAudioMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_INITIAL_VIDEO_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.initialVideoMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_INITIAL_SCREEN_SHARING_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.initialScreenSharingMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_AUDIO_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.audioMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_VIDEO_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.videoMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.screenSharingMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.STOP_SCREEN_SHARING) {
+                const event = e as StopScreenSharingEvent;
+                this.#resolveOrNotify(e, e.type, event);
+            } else if (e.type === RoomEvent.ROOM_CHAT_MUTED) {
+                const value = (e as BooleanEvent).value;
+                this.#config.chatMuted = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_CAN_CHANGE_NICKNAME) {
+                const value = (e as BooleanEvent).value;
+                this.#config.canChangeNickname = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_MULTIPLE_SHARES) {
+                const value = (e as BooleanEvent).value;
+                this.#config.screenSharingConfig.multipleShares = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_EVERYONE_CAN_SHARE) {
+                const value = (e as BooleanEvent).value;
+                this.#config.screenSharingConfig.everyoneCanShare = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.ROOM_SCREEN_SHARING_EVERYONE_CAN_DO_SUBSEQUENT_SHARE) {
+                const value = (e as BooleanEvent).value;
+                this.#config.screenSharingConfig.everyoneCanDoSubsequentShare = value;
+                this.#resolveOrNotify(e, e.type, value);
+            } else if (e.type === RoomEvent.PARTICIPANT_CONFIG) {
+                const pConfig = e as ParticipantConfigEvent;
+                this.#config.participantsConfig[pConfig.userId] = pConfig.config;
+                this.#resolveOrNotify(e, e.type, e);
+            } else if (e.type === RoomEvent.SCREEN_SHARING_CONFIG) {
+                const screenSharingConfigEvent = e as RoomScreenSharingConfigEvent;
+                this.#config.screenSharingConfig.multipleShares = screenSharingConfigEvent.config.multipleShares;
+                this.#config.screenSharingConfig.everyoneCanShare = screenSharingConfigEvent.config.everyoneCanShare;
+                this.#config.screenSharingConfig.everyoneCanDoSubsequentShare = screenSharingConfigEvent.config.everyoneCanDoSubsequentShare;
+                this.#resolveOrNotify(e, e.type, screenSharingConfigEvent);
+            } else if (e.type === RoomEvent.PARTICIPANT_AUDIO_MUTED) {
+                const mutedEvent = e as ParticipantAVSMutedEvent;
+                this.#participantConfig(mutedEvent.userId).audioMuted = mutedEvent.value;
+                this.#resolveOrNotify(e, e.type, mutedEvent.value);
+            } else if (e.type === RoomEvent.PARTICIPANT_VIDEO_MUTED) {
+                const mutedEvent = e as ParticipantAVSMutedEvent;
+                this.#participantConfig(mutedEvent.userId).videoMuted = mutedEvent.value;
+                this.#resolveOrNotify(e, e.type, mutedEvent.value);
+            } else if (e.type === RoomEvent.PARTICIPANT_SCREEN_SHARING_MUTED) {
+                const mutedEvent = e as ParticipantAVSMutedEvent;
+                this.#participantConfig(mutedEvent.userId).screenSharingMuted = mutedEvent.value;
+                this.#resolveOrNotify(e, e.type, mutedEvent.value);
+            } else if (e.type === RoomEvent.STOP_TRACK) {
+                const event = e as StopTrackEvent;
+                this.#resolveOrNotify(e, e.type, event);
+            } else if (e.type === RoomEvent.WAITING_ROOM_UPDATE) {
+                const waitingRoomUpdate = e as WaitingRoomUpdate;
+                this.#waitingRoomEnabled = waitingRoomUpdate.enabled;
+                if (promises.promised(e.internalMessageId)) {
+                    promises.resolve(e.internalMessageId, waitingRoomUpdate);
+                } else {
+                    this.notifier.notify(RoomEvent.WAITING_ROOM_UPDATE, waitingRoomUpdate);
+                }
+            } else if (e.type === RoomEvent.ROOM_NAME_UPDATED) {
+                const event = e as RoomNameUpdated;
+                super.updateName(event.name);
+                this.#resolveOrNotify(e, e.type, event);
+            } else if (e.type === RoomEvent.PARTICIPANT_ICON_UPDATED) {
+                const event = e as ParticipantIconUpdated;
+                this.notifier.notify(RoomEvent.PARTICIPANT_ICON_UPDATED, event);
+            } else if (e.type === RoomEvent.ROOM_RECORD_STARTED) {
+                const event = e as RecordStarted;
+                this.notifier.notify(RoomEvent.ROOM_RECORD_STARTED, event);
+            } else if (e.type === RoomEvent.ROOM_AUTO_RECORD_FAILED) {
+                const event = e as AutoRecordFailed;
+                this.notifier.notify(RoomEvent.ROOM_AUTO_RECORD_FAILED, event);
             } else {
-                this.notifier.notify(RoomEvent.WAITING_ROOM_UPDATE, waitingRoomUpdate);
+                await super.processEvent(e);
             }
-        } else if (e.type === RoomEvent.ROOM_NAME_UPDATED) {
-            const event = e as RoomNameUpdated;
-            super.updateName(event.name);
-            this.#resolveOrNotify(e, e.type, event);
-        } else if (e.type === RoomEvent.PARTICIPANT_ICON_UPDATED) {
-            const event = e as ParticipantIconUpdated;
-            this.notifier.notify(RoomEvent.PARTICIPANT_ICON_UPDATED, event);
-        } else if (e.type === RoomEvent.ROOM_RECORD_STARTED) {
-            const event = e as RecordStarted;
-            this.notifier.notify(RoomEvent.ROOM_RECORD_STARTED, event);
-        } else if (e.type === RoomEvent.ROOM_AUTO_RECORD_FAILED) {
-            const event = e as AutoRecordFailed;
-            this.notifier.notify(RoomEvent.ROOM_AUTO_RECORD_FAILED, event);
-        } else {
-            super.processEvent(e);
+        } catch (error) {
+            /* Nobody awaits processEvent, so a throw in here is nothing but an unhandled
+             * rejection: the event is lost, and when it carries an internalMessageId the
+             * promise of the request that waits for that very event never settles. Naming the
+             * event type is what makes such a loss findable at all — #zapp-847 stayed hidden
+             * exactly because it was silent. */
+            this.logger.error("failed to process room event ", e.type, error);
         }
     }
 
@@ -597,6 +614,32 @@ export class RoomExtended extends Room {
 
     public conferenceType(): ConferenceType {
         return this.#_conferenceType;
+    }
+
+    /**
+     * Config of a single participant, created on first use.
+     *
+     * A client learns a participant's config from PARTICIPANT_CONFIG, and those are sent for the
+     * participants that are in the room at the moment one joins. Whoever joins a room that is
+     * already running therefore has no entry for the people who were there before them, and the
+     * first PARTICIPANT_AUDIO_MUTED / PARTICIPANT_VIDEO_MUTED / PARTICIPANT_SCREEN_SHARING_MUTED
+     * about such a participant used to throw on the missing entry. The throw landed before
+     * #resolveOrNotify, in an async processEvent, so it surfaced as nothing but an unhandled
+     * rejection: setParticipant*Muted() stayed pending forever and the event was not delivered
+     * either, leaving the muting side unaware that its own mute had been applied. #zapp-847
+     */
+    #participantConfig(userId: UserId): RoomExtendedParticipantConfig {
+        if (!this.#config.participantsConfig) {
+            this.#config.participantsConfig = {};
+        }
+        if (!this.#config.participantsConfig[userId]) {
+            this.#config.participantsConfig[userId] = {
+                audioMuted: false,
+                videoMuted: false,
+                screenSharingMuted: false
+            };
+        }
+        return this.#config.participantsConfig[userId];
     }
 
     #resolveOrNotify(e: InternalMessage, type: RoomEvent, value: boolean | {}) {

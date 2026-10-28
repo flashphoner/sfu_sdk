@@ -55,6 +55,9 @@ export type {
     ConnectionQualityResult,
     ConnectionQualityStatus
 } from "./sdk/connection-quality";
+export type {
+    SendingAttachmentsHandler
+} from "./sdk/attachments/sending-attachments-handler";
 
 export const sfu = new Sfu();
 export const sfuExtended = new SfuExtended();

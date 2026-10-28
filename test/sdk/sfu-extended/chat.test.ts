@@ -47,6 +47,9 @@ import {
     MeetingHistoryItem,
     MessageType,
     ChatIconUpdated,
+    HTTP_ATTACHMENTS_LINKS_REFRESH_MS,
+    MessageAttachmentType,
+    SENDING_FINALIZING_ERROR,
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -1589,6 +1592,290 @@ describe("chat", () => {
 
                 await bob.deleteChat(chat);
             });
+        })
+        describe("http attachments", () => {
+            let restoreGlobals: (() => void) | undefined;
+            afterEach(() => {
+                restoreGlobals?.();
+                restoreGlobals = undefined;
+            });
+            const draftOf = (chatId: string, body: string, attachments) => ({
+                body,
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId},
+                attachments
+            });
+            const sendHttp = (chatId: string, body: string, attachments) => bob.sendMessage({
+                id: SfuExtended.generateAttachmentId(),
+                targetEntityType: MessageTargetEntityType.CHAT,
+                targetEntityId: {chatId},
+                body,
+                attachments,
+                httpAttachments: true
+            });
+            it("Should send a message over the http transfer", async () => {
+                const chat = await bob.createChat({});
+                const pic = newPictureUniqueId();
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                const handler = bob.getSendingAttachmentsHandler([pic.data], status.id,
+                    draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
+                const delivered = await handler.sendAttachments();
+                expect(delivered.state).not.toBe(MessageState.PENDING_ATTACHMENTS);
+                expect(delivered.attachments.length).toBe(1);
+                expect(delivered.attachments[0].mime).toBeTruthy();
+                await bob.deleteChat(chat);
+            });
+            it("Should cancel one of two attachments and deliver the other", async () => {
+                const chat = await bob.createChat({});
+                const keep = newPictureUniqueId();
+                const drop = newPictureUniqueId();
+                drop.attachment.name = "drop-" + drop.attachment.name;
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [keep.attachment, drop.attachment]);
+                const handler = bob.getSendingAttachmentsHandler([keep.data, drop.data], status.id,
+                    draftOf(chat.id, MESSAGE_BODY, [keep.attachment, drop.attachment]));
+                const cancelStatus = await handler.cancelSendingAttachment(drop.attachment);
+                expect(cancelStatus.state).toBe(AttachmentState.CANCELLED);
+                const delivered = await handler.sendAttachments();
+                expect(delivered.attachments.length).toBe(1);
+                expect(delivered.attachments[0].id).toBe(keep.attachment.id);
+                await bob.deleteChat(chat);
+            });
+            it("Should re-issue the links on a repeat and refuse one after the delivery", async () => {
+                const chat = await bob.createChat({});
+                const pic = newPictureUniqueId();
+                const first = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                const repeat = await bob.sendMessage({
+                    id: first.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    body: MESSAGE_BODY,
+                    attachments: [pic.attachment],
+                    httpAttachments: true
+                });
+                expect(repeat.id).toBe(first.id);
+                expect(repeat.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                const handler = bob.getSendingAttachmentsHandler([pic.data], first.id,
+                    draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
+                await handler.sendAttachments();
+                await expect(bob.sendMessage({
+                    id: first.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    body: MESSAGE_BODY,
+                    attachments: [pic.attachment],
+                    httpAttachments: true
+                })).rejects.toMatchObject({error: "The message was already delivered"});
+                await bob.deleteChat(chat);
+            });
+            it("Should add an attachment to a sent message by an http edit", async () => {
+                const chat = await bob.createChat({});
+                const base = await bob.sendMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    body: MESSAGE_BODY
+                });
+                const added = newPictureUniqueId();
+                const editStatus = await bob.editMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    messageId: base.id,
+                    body: MESSAGE_BODY + " edited",
+                    attachmentsToSend: [added.attachment],
+                    httpAttachments: true
+                });
+                expect(editStatus.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                const handler = bob.getSendingAttachmentsHandler([added.data], base.id,
+                    {...draftOf(chat.id, MESSAGE_BODY + " edited", [added.attachment]), kind: "edit" as const});
+                const delivered = await handler.sendAttachments();
+                expect(delivered.attachments.length).toBe(1);
+                expect(delivered.attachments[0].id).toBe(added.attachment.id);
+                await bob.deleteChat(chat);
+            });
+            it("Should not re-ask the links with an empty list for a queued send cancelled past the link lifetime", async () => {
+                const chat = await bob.createChat({});
+                const target = {targetEntityType: MessageTargetEntityType.CHAT, targetEntityId: {chatId: chat.id}};
+                const headSize = 100 * 1024 * 1024;
+                const headSpec = {type: MessageAttachmentType.file, name: "queue-head.bin", size: headSize, id: SfuExtended.generateAttachmentId()};
+                const headData = {id: headSpec.id, payload: Buffer.alloc(headSize, 7).buffer as ArrayBuffer};
+                const head = await sendHttp(chat.id, "queue head", [headSpec]);
+                const headHandler = bob.getSendingAttachmentsHandler([headData], head.id, draftOf(chat.id, "queue head", [headSpec]));
+                const pic = newPictureUniqueId();
+                const queued = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                const queuedHandler = bob.getSendingAttachmentsHandler([pic.data], queued.id, draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
+                const reAsks = [];
+                const webSocket = (global as any).WebSocket.prototype;
+                const originalSend = webSocket.send;
+                webSocket.send = function (frame) {
+                    const parsed = typeof frame === "string" ? JSON.parse(frame) : null;
+                    if (parsed && parsed.message === "sendMessage" && parsed.data[0].id === queued.id) {
+                        reAsks.push(parsed.data[0]);
+                    }
+                    return originalSend.call(this, frame);
+                };
+                const realNow = Date.now;
+                restoreGlobals = () => {
+                    Date.now = realNow;
+                    webSocket.send = originalSend;
+                };
+                try {
+                    const headSend = headHandler.sendAttachments();
+                    const queuedSend = queuedHandler.sendAttachments();
+                    Date.now = () => realNow() + HTTP_ATTACHMENTS_LINKS_REFRESH_MS + 1000;
+                    await bob.cancelSendingMessage({...target, messageId: queued.id});
+                    queuedHandler.abandonSend();
+                    const cancelled = await queuedSend;
+                    Date.now = realNow;
+                    expect(cancelled.state).toBe(MessageState.DELIVERY_CANCELLED);
+                    expect(reAsks).toHaveLength(0);
+                    await headSend;
+                } finally {
+                    restoreGlobals?.();
+                }
+                const messages = await bob.loadMessages({...target, timeFrame: {start: 0, end: -1}});
+                expect(messages.map((message) => message.id)).not.toContain(queued.id);
+                await bob.deleteChat(chat);
+            }, 60000);
+            it("Should cancel an attachment download without an error and download it whole after", async () => {
+                const chat = await bob.createChat({});
+                const size = 40 * 1024 * 1024;
+                const spec = {type: MessageAttachmentType.file, name: "download-cancel.bin", size, id: SfuExtended.generateAttachmentId()};
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [spec]);
+                const handler = bob.getSendingAttachmentsHandler([{id: spec.id, payload: Buffer.alloc(size, 3).buffer as ArrayBuffer}], status.id,
+                    draftOf(chat.id, MESSAGE_BODY, [spec]));
+                await handler.sendAttachments();
+                const request = {
+                    messageId: status.id,
+                    attachmentId: spec.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    name: spec.name
+                };
+                const early = bob.getMessageAttachment(request);
+                bob.cancelAttachmentDownload({messageId: status.id, attachmentId: spec.id});
+                await expect(early).rejects.toThrow(ChatError.DOWNLOADING_ATTACHMENT_CANCELLED);
+                const onChunk = (state: AttachmentStatus) => {
+                    if (state.id === spec.id && state.state === AttachmentState.PENDING && state.downloadedSize > 0) {
+                        bob.off(SfuEvent.MESSAGE_ATTACHMENT_STATE, onChunk);
+                        bob.cancelAttachmentDownload({messageId: status.id, attachmentId: spec.id});
+                    }
+                };
+                bob.on(SfuEvent.MESSAGE_ATTACHMENT_STATE, onChunk);
+                await expect(bob.getMessageAttachment(request)).rejects.toThrow(ChatError.DOWNLOADING_ATTACHMENT_CANCELLED);
+                bob.off(SfuEvent.MESSAGE_ATTACHMENT_STATE, onChunk);
+                const whole = await bob.getMessageAttachment(request);
+                expect(whole.payload.byteLength).toBe(size);
+                await bob.deleteChat(chat);
+            }, 60000);
+            it("Should adopt the sender-taken poster of an attachment", async () => {
+                //SOI, JFIF APP0, SOF0 32x32, EOI: the server validates the content and the frame size
+                const tinyJpegPoster = new Uint8Array([
+                    0xFF, 0xD8,
+                    0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+                    0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x20, 0x00, 0x20, 0x01, 0x01, 0x11, 0x00,
+                    0xFF, 0xD9
+                ]).buffer;
+                const chat = await bob.createChat({});
+                const pic = newPictureUniqueId();
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                const handler = bob.getSendingAttachmentsHandler([{...pic.data, poster: tinyJpegPoster}], status.id,
+                    draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
+                const delivered = await handler.sendAttachments();
+                expect(delivered.attachments[0].poster).toBe(true);
+                await bob.deleteChat(chat);
+            });
+            it("Should cancel the whole pending send", async () => {
+                const chat = await bob.createChat({});
+                const pic = newPictureUniqueId();
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                await bob.cancelSendingMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    messageId: status.id
+                });
+                const handler = bob.getSendingAttachmentsHandler([pic.data], status.id,
+                    draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
+                await expect(handler.sendAttachments()).rejects.toBeTruthy();
+                await bob.deleteChat(chat);
+            });
+            it("Should cancel an edit named by its files and leave another client's edit of the message", async () => {
+                const chat = await bob.createChat({});
+                const target = {targetEntityType: MessageTargetEntityType.CHAT, targetEntityId: {chatId: chat.id}};
+                const base = await bob.sendMessage({...target, body: MESSAGE_BODY});
+                const abandoned = newPictureUniqueId();
+                await bob.editMessage({
+                    ...target, messageId: base.id, body: "abandoned edit", attachmentsToSend: [abandoned.attachment], httpAttachments: true
+                });
+                const bobSecondClient = await connect(TEST_USER_0);
+                try {
+                    // takes the message over as the application does: cancels the orphan unnamed
+                    await bobSecondClient.cancelSendingMessage({...target, messageId: base.id});
+                    const live = newPictureUniqueId();
+                    live.attachment.name = "live-" + live.attachment.name;
+                    await bobSecondClient.editMessage({
+                        ...target, messageId: base.id, body: "live edit", attachmentsToSend: [live.attachment], httpAttachments: true
+                    });
+                    const ack = await bob.cancelSendingMessage({...target, messageId: base.id, editAttachmentIds: [abandoned.attachment.id]});
+                    expect(ack?.cancelledKind).toBe("EDIT");
+                    expect(ack?.body).toBe(MESSAGE_BODY);
+                    const handler = bobSecondClient.getSendingAttachmentsHandler([live.data], base.id,
+                        {...draftOf(chat.id, "live edit", [live.attachment]), kind: "edit" as const});
+                    const delivered = await handler.sendAttachments();
+                    expect(delivered.attachments.map((attachment) => attachment.id)).toContain(live.attachment.id);
+                } finally {
+                    await bobSecondClient.disconnect();
+                }
+                await bob.deleteChat(chat);
+            });
+            it("Should refuse an abandoned cancel while the uploaded message is delivered, not the user's cancel", async () => {
+                const chat = await bob.createChat({});
+                const target = {targetEntityType: MessageTargetEntityType.CHAT, targetEntityId: {chatId: chat.id}};
+                const pic = newPictureUniqueId();
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                // the bodies never reach the server, so its delivery attempt waits
+                const RealXhr = (global as any).XMLHttpRequest;
+                (global as any).XMLHttpRequest = class {
+                    upload = {};
+                    status = 200;
+                    response = {};
+                    onload?: () => void;
+                    open() {}
+                    setRequestHeader() {}
+                    send() {
+                        setTimeout(() => this.onload?.(), 0);
+                    }
+                    abort() {}
+                };
+                let finalized: () => void;
+                const finalizeSent = new Promise<void>((resolve) => {
+                    finalized = resolve;
+                });
+                const webSocket = (global as any).WebSocket.prototype;
+                const originalSend = webSocket.send;
+                webSocket.send = function (frame) {
+                    const parsed = typeof frame === "string" ? JSON.parse(frame) : null;
+                    if (parsed && parsed.message === "sendMessageWithAttachments" && parsed.data[0].id === status.id) {
+                        finalized();
+                    }
+                    return originalSend.call(this, frame);
+                };
+                restoreGlobals = () => {
+                    (global as any).XMLHttpRequest = RealXhr;
+                    webSocket.send = originalSend;
+                };
+                const handler = bob.getSendingAttachmentsHandler([pic.data], status.id,
+                    draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
+                const sending = handler.sendAttachments();
+                await finalizeSent;
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                await expect(bob.cancelSendingMessage({...target, messageId: status.id, abandoned: true}))
+                    .rejects.toMatchObject({error: SENDING_FINALIZING_ERROR});
+                await bob.cancelSendingMessage({...target, messageId: status.id});
+                await expect(sending).rejects.toBeTruthy();
+                restoreGlobals();
+                restoreGlobals = undefined;
+                await bob.deleteChat(chat);
+            }, 30000);
         })
         describe("notifications", () => {
             it("user should be notified when added to group chat", async (done) => {

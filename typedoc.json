@@ -1,5 +1,5 @@
 {
-  "entryPoints": ["src/sdk/*"],
+  "entryPoints": ["src/sdk/*", "src/sdk/attachments/*"],
   "entryPointStrategy": "resolve",
   "out": "docs",
   "useTsLinkResolution": true,

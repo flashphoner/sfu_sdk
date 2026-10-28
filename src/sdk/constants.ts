@@ -619,6 +619,7 @@ export enum InternalApi {
     GET_ACTIVE_ROOMS = "getActiveRooms",
     RECLAIM_OWNER_RIGHTS = "reclaimOwnerRights",
     CANCEL_SENDING_ATTACHMENT = "cancelSendingAttachment",
+    CANCEL_SENDING_MESSAGE = "cancelSendingMessage",
     SEND_MESSAGE_WITH_ATTACHMENTS = "sendMessageWithAttachments",
     SET_ROOM_LOCK = "setRoomLock",
     SET_ROOM_INITIAL_AUDIO_MUTED = "setRoomInitialAudioMuted",
@@ -756,7 +757,8 @@ export enum ChatError {
     CAN_NOT_REMOVE_MEMBER_FROM_PRIVATE_CHAT = "Removing a member from the private chat is not allowed",
     CAN_NOT_RENAME_PRIVATE_CHAT = "Renaming the private chat is not allowed",
     INCORRECT_CHAT_ENCRYPTION_SETTINGS = "Incorrect chat encryption settings",
-    DOWNLOADING_ATTACHMENT_FAILED = "Downloading failed"
+    DOWNLOADING_ATTACHMENT_FAILED = "Downloading failed",
+    DOWNLOADING_ATTACHMENT_CANCELLED = "Downloading cancelled"
 }
 
 export enum ChatSectionsError {
@@ -816,6 +818,9 @@ export enum ExamplesError {
 export const ATTACHMENT_CHUNK_SIZE = 100000;
 export const ATTACHMENT_REQUEST_TIMEOUT_MS = 30000;
 export const ATTACHMENTS_TRANSFER_POOL_SIZE = 3;
+export const HTTP_ATTACHMENTS_UPLOAD_PARALLELISM = 3;
+export const HTTP_ATTACHMENTS_LINKS_REFRESH_MS = 60000;
+export const HTTP_ATTACHMENTS_LINK_REASK_TIMEOUT_MS = 30000;
 export const ATTACHMENTS_TRANSFER_MAX_CLIENTS = 6;
 export const ATTACHMENTS_TRANSFER_STALLED_MS = 3000;
 export const ATTACHMENTS_TRANSFER_IDLE_TIMEOUT_MS = 30000;
@@ -918,6 +923,21 @@ export type RoomAvailable = InternalMessage & {
     config: RoomExtendedConfig
 }
 
+/**
+ * What the owner has forced upon a single participant.
+ *
+ * The entries of everybody who is already in the room arrive in one go, in the
+ * {@link RoomEvent.ROOM_CONFIG} the server sends to a joining session; note that the config of
+ * ROOM_AVAILABLE carries no participantsConfig at all, so joining is the moment this is learned.
+ * After that an entry is replaced by {@link RoomEvent.PARTICIPANT_CONFIG}, which the server sends
+ * when it changes a participant's config, to that participant and to the owner and admins.
+ *
+ * An entry may also be created from the first {@link RoomEvent.PARTICIPANT_AUDIO_MUTED} /
+ * {@link RoomEvent.PARTICIPANT_VIDEO_MUTED} / {@link RoomEvent.PARTICIPANT_SCREEN_SHARING_MUTED}
+ * about a participant we have no entry for, and then only the flag that event carried is known:
+ * the other two read false whether they are false or merely unseen. The next PARTICIPANT_CONFIG
+ * or ROOM_CONFIG replaces the entry with what the server reports.
+ */
 export type RoomExtendedParticipantConfig = {
     audioMuted: boolean,
     videoMuted: boolean,
@@ -1275,11 +1295,19 @@ export type MessageAttachment = {
     name: string;
     size: number;
     id: string;
+    mime?: string;
+    durationMs?: number;
+    width?: number;
+    height?: number;
+    poster?: boolean;
+    asMedia?: boolean;
 }
 
 export type MessageAttachmentData = {
-    payload: ArrayBuffer;
+    payload: ArrayBuffer | Blob;
     id: string;
+    /** A sender-taken JPEG replacing the server-side extraction; best effort, never fails the send. */
+    poster?: ArrayBuffer | Blob;
 }
 
 export type AttachmentRequest = {
@@ -1363,8 +1391,50 @@ export type MessageWithUploadingAttachments = {
 
 export type UploadingAttachmentInfo = {
     id: string,
-    attachmentTransferId: number
+    attachmentTransferId: number,
+    uploadUrl?: string,
+    posterUploadUrl?: string,
+    uploadState?: AttachmentUploadState
 }
+
+export type SendingMessageDraft = {
+    kind?: "send" | "edit";
+    body?: string;
+    to?: string;
+    parentId?: string;
+    targetEntityType: MessageTargetEntityType;
+    targetEntityId: MessageTargetEntityId;
+    /** Of an edit: only the NEW attachments. */
+    attachments: Array<MessageAttachment>;
+    attachmentIdsToDelete?: string[];
+}
+
+export enum AttachmentUploadState {
+    AWAITING_UPLOAD = "AWAITING_UPLOAD",
+    PENDING = "PENDING",
+    READY = "READY",
+    FAILED = "FAILED"
+}
+
+/** Wire contract with zapp-server: the application's legacy fallback keys on this exact refusal. */
+export const ATTACHMENT_TRANSFER_DISABLED_ERROR = "HTTP attachment transfer is disabled";
+
+/** Wire contracts with zapp-server: an orphaned pending record holds the edit's id; cancel it and retry. */
+export const ATTACHMENTS_DIFFER_ERROR = "The attachments differ from the ones this message id was issued for";
+export const REMOVALS_DIFFER_ERROR = "The removals differ from the ones this edit was issued for";
+
+/** Wire contract with zapp-server: the uploaded message is being delivered, its abandoned cancel is refused. */
+export const SENDING_FINALIZING_ERROR = "The upload is complete, the message is being processed for delivery";
+
+/** Wire contract with zapp-server: the cancel stands, only its cleanup failed; a repeat finishes it. */
+export const ATTACHMENT_CLEANUP_INCOMPLETE_ERROR = "The attachment cleanup is incomplete, retry the cancel";
+
+/** For a cancelled edit, body and status are the settled ones the optimistic edit rolls back to. */
+export type AttachmentCancelAck = InternalMessage & {
+    cancelledKind?: "SEND" | "EDIT",
+    body?: string,
+    status?: MessageState
+};
 
 export type AttachmentStatusEvent = InternalMessage & {
     status: AttachmentStatus

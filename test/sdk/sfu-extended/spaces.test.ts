@@ -13,6 +13,7 @@ import {
     iconFile,
     MESSAGE_REACTION,
     NAME_OF_DEFAULT_ROLE,
+    newPictureUniqueId,
     TEST_CATEGORY_NAME,
     TEST_CHANNEL_NAME,
     TEST_SPACE_NAME,
@@ -759,6 +760,30 @@ describe("spaces", () => {
             });
         });
         describe("messages", () => {
+            it('should tell the other client of the author of a channel message delivered over http', async () => {
+                const space = await bob.createSpace({name: TEST_SPACE_NAME});
+                const channel = space.channels[0];
+                const target = {
+                    targetEntityType: MessageTargetEntityType.CHANNEL,
+                    targetEntityId: {spaceId: space.id, channelId: channel.id}
+                };
+                const bobSecondClient = await connect(TEST_USER_0);
+                try {
+                    const pic = newPictureUniqueId();
+                    const synced = new Promise<Message>((resolve) => {
+                        bobSecondClient.on(SfuEvent.SEND_MESSAGE_SYNC, (msg) => resolve(msg as Message));
+                    });
+                    const status = await bob.sendMessage({
+                        ...target, id: SfuExtended.generateAttachmentId(), body: "body", attachments: [pic.attachment], httpAttachments: true
+                    });
+                    await bob.getSendingAttachmentsHandler([pic.data], status.id,
+                        {...target, body: "body", attachments: [pic.attachment]}).sendAttachments();
+                    expect((await synced).id).toBe(status.id);
+                } finally {
+                    await bobSecondClient.disconnect();
+                }
+                await bob.deleteSpace({id: space.id});
+            }, 30000);
             it('should send channel message', async () => {
                 const space = await bob.createSpace({name: TEST_SPACE_NAME});
                 const channel = space.channels[0];
