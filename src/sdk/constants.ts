@@ -2598,9 +2598,14 @@ export type CustomDomain = {
     owner: string;
 }
 
+export type AttachmentsConfig = {
+    maxAttachmentBytes: number;
+}
+
 export type SystemConfig = {
     recorder: RecorderConfig;
     billing: BillingConfig;
+    attachments?: AttachmentsConfig;
     domains: Array<CustomDomain>;
     availableMediaNodes: Array<MediaNodeInfo>;
     endpoints: Record<string, string>;
