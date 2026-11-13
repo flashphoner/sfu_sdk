@@ -25,41 +25,43 @@ export type InitialUserData = {
     webRTCMetricsServerDescription: RTCMetricsServerDescription
 }
 
-type OnMessageCallback = (arg0: string, arg1: Array<InternalMessage>) => void;
+type OnMessageCallback = (name: string, data: Array<InternalMessage>) => void;
 
-type OnBinaryDataCallback = (arg0: string, arg1: ArrayBuffer) => void;
+type OnBinaryDataCallback = (name: string, data: ArrayBuffer) => void;
+
+type OnErrorCallback = (error: Event | ConnectionFailedEvent) => void;
+
+type OnCloseCallback = (event: CloseEvent) => void;
+
+type ConnectOptions = {
+    url: string,
+    appName: string,
+    timeout?: number,
+    failedProbesThreshold?: number,
+    pingInterval?: number,
+    authToken?: string,
+    custom: object | null
+};
 
 class WSPingReceiver {
-    private failedProbesThreshold: number;
-    private interval: number;
-    private checkInterval: number;
-    private pingsMissing: number;
-    private connection: Connection;
-    private logger: Logger;
+    private readonly failedProbesThreshold: number;
+    private readonly interval: number;
+    private readonly onMissed: (pingsMissing: number) => void;
+    private checkInterval: number | null = null;
+    private pingsMissing = 0;
 
-    public constructor(failedProbesThreshold: number, interval: number, connection: Connection, logger?: Logger) {
+    public constructor(failedProbesThreshold: number, interval: number, onMissed: (pingsMissing: number) => void) {
         this.failedProbesThreshold = failedProbesThreshold;
-        this.pingsMissing = 0;
         this.interval = interval;
-        this.connection = connection;
-        this.logger = (logger) ? logger : new Logger();
-        if (!logger) {
-            this.logger.setPrefix(() => "[WSPingReceiver]");
-            this.logger.setVerbosity(Verbosity.INFO);
-        }
+        this.onMissed = onMissed;
     }
 
     public start() {
-        if (this.failedProbesThreshold > 0 && this.interval > 0) {
-            const receiver = this;
-            this.checkInterval = window.setInterval(function () {
-                receiver.checkPingsReceived();
-            }, this.interval);
-        }
+        this.checkInterval = window.setInterval(() => this.checkPingsReceived(), this.interval);
     }
 
     public stop() {
-        if (this.checkInterval) {
+        if (this.checkInterval !== null) {
             window.clearInterval(this.checkInterval);
             this.checkInterval = null;
         }
@@ -72,206 +74,181 @@ class WSPingReceiver {
     private checkPingsReceived() {
         this.pingsMissing++;
         if (this.pingsMissing >= this.failedProbesThreshold) {
-            this.failure();
+            this.onMissed(this.pingsMissing);
         }
-    }
-
-    private async failure() {
-        let info: string;
-        info = "Missing " + this.pingsMissing + " pings from server, connection seems to be down";
-        this.logger.warn(info);
-        await this.connection.close({
-            type: SfuEvent.CONNECTION_FAILED,
-            reason: info
-        } as ConnectionFailedEvent);
     }
 }
 
 export class Connection implements IRTCMetricsSender {
-    private ws: WebSocket;
-    private onError: Function;
-    private onClose: Function;
-    private onMessage: OnMessageCallback;
-    private onBinaryData: OnBinaryDataCallback;
-    private connected: boolean;
-    private connectionTimeout: number;
-    private logger: Logger;
-    private pingChecker: WSPingReceiver | null;
+    private ws: WebSocket | null = null;
+    private readonly onError: OnErrorCallback;
+    private readonly onClose: OnCloseCallback;
+    private readonly onMessage: OnMessageCallback;
+    private readonly onBinaryData: OnBinaryDataCallback;
+    private connected = false;
+    private connectionTimeout: number | null = null;
+    private readonly logger: Logger;
+    private pingChecker: WSPingReceiver | null = null;
+    private closeError: ConnectionFailedEvent | null = null;
+    private closeWaiters: Array<() => void> = [];
 
-    public constructor(onMessage: OnMessageCallback, onBinaryData: OnBinaryDataCallback, onError: Function, onClose: Function, logger?: Logger) {
-        this.connected = false;
+    public constructor(onMessage: OnMessageCallback, onBinaryData: OnBinaryDataCallback, onError: OnErrorCallback, onClose: OnCloseCallback, logger?: Logger) {
         this.onMessage = onMessage;
         this.onBinaryData = onBinaryData;
         this.onError = onError;
         this.onClose = onClose;
-        this.logger = (logger) ? logger : new Logger();
+        this.logger = logger ?? new Logger();
         if (!logger) {
             this.logger.setPrefix(() => "[Connection]");
             this.logger.setVerbosity(Verbosity.INFO);
         }
-        this.pingChecker = null;
     }
 
     public sendDescription(message: RTCMetricsClientDescriptionMessage): Promise<number> {
-        return new Promise((resolve, reject) => {
-            if (!this.ws) {
-                reject(new Error("Connection closed"));
-            }else{
-                this.send(RTCMetricsMessageType.description, message);
-                resolve(200);
-            }
-        })
+        return this.sendMetrics(RTCMetricsMessageType.description, message);
     }
 
     public sendBatch(message: RTCMetricsBatchMessage): Promise<number> {
-        return new Promise((resolve, reject) => {
-            if (!this.ws) {
-                reject(new Error("Connection closed"));
-            }else{
-                this.send(RTCMetricsMessageType.batch, message);
-                resolve(200);
-            }
-        })
+        return this.sendMetrics(RTCMetricsMessageType.batch, message);
     }
 
-    public connect(options: {
-        url: string,
-        appName: string,
-        timeout?: number,
-        failedProbesThreshold?: number,
-        pingInterval?: number,
-        authToken?: string,
-        custom: object | null
-    }): Promise<InitialUserData> {
-        const timeout = options.timeout !== undefined ? options.timeout : WS_CONNECTION_TIMEOUT;
-        const failedProbesThreshold = options.failedProbesThreshold !== undefined ? options.failedProbesThreshold : WS_PINGS_MISSING_THRESHOLD;
-        const pingInterval = options.pingInterval !== undefined ? options.pingInterval : WS_PING_INTERVAL_MS;
-        this.ws = new WebSocket(options.url);
-        this.ws.binaryType = 'arraybuffer';
-        const that = this;
-        return new Promise(function (resolve, reject) {
-            if (that.ws.readyState === 3) {
-                reject("Can't connect to websocket URL " + options.url);
-            }
+    public connect({
+        url,
+        appName,
+        timeout = WS_CONNECTION_TIMEOUT,
+        failedProbesThreshold = WS_PINGS_MISSING_THRESHOLD,
+        pingInterval = WS_PING_INTERVAL_MS,
+        authToken,
+        custom
+    }: ConnectOptions): Promise<InitialUserData> {
+        const ws = new WebSocket(url);
+        ws.binaryType = 'arraybuffer';
+        this.ws = ws;
+        return new Promise((resolve, reject) => {
             if (timeout > 0) {
-                that.connectionTimeout = window.setInterval(function () {
-                    if (that.ws.readyState === 0) {
-                        that.logger.warn("WS connection timeout");
-                        that.ws.close();
-                    }
+                this.connectionTimeout = window.setTimeout(() => {
+                    this.logger.warn("WS connection timeout");
+                    ws.close();
                 }, timeout);
             }
-            that.ws.onerror = function (e) {
-                that.stopPingChecking();
-                if (that.connected) {
-                    that.onError(e);
-                } else {
-                    reject(e);
+            ws.onerror = (event) => this.end(() => this.onError(event), () => reject(event));
+            ws.onclose = (event) => {
+                this.logger.debug("WebSocket connection closed, reason " + event.reason);
+                const error = this.closeError;
+                this.closeError = null;
+                try {
+                    this.end(error ? () => this.onError(error) : () => this.onClose(event), () => reject(error ?? event));
+                } finally {
+                    this.closeWaiters.splice(0).forEach((resolveClose) => resolveClose());
                 }
-                that.connected = false;
             };
-            that.ws.onclose = function (e) {
-                that.logger.debug("WebSocket connection closed, reason " + e.reason);
-                that.stopPingChecking();
-                if (that.connected) {
-                    that.onClose(e);
-                } else {
-                    reject(e);
+            ws.onopen = () => {
+                this.stopConnectionTimeout();
+                if (failedProbesThreshold > 0 && pingInterval > 0) {
+                    this.pingChecker = new WSPingReceiver(failedProbesThreshold, pingInterval, (pingsMissing) => this.onPingsMissed(pingsMissing));
+                    this.pingChecker.start();
                 }
-                that.connected = false;
-            };
-            that.ws.onopen = function () {
-                clearInterval(that.connectionTimeout);
-                let cConfig = {
-                    appKey: options.appName,
+                this.send("connection", {
+                    appKey: appName,
                     mediaProviders: ["WebRTC"],
                     keepAlive: true,
-                    authToken: options.authToken ?? null,
+                    authToken: authToken ?? null,
                     clientVersion: "0.5.28",
                     clientOSVersion: window.navigator.appVersion,
                     clientBrowserVersion: window.navigator.userAgent,
-                    custom: options.custom
-                };
-                // Enable intervalic ping checking if ping options are set
-                if (failedProbesThreshold > 0 && pingInterval > 0) {
-                    that.pingChecker = new WSPingReceiver(failedProbesThreshold, pingInterval, that, that.logger);
-                    that.pingChecker.start();
-                }
-                //connect to REST App
-                that.send("connection", cConfig);
+                    custom
+                });
             };
-            that.ws.onmessage = function (event: MessageEvent<ArrayBuffer | string>) {
-                let name: string;
-                let msg: Array<InternalMessage>;
-                if (event.data instanceof ArrayBuffer) {
-                    name = InternalApi.BINARY_DATA;
-                } else {
-                    let obj = JSON.parse(event.data) as {
-                        message?: string,
-                        type?: string,
-                        data: Array<InternalMessage>
-                    };
-                    name = obj.message || (obj.type === InternalApi.TRAFFIC_UPDATE ? obj.type : undefined);
-                    msg = obj.data;
-                }
-                switch (name) {
-                    case "ping":
-                        that.send("pong", null);
-                        break;
-                    case "getUserData":
-                        that.connected = true;
-                        resolve(msg[0] as unknown as InitialUserData);
-                        break;
-                    case "binaryData":
-                        that.onBinaryData(name, event.data as ArrayBuffer);
-                        break;
-                    default:
-                        that.onMessage(name, msg);
-                }
-                that.resetPingChecker(name);
-            };
+            ws.onmessage = (event: MessageEvent<ArrayBuffer | string>) => this.receive(event, resolve);
         });
     }
 
     public send(message: string, data: any) {
         this.logger.info("==>", message, data);
-        if (this.ws) {
-            this.ws.send(JSON.stringify({
-                message: message,
-                data: [data]
-            }));
-        }
+        this.ws?.send(JSON.stringify({
+            message: message,
+            data: [data]
+        }));
     };
 
     public sendBinaryData(data: any) {
         this.logger.info("==>", data.size);
-        if (this.ws) {
-            this.ws.send(data);
-        }
-
+        this.ws?.send(data);
     }
 
-    public async close(error?: ConnectionFailedEvent) {
-        if (this.ws) {
-            // Stop pings checking if enabled
-            this.stopPingChecking();
-            // Close websocket connection
-            const self = this;
-            return new Promise<void>(function (resolve) {
-                self.ws.onclose = function (e) {
-                    self.logger.debug("WebSocket connection closed, reason " + e.reason);
-                    if (self.connected) {
-                        if (error) {
-                            self.onError(error);
-                        } else {
-                            self.onClose(e);
-                        }
-                    }
-                    self.connected = false;
-                    resolve();
-                }
-                self.ws.close();
-            });
+    public close(error?: ConnectionFailedEvent): Promise<void> {
+        if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+            return Promise.resolve();
+        }
+        this.stopPingChecking();
+        this.closeError = error ?? null;
+        return new Promise<void>((resolve) => {
+            this.closeWaiters.push(resolve);
+            this.ws.close();
+        });
+    }
+
+    private end(report: () => void, failAttempt: () => void) {
+        this.stopConnectionTimeout();
+        this.stopPingChecking();
+        if (this.connected) {
+            report();
+        } else {
+            failAttempt();
+        }
+        this.connected = false;
+    }
+
+    private receive(event: MessageEvent<ArrayBuffer | string>, resolveConnect: (userData: InitialUserData) => void) {
+        if (event.data instanceof ArrayBuffer) {
+            this.onBinaryData(InternalApi.BINARY_DATA, event.data);
+        } else {
+            this.receiveMessage(event.data, resolveConnect);
+        }
+        this.pingChecker?.success();
+    }
+
+    private receiveMessage(raw: string, resolveConnect: (userData: InitialUserData) => void) {
+        const {message, type, data} = JSON.parse(raw) as {
+            message?: string,
+            type?: string,
+            data: Array<InternalMessage>
+        };
+        const name = message || (type === InternalApi.TRAFFIC_UPDATE ? type : undefined);
+        switch (name) {
+            case "ping":
+                this.send("pong", null);
+                break;
+            case "getUserData":
+                this.connected = true;
+                resolveConnect(data[0] as unknown as InitialUserData);
+                break;
+            default:
+                this.onMessage(name, data);
+        }
+    }
+
+    private onPingsMissed(pingsMissing: number) {
+        const reason = "Missing " + pingsMissing + " pings from server, connection seems to be down";
+        this.logger.warn(reason);
+        this.close({
+            type: SfuEvent.CONNECTION_FAILED,
+            reason
+        } as ConnectionFailedEvent);
+    }
+
+    private async sendMetrics(type: RTCMetricsMessageType, message: RTCMetricsClientDescriptionMessage | RTCMetricsBatchMessage): Promise<number> {
+        if (!this.ws) {
+            throw new Error("Connection closed");
+        }
+        this.send(type, message);
+        return 200;
+    }
+
+    private stopConnectionTimeout() {
+        if (this.connectionTimeout !== null) {
+            window.clearTimeout(this.connectionTimeout);
+            this.connectionTimeout = null;
         }
     }
 
@@ -279,13 +256,6 @@ export class Connection implements IRTCMetricsSender {
         if (this.pingChecker) {
             this.pingChecker.stop();
             this.pingChecker = null;
-        }
-    }
-
-    private resetPingChecker(eventName: string) {
-        if (this.pingChecker) {
-            this.logger.debug("Reset pings checker by event:", eventName);
-            this.pingChecker.success();
         }
     }
 }
