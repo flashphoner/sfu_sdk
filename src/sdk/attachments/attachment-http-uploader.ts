@@ -14,11 +14,13 @@ export type HttpUploadOptions = {
     body: Blob | ArrayBuffer;
     onProgress?: (uploadedBytes: number) => void;
     stallTimeoutMs?: number;
+    connectTimeoutMs?: number;
 };
 
 export type HttpUpload = {
     promise: Promise<HttpUploadResult>;
     abort: () => void;
+    reachedServer: () => boolean;
 };
 
 export function uploadAttachmentBody(options: HttpUploadOptions): HttpUpload {
@@ -28,35 +30,38 @@ export function uploadAttachmentBody(options: HttpUploadOptions): HttpUpload {
 function uploadWithXhr(options: HttpUploadOptions): HttpUpload {
     const xhr = new XMLHttpRequest();
     let aborted = false;
+    let reached = false;
     const promise = new Promise<HttpUploadResult>((resolve, reject) => {
         let stallTimer: ReturnType<typeof setTimeout>;
         const stallMs = options.stallTimeoutMs === undefined ? 120000 : options.stallTimeoutMs;
-        const rearmStallWatchdog = () => {
-            if (!stallMs) {
+        const rearmStallWatchdog = (timeoutMs = stallMs) => {
+            clearTimeout(stallTimer);
+            if (!timeoutMs) {
                 return;
             }
-            clearTimeout(stallTimer);
             stallTimer = setTimeout(() => {
                 aborted = true;
                 xhr.abort();
                 reject(new Error(UPLOAD_NETWORK_FAILURE));
-            }, stallMs);
+            }, timeoutMs);
         };
         xhr.open("PUT", options.url);
         xhr.setRequestHeader("Content-Type", "application/octet-stream");
         xhr.responseType = "json";
         xhr.upload.onprogress = (event) => {
+            reached = reached || event.loaded > 0;
             /* No progress events follow the last body byte, and a big body may take the server long to answer. */
             if (event.total && event.loaded >= event.total) {
                 clearTimeout(stallTimer);
             } else {
-                rearmStallWatchdog();
+                rearmStallWatchdog(reached ? stallMs : options.connectTimeoutMs || stallMs);
             }
             if (options.onProgress) {
                 options.onProgress(event.loaded);
             }
         };
         xhr.onload = () => {
+            reached = true;
             clearTimeout(stallTimer);
             resolve({status: xhr.status, response: xhr.response});
         };
@@ -68,12 +73,13 @@ function uploadWithXhr(options: HttpUploadOptions): HttpUpload {
             clearTimeout(stallTimer);
             reject(new Error(aborted ? UPLOAD_NETWORK_FAILURE : UPLOAD_ABORTED));
         };
-        rearmStallWatchdog();
+        rearmStallWatchdog(options.connectTimeoutMs || stallMs);
         xhr.send(options.body);
     });
     return {
         promise,
-        abort: () => xhr.abort()
+        abort: () => xhr.abort(),
+        reachedServer: () => reached
     };
 }
 
@@ -85,6 +91,8 @@ function uploadWithNodeHttp(options: HttpUploadOptions): HttpUpload {
     const https = nodeRequire('https');
     let request: any;
     let aborted = false;
+    let reached = false;
+    let connectTimer: ReturnType<typeof setTimeout>;
     const promise = new Promise<HttpUploadResult>((resolve, reject) => {
         toBuffer(options.body).then((buffer) => {
             if (aborted) {
@@ -100,6 +108,7 @@ function uploadWithNodeHttp(options: HttpUploadOptions): HttpUpload {
                     'Content-Length': buffer.length
                 }
             }, (response: any) => {
+                reached = true;
                 const parts: any[] = [];
                 response.on('data', (part: any) => parts.push(part));
                 response.on('end', () => {
@@ -115,7 +124,24 @@ function uploadWithNodeHttp(options: HttpUploadOptions): HttpUpload {
                 response.on('aborted', () => reject(new Error(aborted ? UPLOAD_ABORTED : UPLOAD_NETWORK_FAILURE)));
             });
             request.on('error', () => reject(new Error(aborted ? UPLOAD_ABORTED : UPLOAD_NETWORK_FAILURE)));
-            request.on('close', () => reject(new Error(aborted ? UPLOAD_ABORTED : UPLOAD_NETWORK_FAILURE)));
+            request.on('close', () => {
+                clearTimeout(connectTimer);
+                reject(new Error(aborted ? UPLOAD_ABORTED : UPLOAD_NETWORK_FAILURE));
+            });
+            request.on('socket', (socket: any) => {
+                const onConnected = () => {
+                    reached = true;
+                    clearTimeout(connectTimer);
+                };
+                if (socket.connecting) {
+                    socket.once(link.protocol === 'https:' ? 'secureConnect' : 'connect', onConnected);
+                } else {
+                    onConnected();
+                }
+            });
+            if (options.connectTimeoutMs) {
+                connectTimer = setTimeout(() => request.destroy(), options.connectTimeoutMs);
+            }
             request.end(buffer, () => {
                 if (options.onProgress) {
                     options.onProgress(buffer.length);
@@ -130,7 +156,8 @@ function uploadWithNodeHttp(options: HttpUploadOptions): HttpUpload {
             if (request) {
                 request.destroy();
             }
-        }
+        },
+        reachedServer: () => reached
     };
 }
 

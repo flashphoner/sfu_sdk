@@ -821,6 +821,9 @@ export const ATTACHMENTS_TRANSFER_POOL_SIZE = 3;
 export const HTTP_ATTACHMENTS_UPLOAD_PARALLELISM = 3;
 export const HTTP_ATTACHMENTS_LINKS_REFRESH_MS = 60000;
 export const HTTP_ATTACHMENTS_LINK_REASK_TIMEOUT_MS = 30000;
+export const HTTP_ATTACHMENTS_PUBLIC_ADDRESS_CONNECT_TIMEOUT_MS = 20000;
+export const HTTP_ATTACHMENTS_PUBLIC_ADDRESS_RECHECK_DELAY_MS = 3000;
+export const HTTP_ATTACHMENTS_PUBLIC_ADDRESS_RETRY_AFTER_MS = 600000;
 export const ATTACHMENTS_TRANSFER_MAX_CLIENTS = 6;
 export const ATTACHMENTS_TRANSFER_STALLED_MS = 3000;
 export const ATTACHMENTS_TRANSFER_IDLE_TIMEOUT_MS = 30000;
@@ -1394,7 +1397,8 @@ export type UploadingAttachmentInfo = {
     attachmentTransferId: number,
     uploadUrl?: string,
     posterUploadUrl?: string,
-    uploadState?: AttachmentUploadState
+    uploadState?: AttachmentUploadState,
+    publicAddress?: boolean
 }
 
 export type SendingMessageDraft = {

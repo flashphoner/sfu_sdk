@@ -10,6 +10,9 @@ import {
     HTTP_ATTACHMENTS_UPLOAD_PARALLELISM,
     HTTP_ATTACHMENTS_LINKS_REFRESH_MS,
     HTTP_ATTACHMENTS_LINK_REASK_TIMEOUT_MS,
+    HTTP_ATTACHMENTS_PUBLIC_ADDRESS_CONNECT_TIMEOUT_MS,
+    HTTP_ATTACHMENTS_PUBLIC_ADDRESS_RECHECK_DELAY_MS,
+    HTTP_ATTACHMENTS_PUBLIC_ADDRESS_RETRY_AFTER_MS,
     SendingMessageDraft,
     UploadingAttachmentInfo,
     ATTACHMENT_REQUEST_TIMEOUT_MS,
@@ -226,7 +229,8 @@ import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 import {AttachmentsTransferManager} from "./attachments/attachments-transfer-manager";
 import { uploadFile } from './attachments/file-upload';
-import { uploadAttachmentBody, HttpUpload, UPLOAD_ABORTED, UPLOAD_NETWORK_FAILURE } from './attachments/attachment-http-uploader';
+import { HttpUpload, UPLOAD_ABORTED, UPLOAD_NETWORK_FAILURE } from './attachments/attachment-http-uploader';
+import { LinkUploadAttempt, PublicUploadAddress, uploadAddressOf, uploadByLink } from './attachments/public-upload-address';
 import { resolveServerTemplate, resolveServerUrl } from './server-url';
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
 
@@ -256,6 +260,7 @@ export class SfuExtended {
     //TODO(naz): Provide union instead of InternalMessage
     #notifier: Notifier<EventUnion, NotifyUnion> = new Notifier<SfuEvent, NotifyUnion>();
     #uploadingAttachmentState: MessageWithUploadingAttachmentState = {}
+    #publicUploadAddress = new PublicUploadAddress(HTTP_ATTACHMENTS_PUBLIC_ADDRESS_RETRY_AFTER_MS);
     #attachmentsTransferManager: AttachmentsTransferManager = new AttachmentsTransferManager(this.#notifier);
     #attachmentDownloadCancels: Set<string> = new Set();
     // a cancel with no getMessageAttachment in flight must not poison a future one
@@ -392,6 +397,7 @@ export class SfuExtended {
         this.#createConnection();
         this.#_server = new URL(options.url).hostname;
         this.#_url = options.url;
+        this.#publicUploadAddress.reset();
         this.#binaryChunkSize = options.binaryChunkSize ? options.binaryChunkSize : ATTACHMENT_CHUNK_SIZE;
         return new Promise<{
             username: UserId,
@@ -1705,7 +1711,9 @@ export class SfuExtended {
         targetEntityId: MessageTargetEntityId,
         attachments?: Array<MessageAttachment>,
         /** Upload by server-issued links; with a client-supplied id a repeat re-issues them idempotently. */
-        httpAttachments?: boolean
+        httpAttachments?: boolean,
+        /** Ask the links to the node of this connection; set by the SDK itself once a public address failed. */
+        uploadToThisNode?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1724,11 +1732,16 @@ export class SfuExtended {
                     targetEntityType: msg.targetEntityType,
                     targetEntityId: msg.targetEntityId,
                     attachments: msg.attachments,
-                    httpAttachments: msg.httpAttachments
+                    httpAttachments: msg.httpAttachments,
+                    uploadToThisNode: self.#uploadsToThisNode(msg) ? true : undefined
                 }, resolve, reject);
             }
         });
     };
+
+    #uploadsToThisNode(msg: { httpAttachments?: boolean, uploadToThisNode?: boolean }): boolean {
+        return !!msg.httpAttachments && (!!msg.uploadToThisNode || this.#publicUploadAddress.givenUp());
+    }
 
     /**
      * Edit a message in a Direct chat | Channel | Thread
@@ -1745,7 +1758,8 @@ export class SfuExtended {
         body: string,
         attachmentsToSend?: Array<MessageAttachment>,
         attachmentIdsToDelete?: string[],
-        httpAttachments?: boolean
+        httpAttachments?: boolean,
+        uploadToThisNode?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1757,7 +1771,8 @@ export class SfuExtended {
                 body: msg.body,
                 attachments: msg.attachmentsToSend,
                 attachmentIdsToDelete: msg.attachmentIdsToDelete,
-                httpAttachments: msg.httpAttachments
+                httpAttachments: msg.httpAttachments,
+                uploadToThisNode: self.#uploadsToThisNode(msg) ? true : undefined
             }, resolve, reject);
         });
     }
@@ -2244,6 +2259,10 @@ export class SfuExtended {
         let detachRequested = message.kind === "edit";
         let connectionLostInFlight = false;
         let linksIssuedAt = Date.now();
+        /* Kept for the whole send once chosen: links to a public address again would fail it halfway. */
+        let toThisNode = self.#publicUploadAddress.givenUp();
+        let retryAhead = false;
+        let passFailed = false;
 
         const activeSpecs = () => message.attachments.filter((spec) => !cancelRequested.has(spec.id));
         const payloadOf = (id: string) => attachments.find((data) => data.id === id);
@@ -2266,6 +2285,7 @@ export class SfuExtended {
                 linksIssuedAt = 0;
                 return undefined;
             }
+            toThisNode = toThisNode || self.#publicUploadAddress.givenUp();
             const status = await (message.kind === "edit"
                 ? self.editMessage({
                     targetEntityType: message.targetEntityType,
@@ -2274,7 +2294,8 @@ export class SfuExtended {
                     body: message.body,
                     attachmentsToSend: activeSpecs(),
                     attachmentIdsToDelete: message.attachmentIdsToDelete,
-                    httpAttachments: true
+                    httpAttachments: true,
+                    uploadToThisNode: toThisNode
                 })
                 : self.sendMessage({
                     id: messageId,
@@ -2284,7 +2305,8 @@ export class SfuExtended {
                     targetEntityType: message.targetEntityType,
                     targetEntityId: message.targetEntityId,
                     attachments: activeSpecs(),
-                    httpAttachments: true
+                    httpAttachments: true,
+                    uploadToThisNode: toThisNode
                 }));
             linksIssuedAt = Date.now();
             return status;
@@ -2299,32 +2321,62 @@ export class SfuExtended {
             return info;
         }
 
+        function linkAttemptOf(spec: MessageAttachment, info: UploadingAttachmentInfo, key: string,
+                               onGivenUp?: () => void): LinkUploadAttempt {
+            return {
+                address: self.#publicUploadAddress,
+                publicAddress: !!info.publicAddress,
+                recheckDelayMs: HTTP_ATTACHMENTS_PUBLIC_ADDRESS_RECHECK_DELAY_MS,
+                connectionLost: () => connectionLostInFlight,
+                cancelled: () => cancelRequested.has(spec.id),
+                passFailed: () => passFailed,
+                onStart: (upload) => {
+                    activeUploads[key] = upload;
+                },
+                onEnd: (upload) => {
+                    if (activeUploads[key] === upload) {
+                        delete activeUploads[key];
+                    }
+                },
+                onGivenUp: () => {
+                    self.#logger.info("The public upload address is unreachable, uploading through this connection's node");
+                    if (onGivenUp) {
+                        onGivenUp();
+                    }
+                }
+            };
+        }
+
+        /* Ends the pass for the links to be asked again; with no retry ahead they are tried all the same. */
+        function refusePublicLinksGivenUp(info: UploadingAttachmentInfo): void {
+            if (retryAhead && info.publicAddress && self.#publicUploadAddress.givenUp()) {
+                throw new Error(UPLOAD_NETWORK_FAILURE);
+            }
+        }
+
         /* Runs before the body: the server pipeline starts on the body and must find the poster staged. */
         async function uploadPosterOf(spec: MessageAttachment, data: MessageAttachmentData, info: UploadingAttachmentInfo): Promise<void> {
             if (!data.poster || !info.posterUploadUrl) {
                 return;
             }
-            const upload = uploadAttachmentBody({
-                url: resolveServerUrl(info.posterUploadUrl, self.#_url),
-                body: data.poster,
-                stallTimeoutMs: 20000
-            });
-            activeUploads[spec.id + "#poster"] = upload;
+            let gaveUp = false;
             try {
-                const result = await upload.promise;
+                const result = await uploadByLink({
+                    url: uploadAddressOf(info.posterUploadUrl, info.publicAddress, self.#_url),
+                    body: data.poster,
+                    stallTimeoutMs: 20000
+                }, linkAttemptOf(spec, info, spec.id + "#poster", () => {
+                    gaveUp = true;
+                }));
                 if (result.status !== 200) {
                     self.#logger.info("Poster of attachment " + spec.id + " was refused with " + result.status
                         + ", the server will extract its own");
                 }
             } catch (e) {
-                if (connectionLostInFlight) {
+                if (connectionLostInFlight || gaveUp || passFailed) {
                     throw new Error(UPLOAD_NETWORK_FAILURE);
                 }
                 self.#logger.info("Poster of attachment " + spec.id + " was not uploaded, the server will extract its own");
-            } finally {
-                if (activeUploads[spec.id + "#poster"] === upload) {
-                    delete activeUploads[spec.id + "#poster"];
-                }
             }
         }
 
@@ -2342,24 +2394,26 @@ export class SfuExtended {
             if (!data) {
                 throw new Error("No payload for attachment " + spec.id);
             }
+            refusePublicLinksGivenUp(info);
             await uploadPosterOf(spec, data, info);
             if (cancelRequested.has(spec.id)) {
                 return;
             }
+            refusePublicLinksGivenUp(info);
             let lastReported = 0;
-            const upload = uploadAttachmentBody({
-                url: resolveServerUrl(info.uploadUrl, self.#_url),
+            const options = {
+                url: uploadAddressOf(info.uploadUrl, info.publicAddress, self.#_url),
                 body: data.payload,
+                connectTimeoutMs: info.publicAddress ? HTTP_ATTACHMENTS_PUBLIC_ADDRESS_CONNECT_TIMEOUT_MS : undefined,
                 onProgress: (uploadedBytes) => {
                     if (uploadedBytes - lastReported >= 1048576 || uploadedBytes >= spec.size) {
                         lastReported = uploadedBytes;
                         notifyProgress(spec, AttachmentState.PENDING, uploadedBytes);
                     }
                 }
-            });
-            activeUploads[spec.id] = upload;
+            };
             try {
-                const result = await upload.promise;
+                const result = await uploadByLink(options, linkAttemptOf(spec, info, spec.id));
                 if (result.status !== 200) {
                     const reason = result.response && result.response.error ? result.response.error : String(result.status);
                     throw new Error("Upload of attachment " + spec.id + " refused: " + reason);
@@ -2374,10 +2428,6 @@ export class SfuExtended {
                     throw new Error(UPLOAD_NETWORK_FAILURE);
                 }
                 throw e;
-            } finally {
-                if (activeUploads[spec.id] === upload) {
-                    delete activeUploads[spec.id];
-                }
             }
         }
 
@@ -2389,6 +2439,7 @@ export class SfuExtended {
             const queue = activeSpecs();
             let next = 0;
             const walk: { failure?: { error: unknown } } = {};
+            passFailed = false;
             const worker = async () => {
                 while (next < queue.length && !walk.failure) {
                     const spec = queue[next++];
@@ -2410,6 +2461,7 @@ export class SfuExtended {
                     } catch (e) {
                         if (!walk.failure) {
                             walk.failure = {error: e};
+                            passFailed = true;
                             self.#attachmentSendScheduler.releaseSlotWaiters(member);
                         }
                     } finally {
@@ -2533,8 +2585,11 @@ export class SfuExtended {
                 stateStale = false;
             }
             try {
+                retryAhead = true;
                 await uploadPending();
+                retryAhead = false;
             } catch (e) {
+                retryAhead = false;
                 if (!(e instanceof Error) || e.message !== UPLOAD_NETWORK_FAILURE) {
                     throw e;
                 }
@@ -2616,6 +2671,7 @@ export class SfuExtended {
                 };
                 self.#notifier.add(SfuEvent.DISCONNECTED, onConnectionLost);
                 self.#notifier.add(SfuEvent.CONNECTION_FAILED, onConnectionLost);
+                toThisNode = self.#publicUploadAddress.givenUp();
                 sendInFlight = runSend().catch((e) => {
                     stateStale = true;
                     abortActiveUploads();
