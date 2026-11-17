@@ -219,6 +219,7 @@ import {
     AttachmentSortField,
     RecordSortField,
     ATTACHMENT_CLEANUP_INCOMPLETE_ERROR,
+    SENDING_WINDOW_EXPIRED_ERROR,
 } from "./constants";
 import {Notifier} from "./notifier";
 import {MessagesSyncOptions, MessagesSynchronizer, SyncEntity} from "./messages-sync";
@@ -229,7 +230,7 @@ import Logger, {PrefixFunction, Verbosity} from "./logger";
 import {ResetPasswordHandler} from "./reset-password-handler";
 import {AttachmentsTransferManager} from "./attachments/attachments-transfer-manager";
 import { uploadFile } from './attachments/file-upload';
-import { HttpUpload, UPLOAD_ABORTED, UPLOAD_NETWORK_FAILURE } from './attachments/attachment-http-uploader';
+import { HttpUpload, HttpUploadResult, UPLOAD_ABORTED, UPLOAD_NETWORK_FAILURE } from './attachments/attachment-http-uploader';
 import { LinkUploadAttempt, PublicUploadAddress, uploadAddressOf, uploadByLink } from './attachments/public-upload-address';
 import { resolveServerTemplate, resolveServerUrl } from './server-url';
 import {RTCMetricsServerDescription} from "@flashphoner/web-sdk-metrics";
@@ -471,6 +472,10 @@ export class SfuExtended {
                                 messageState.status ? messageState.status.id : undefined);
                             if (!!messageState.waitingUploadingAttachments) {
                                 this.#uploadingAttachmentState[messageState.status.id] = messageState.messageWithUploadingAttachments;
+                                const windowLeft = messageState.messageWithUploadingAttachments?.retryWindowLeftMs;
+                                if (typeof windowLeft === "number") {
+                                    messageState.status.retryWindowLeftMs = windowLeft;
+                                }
                             }
                             if (!promises.resolve(data[0].internalMessageId, messageState.status)) {
                                 this.#notifier.notify(SfuEvent.MESSAGE_STATE, messageState.status);
@@ -1710,10 +1715,12 @@ export class SfuExtended {
         targetEntityType: MessageTargetEntityType,
         targetEntityId: MessageTargetEntityId,
         attachments?: Array<MessageAttachment>,
-        /** Upload by server-issued links; with a client-supplied id a repeat re-issues them idempotently. */
+        /** Upload by server-issued links; with a client-supplied id a repeat re-issues them while its retry window lasts. */
         httpAttachments?: boolean,
         /** Ask the links to the node of this connection; set by the SDK itself once a public address failed. */
-        uploadToThisNode?: boolean
+        uploadToThisNode?: boolean,
+        /** A repeated ask of the links of a send already issued, set by the SDK itself: a first ask must not carry it. */
+        reAsk?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1733,7 +1740,8 @@ export class SfuExtended {
                     targetEntityId: msg.targetEntityId,
                     attachments: msg.attachments,
                     httpAttachments: msg.httpAttachments,
-                    uploadToThisNode: self.#uploadsToThisNode(msg) ? true : undefined
+                    uploadToThisNode: self.#uploadsToThisNode(msg) ? true : undefined,
+                    reAsk: msg.httpAttachments && msg.reAsk ? true : undefined
                 }, resolve, reject);
             }
         });
@@ -1759,7 +1767,8 @@ export class SfuExtended {
         attachmentsToSend?: Array<MessageAttachment>,
         attachmentIdsToDelete?: string[],
         httpAttachments?: boolean,
-        uploadToThisNode?: boolean
+        uploadToThisNode?: boolean,
+        reAsk?: boolean
     }) {
         this.#checkAuthenticated();
         const self = this;
@@ -1772,7 +1781,8 @@ export class SfuExtended {
                 attachments: msg.attachmentsToSend,
                 attachmentIdsToDelete: msg.attachmentIdsToDelete,
                 httpAttachments: msg.httpAttachments,
-                uploadToThisNode: self.#uploadsToThisNode(msg) ? true : undefined
+                uploadToThisNode: self.#uploadsToThisNode(msg) ? true : undefined,
+                reAsk: msg.httpAttachments && msg.reAsk ? true : undefined
             }, resolve, reject);
         });
     }
@@ -2295,7 +2305,8 @@ export class SfuExtended {
                     attachmentsToSend: activeSpecs(),
                     attachmentIdsToDelete: message.attachmentIdsToDelete,
                     httpAttachments: true,
-                    uploadToThisNode: toThisNode
+                    uploadToThisNode: toThisNode,
+                    reAsk: true
                 })
                 : self.sendMessage({
                     id: messageId,
@@ -2306,7 +2317,8 @@ export class SfuExtended {
                     targetEntityId: message.targetEntityId,
                     attachments: activeSpecs(),
                     httpAttachments: true,
-                    uploadToThisNode: toThisNode
+                    uploadToThisNode: toThisNode,
+                    reAsk: true
                 }));
             linksIssuedAt = Date.now();
             return status;
@@ -2354,6 +2366,25 @@ export class SfuExtended {
             }
         }
 
+        /* The case is ignored: older servers answer the same words in lower case. */
+        function windowRefusalOf(result: HttpUploadResult): OperationFailedEvent | undefined {
+            const reason = result.response && typeof result.response.error === "string" ? result.response.error : "";
+            if (result.status !== 410 || reason.toLowerCase() !== SENDING_WINDOW_EXPIRED_ERROR.toLowerCase()) {
+                return undefined;
+            }
+            return {
+                type: RoomEvent.OPERATION_FAILED,
+                operation: message.kind === "edit" ? Operations.EDIT_CHAT_MESSAGE : Operations.SEND_MESSAGE,
+                error: SENDING_WINDOW_EXPIRED_ERROR,
+                internalMessageId: messageId
+            } as OperationFailedEvent;
+        }
+
+        function isWindowRefusal(e: unknown): boolean {
+            return !!e && (e as OperationFailedEvent).type === RoomEvent.OPERATION_FAILED
+                && (e as OperationFailedEvent).error === SENDING_WINDOW_EXPIRED_ERROR;
+        }
+
         /* Runs before the body: the server pipeline starts on the body and must find the poster staged. */
         async function uploadPosterOf(spec: MessageAttachment, data: MessageAttachmentData, info: UploadingAttachmentInfo): Promise<void> {
             if (!data.poster || !info.posterUploadUrl) {
@@ -2368,11 +2399,18 @@ export class SfuExtended {
                 }, linkAttemptOf(spec, info, spec.id + "#poster", () => {
                     gaveUp = true;
                 }));
+                const windowRefusal = windowRefusalOf(result);
+                if (windowRefusal) {
+                    throw windowRefusal;
+                }
                 if (result.status !== 200) {
                     self.#logger.info("Poster of attachment " + spec.id + " was refused with " + result.status
                         + ", the server will extract its own");
                 }
             } catch (e) {
+                if (isWindowRefusal(e)) {
+                    throw e;
+                }
                 if (connectionLostInFlight || gaveUp || passFailed) {
                     throw new Error(UPLOAD_NETWORK_FAILURE);
                 }
@@ -2414,6 +2452,10 @@ export class SfuExtended {
             };
             try {
                 const result = await uploadByLink(options, linkAttemptOf(spec, info, spec.id));
+                const windowRefusal = windowRefusalOf(result);
+                if (windowRefusal) {
+                    throw windowRefusal;
+                }
                 if (result.status !== 200) {
                     const reason = result.response && result.response.error ? result.response.error : String(result.status);
                     throw new Error("Upload of attachment " + spec.id + " refused: " + reason);
@@ -2463,6 +2505,9 @@ export class SfuExtended {
                             walk.failure = {error: e};
                             passFailed = true;
                             self.#attachmentSendScheduler.releaseSlotWaiters(member);
+                            if (isWindowRefusal(e)) {
+                                abortActiveUploads();
+                            }
                         }
                     } finally {
                         releaseSlot();

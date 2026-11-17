@@ -50,6 +50,7 @@ import {
     HTTP_ATTACHMENTS_LINKS_REFRESH_MS,
     MessageAttachmentType,
     SENDING_FINALIZING_ERROR,
+    SENDING_WINDOW_EXPIRED_ERROR,
 } from "../../../src/sdk/constants";
 import * as fsUtils from "../../util/fsUtils";
 import {SfuExtended} from "../../../src";
@@ -1618,12 +1619,34 @@ describe("chat", () => {
                 const pic = newPictureUniqueId();
                 const status = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
                 expect(status.state).toBe(MessageState.PENDING_ATTACHMENTS);
+                expect(status.retryWindowLeftMs).toBeGreaterThan(0);
                 const handler = bob.getSendingAttachmentsHandler([pic.data], status.id,
                     draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
                 const delivered = await handler.sendAttachments();
                 expect(delivered.state).not.toBe(MessageState.PENDING_ATTACHMENTS);
                 expect(delivered.attachments.length).toBe(1);
                 expect(delivered.attachments[0].mime).toBeTruthy();
+                await bob.deleteChat(chat);
+            });
+            it("Should refuse to re-issue the links of a cancelled send", async () => {
+                const chat = await bob.createChat({});
+                const pic = newPictureUniqueId();
+                const status = await sendHttp(chat.id, MESSAGE_BODY, [pic.attachment]);
+                await bob.cancelSendingMessage({
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    messageId: status.id
+                });
+                const reAsk = {
+                    id: status.id,
+                    targetEntityType: MessageTargetEntityType.CHAT,
+                    targetEntityId: {chatId: chat.id},
+                    body: MESSAGE_BODY,
+                    attachments: [pic.attachment],
+                    httpAttachments: true,
+                    reAsk: true
+                };
+                await expect(bob.sendMessage(reAsk)).rejects.toHaveProperty("error", SENDING_WINDOW_EXPIRED_ERROR);
                 await bob.deleteChat(chat);
             });
             it("Should cancel one of two attachments and deliver the other", async () => {
@@ -1795,7 +1818,7 @@ describe("chat", () => {
                 });
                 const handler = bob.getSendingAttachmentsHandler([pic.data], status.id,
                     draftOf(chat.id, MESSAGE_BODY, [pic.attachment]));
-                await expect(handler.sendAttachments()).rejects.toBeTruthy();
+                await expect(handler.sendAttachments()).rejects.toMatchObject({error: SENDING_WINDOW_EXPIRED_ERROR});
                 await bob.deleteChat(chat);
             });
             it("Should cancel an edit named by its files and leave another client's edit of the message", async () => {

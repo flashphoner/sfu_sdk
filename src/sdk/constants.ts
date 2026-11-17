@@ -1273,7 +1273,8 @@ export type MessageStatus = {
     deliveryStatus: MessageDeliveryStatus;
     edited: boolean,
     dateOfEdit: number,
-    reactions: Array<string>
+    reactions: Array<string>,
+    retryWindowLeftMs?: number
 }
 
 export type AttachmentStatus = {
@@ -1389,7 +1390,8 @@ export type MessageStatusEvent = InternalMessage & {
 export type MessageWithUploadingAttachments = {
     messageId: string,
     messageTransferId: number,
-    attachmentsInfo: Array<UploadingAttachmentInfo>
+    attachmentsInfo: Array<UploadingAttachmentInfo>,
+    retryWindowLeftMs?: number
 }
 
 export type UploadingAttachmentInfo = {
@@ -1429,6 +1431,9 @@ export const REMOVALS_DIFFER_ERROR = "The removals differ from the ones this edi
 
 /** Wire contract with zapp-server: the uploaded message is being delivered, its abandoned cancel is refused. */
 export const SENDING_FINALIZING_ERROR = "The upload is complete, the message is being processed for delivery";
+
+/** Wire contract with zapp-server: the retry window of the send or the edit is over, only its cancel is left. */
+export const SENDING_WINDOW_EXPIRED_ERROR = "The message is unknown or its upload window has expired";
 
 /** Wire contract with zapp-server: the cancel stands, only its cleanup failed; a repeat finishes it. */
 export const ATTACHMENT_CLEANUP_INCOMPLETE_ERROR = "The attachment cleanup is incomplete, retry the cancel";
