@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-wcs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SFU Client</title>
+  <link href="../../commons/dependencies/bootstrap@5.0.0-beta3/css/bootstrap.min.css" rel="stylesheet">
+  <link href="../../commons/dependencies/datatables@1.10.24/css/jquery.dataTables.min.css" rel="stylesheet">
+  <link href="../dependencies/css/examples.css" rel="stylesheet">
+  <link href="client.css" rel="stylesheet">
+  <script src="../../commons/dependencies/jquery@3.6.0/jquery.min.js"></script>
+  <script src="../../commons/dependencies/datatables@1.10.24/js/jquery.dataTables.min.js"></script>
+  <script src="../../sfu.js"></script>
+  <script src="../dependencies/js/display.js"></script>
+  <script src="../../commons/js/util.js"></script>
+  <script src="../../commons/js/stats.js"></script>
+  <script src="../dependencies/js/ui.js"></script>
+  <script src="quality.js"></script>
+  <script src="controls.js"></script>
+  <script src="chat.js"></script>
+  <script src="main.js"></script>
+</head>
+<body onload="init()">
+<main class="example-page" id="main">
+  <header class="page-header"><h1>SFU Client</h1></header>
+  <section class="video-grid" aria-label="Video previews">
+    <fieldset class="video-panel"><legend>Publisher</legend><div id="localDisplay" class="participant-display"><span class="empty-video">Local tracks</span></div></fieldset>
+    <fieldset class="video-panel"><legend>Participants</legend><div id="display" class="participant-display"><span class="empty-video">Remote tracks</span></div></fieldset>
+  </section>
+  <section class="connection-panel" aria-label="Room connection">
+    <form id="connectionForm" onsubmit="connect(); return false">
+      <div class="connection-fields">
+        <label class="field" for="url">Server URL<input id="url" type="text" required spellcheck="false" autocomplete="off"></label>
+        <label class="field" for="roomName">Room<input id="roomName" type="text" required value="ROOM1"></label>
+        <label class="field" for="roomPin">PIN<input id="roomPin" type="text" value="1234" autocomplete="off"></label>
+        <label class="field" for="nickName">Nickname<input id="nickName" type="text" required value="Bob"></label>
+      </div>
+      <div class="controls"><button id="startButton" type="submit" disabled>Connect</button><button id="disconnectButton" type="button" onclick="disconnect()" disabled>Disconnect</button></div>
+      <div class="status" id="connectionStatus" role="status" aria-live="polite">DISCONNECTED</div>
+      <div class="error" id="errorMsg" role="alert"></div>
+      <details class="connection-options"><summary>Connection options</summary>
+        <div class="connection-fields">
+          <label class="field" for="transport">Transport<select id="transport"><option value="">Auto (server default)</option></select></label>
+          <label class="field" for="participantViewType">Participant view<select id="participantViewType"></select></label>
+          <label class="field turn-field" for="turnServer">TURN server<input id="turnServer" type="text" placeholder="turn:user:password@turn.example.com:3478?transport=udp" autocomplete="off" spellcheck="false"></label>
+          <label class="checkbox-field" for="forceRelay"><input id="forceRelay" type="checkbox">Force relay</label>
+        </div>
+      </details>
+    </form>
+  </section>
+  <details class="section track-section" open><summary>Media tracks</summary>
+    <div class="tracks-layout">
+      <section class="track-group"><h2>Video tracks</h2><div class="table-scroll" role="region" aria-label="Video tracks" tabindex="0"><table class="table" id="videoTracksTable">
+                        <thead>
+                        <tr>
+                            <th></th>
+                            <th>Source</th>
+                            <th>Width</th>
+                            <th>Height</th>
+                            <th>Codec</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tfoot>
+                        <tr>
+                            <th></th>
+                            <th>
+                                <select class="form-select-sm" id="addVideoTrackSource" aria-label="Video source">
+                                    <option value="camera" selected>camera</option>
+                                    <option value="screen">screen</option>
+                                </select>
+                            </th>
+                            <th>
+                                <input class="form-control-sm" id="addVideoTrackWidth" aria-label="Video width" type="number" value="1280">
+                            </th>
+                            <th>
+                                <input class="form-control-sm" id="addVideoTrackHeight" aria-label="Video height" type="number" value="720">
+                            </th>
+                            <th>
+                                <select class="form-select-sm" id="addVideoTrackCodec" aria-label="Video codec">
+                                    <option value="H264" selected>H264</option>
+                                    <option value="VP8">VP8</option>
+                                    <option value="VP9">VP9</option>
+                                </select>
+                            </th>
+                            <th>
+                                <button class="btn btn-primary" id="addVideoTrack">Add</button>
+                            </th>
+                        </tr>
+                        </tfoot>
+                        <tbody id="videoTracksTableBody"></tbody>
+                    </table></div>
+        <details class="encoding-section" open><summary>Encodings for new video tracks</summary><div class="table-scroll" role="region" aria-label="Video encodings" tabindex="0"><table class="table" id="videoTrackEncodingsTable">
+                                <thead>
+                                <tr>
+                                    <th>RID</th>
+                                    <th>Active</th>
+                                    <th>Max bitrate</th>
+                                    <th>Resolution scale</th>
+                                    <th>Scalability mode</th>
+                                    <th>Action</th>
+                                </tr>
+                                </thead>
+                                <tfoot>
+                                <tr>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackEncodingRid" aria-label="Encoding RID">
+                                            <option value="h" selected>h</option>
+                                            <option value="m">m</option>
+                                            <option value="l">l</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackEncodingActive" aria-label="Encoding active">
+                                            <option value="true" selected>true</option>
+                                            <option value="false">false</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <input class="form-control-sm" id="addVideoTrackEncodingMaxBitrate" aria-label="Maximum bitrate, bits per second"
+                                               type="number" value="900000">
+                                    </th>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackEncodingResolutionScale" aria-label="Resolution scale">
+                                            <option value="1" selected>1</option>
+                                            <option value="2">2</option>
+                                            <option value="4">4</option>
+                                            <option value="6">6</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <select class="form-select-sm" id="addVideoTrackScalabilityMode" aria-label="Scalability mode">
+                                            <option selected value="">NONE</option>
+                                        </select>
+                                    </th>
+                                    <th>
+                                        <button class="btn btn-primary" id="addVideoTrackEncoding">Add</button>
+                                    </th>
+                                </tr>
+                                </tfoot>
+                                <tbody id="videoTrackEncodingsTableBody"></tbody>
+                            </table></div></details>
+      </section>
+      <section class="track-group"><h2>Audio tracks</h2><div class="table-scroll" role="region" aria-label="Audio tracks" tabindex="0"><table class="table" id="audioTracksTable">
+
+                        <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Channels</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tfoot>
+                        <tr>
+                            <th>
+                                <select class="form-select-sm" id="addAudioTrackSource" aria-label="Audio source">
+                                    <option value="mic" selected>mic</option>
+                                </select>
+                            </th>
+                            <th>
+                                <select class="form-select-sm" id="addAudioTrackChannels" aria-label="Audio channels">
+                                    <option value="1" selected>1</option>
+                                    <option value="2">2</option>
+                                </select>
+                            </th>
+                            <th>
+                                <button id="addAudioTrack" class="btn btn-primary form-control-sm">Add</button>
+                            </th>
+                        </tr>
+                        </tfoot>
+                        <tbody></tbody>
+                    </table></div></section>
+    </div>
+  </details>
+  <details class="section chat-section" open><summary>Chat</summary>
+    <div id="chat"><div id="messages" role="log" aria-label="Room messages" aria-live="polite"></div>
+      <form class="chat-controls" onsubmit="return false"><label class="sr-only" for="localMessage">Message</label><input id="localMessage" type="text" placeholder="Message" disabled><button id="sendMessage" type="submit" disabled>Send</button></form>
+    </div>
+  </details>
+  <details class="section" open><summary>Connection statistics</summary>
+    <div id="statsDashboard" class="stats-dashboard">
+      <dl class="stats-grid">
+        <div class="metric-card"><dt>Outbound</dt><dd><span class="status-circle" id="outbound-status"></span><span id="stat-outbound">0 bps</span></dd></div>
+        <div class="metric-card"><dt>Inbound</dt><dd><span class="status-circle" id="inbound-status"></span><span id="stat-inbound">0 bps</span></dd></div>
+        <div class="metric-card"><dt>Ping</dt><dd><span class="status-circle" id="ping-status"></span><span id="stat-ping">—</span></dd></div>
+        <div class="metric-card"><dt>Route nodes</dt><dd><span class="status-circle" id="participants-status"></span><span id="stat-participants">0</span></dd></div>
+        <div class="metric-card"><dt>Route</dt><dd><span class="status-circle" id="route-status"></span><span id="stat-route">Unknown</span></dd></div>
+      </dl>
+      <h2>Connection topology</h2><div class="topology-diagram" id="topology-diagram"><span class="text-muted">No connection data</span></div>
+    </div>
+  </details>
+</main>
+</body>
+</html>

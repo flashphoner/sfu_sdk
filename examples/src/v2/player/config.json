@@ -1,0 +1,10 @@
+{
+  "room": {
+    "url": "ws://127.0.0.1:8080",
+    "name": "ROOM1",
+    "pin": "1234",
+    "nickName": "User1"
+  },
+  "initPoolParticipantsCount": 10,
+  "idleTransceiverTimeoutMs": 60000
+}

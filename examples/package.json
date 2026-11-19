@@ -1,6 +1,6 @@
 {
   "name": "@flashphoner/sfusdk-examples",
-  "version": "2.0.15",
+  "version": "2.0.18",
   "description": "Official Flashphoner WebCallServer SFU SDK usage examples",
   "main": "dist/sfu.js",
   "types": "src/sfu.ts",
@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist/*",
-    "build": "webpack --mode=production"
+    "build": "webpack --mode=production",
+    "test:examples": "node --test test/*.test.cjs"
   },
   "keywords": [
     "Flashphoner",
@@ -19,15 +20,17 @@
   "author": "Flashphoner",
   "license": "MIT",
   "devDependencies": {
+    "@flashphoner/sfusdk": "2.0.391",
     "@mapbox/node-pre-gyp": "^1.0.8",
+    "@types/node": "18.19.0",
     "copy-webpack-plugin": "^10.2.4",
+    "jsdom": "26.1.0",
     "ts-loader": "^9.2.8",
     "typescript": "^4.6.3",
     "webpack": "^5.72.0",
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
-    "@flashphoner/sfusdk": "2.0.36-zapp-1238",
     "kalmanjs": "^1.1.0"
   }
 }

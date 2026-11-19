@@ -73,12 +73,15 @@ package-sdk:
         console.log("package version =", p.version);
       '
     - npm run build
+    - npm --prefix examples ci --ignore-scripts --no-audit --no-fund
+    - npm --prefix examples run test:examples
+    - npm --prefix examples run build
     - |
       set -e
       test -d dist || { echo "tsc не дал dist/"; exit 1; }
       npm pack                                   # → flashphoner-sfusdk-<version>.tgz
       mv flashphoner-sfusdk-*.tgz "sfu-sdk-${BUILD_VERSION}.tgz"
-      tar czf "sfu-sdk-${BUILD_VERSION}-examples.tar.gz" -C examples .
+      tar czf "sfu-sdk-${BUILD_VERSION}-examples.tar.gz" -C examples/dist .
       ls -lh sfu-sdk-${BUILD_VERSION}*
     - |
       set -e

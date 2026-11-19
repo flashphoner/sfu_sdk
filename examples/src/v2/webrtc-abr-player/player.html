@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" data-wcs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebRTC ABR Player</title>
+    <link rel="stylesheet" href="../dependencies/css/examples.css">
+    <script defer src="../../commons/dependencies/jquery@3.6.0/jquery.min.js"></script>
+    <script defer src="../../sfu.js"></script>
+    <script defer src="../../commons/js/util.js"></script>
+    <script defer src="../../commons/js/stats.js"></script>
+    <script defer src="../dependencies/js/display.js"></script>
+    <script defer src="../dependencies/js/ui.js"></script>
+    <script defer src="../dependencies/js/session.js"></script>
+    <script defer src="player.js"></script>
+</head>
+<body>
+<main class="example-page" id="main">
+    <header class="page-header"><h1>WebRTC ABR Player</h1><p>Play a WebRTC stream with adaptive video quality.</p></header>
+    <section class="video-panel" aria-label="Player"><h2>Player</h2><div id="remoteVideo" class="video-display media-container"></div><p id="playPlaceholder" class="empty-state">Stream playback will appear here.</p></section>
+    <section class="connection-panel" aria-label="Connection">
+        <div class="connection-fields">
+            <div class="field"><label for="url">WCS URL</label><input id="url" type="text" autocomplete="off" required></div>
+            <div class="field"><label for="streamName">Stream name</label><input id="streamName" type="text" autocomplete="off" required></div>
+        </div>
+        <div class="controls"><button id="playBtn" class="primary" type="button" disabled>Play</button><span id="playStatus" class="status" role="status" aria-live="polite"></span></div>
+        <p id="playErrorInfo" class="error" role="alert"></p>
+    </section>
+</main>
+</body>
+</html>

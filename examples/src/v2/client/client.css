@@ -1,0 +1,93 @@
+.connection-fields { grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(120px, 1fr)); }
+.connection-options { margin-top: 15px; }
+.connection-options > summary { margin-bottom: 15px; }
+.connection-options .connection-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.turn-field { grid-column: 1 / -1; }
+.checkbox-field { display: flex; align-items: center; gap: 10px; }
+#connectionForm > .controls { margin-top: 20px; }
+#startButton { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+.participant-display {
+    min-height: 230px;
+    background: var(--video-background);
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 10px 10px;
+    padding: 10px;
+    overflow: hidden;
+}
+.participant-display:has(> .empty-video), .participant-display:empty { aspect-ratio: 16 / 9; display: grid; place-items: center; }
+.participant-display .empty-video { display: block; text-align: center; color: var(--muted); }
+.participant-display:empty::after { display: block; text-align: center; color: var(--muted); content: "No tracks"; }
+.participant-display video { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: var(--video-background); }
+.participant-display audio { max-width: 100%; }
+.track-group { min-width: 0; }
+.track-group + .track-group { margin-top: 25px; }
+.track-group h2, .stats-dashboard h2 { margin: 15px 0 10px; font-size: 14px; font-weight: 650; }
+.table-scroll { max-width: 100%; overflow: auto; }
+.table-scroll > div { min-width: 620px; }
+#audioTracksTable_wrapper { min-width: 320px; }
+.table-scroll table { width: 100% !important; margin: 0 !important; border-collapse: collapse; background: var(--surface); color: var(--text); }
+.table-scroll table.dataTable thead th, .table-scroll table.dataTable tfoot th, .table-scroll table.dataTable td { padding: 10px; border-color: var(--border); background-color: var(--surface); color: var(--text); }
+.table-scroll table.dataTable tbody tr { background: var(--surface); }
+.table-scroll table.dataTable thead th { padding-right: 20px; font-size: 12px; white-space: nowrap; background-repeat: no-repeat; background-position: right center; }
+.table-scroll table.dataTable tfoot th { font-weight: 400; }
+.table-scroll table.dataTable tbody td { font-variant-numeric: tabular-nums; }
+.table-scroll table input, .table-scroll table select { min-width: 80px; }
+.table-scroll table button { white-space: nowrap; }
+.table-scroll table tbody td table { width: auto !important; }
+.table-scroll table tbody td table td { font-size: 12px; }
+.encoding-section { margin-top: 20px; }
+.encoding-section > summary { margin-bottom: 10px; color: var(--muted); }
+td.details-control { cursor: pointer; min-width: 30px; text-align: center; }
+.track-details { min-height: 30px; min-width: 30px; padding: 3px; }
+#messages { min-height: 100px; max-height: 280px; overflow-y: auto; overflow-wrap: anywhere; padding: 10px 0; }
+#messages:empty::before { content: "Messages appear after connecting to the room"; color: var(--muted); }
+.message { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.message-author { color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+.message-self .message-author { color: var(--success); }
+.message-event { color: var(--muted); }
+.chat-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 15px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 15px; margin: 15px 0 25px; }
+.metric-card { min-width: 0; }
+.metric-card dt { color: var(--muted); font-size: 12px; font-weight: 500; margin-bottom: 5px; }
+.metric-card dd { display: flex; align-items: center; gap: 8px; margin: 0; min-height: 25px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status-circle, .badge-status { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+.status-circle.active, .badge-status.green { background: var(--success); }
+.status-circle.warning, .badge-status.yellow { background: #ba8a00; }
+.status-circle.orange, .badge-status.orange { background: #c76620; }
+.status-circle.inactive, .badge-status.red { background: var(--danger); }
+.topology-diagram { overflow-x: auto; padding: 10px 0; }
+.badge-chain { display: inline-flex; align-items: center; min-width: max-content; gap: 15px; }
+.badge-node { display: flex; flex-direction: column; gap: 10px; padding: 15px; min-width: 150px; max-width: 230px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); }
+.badge-node-label-row { display: flex; align-items: center; gap: 10px; }
+.badge-node-main { display: flex; flex-direction: column; min-width: 0; gap: 3px; }
+.badge-node-eyebrow { color: var(--muted); font-size: 11px; }
+.badge-node-label { font-weight: 600; overflow-wrap: anywhere; }
+.badge-node-address { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.badge-node-speeds { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.badge-node-speed { display: flex; align-items: center; gap: 5px; }
+.badge-link { width: 65px; display: flex; flex-direction: column; gap: 8px; text-align: center; font-size: 11px; color: var(--muted); }
+.badge-link-line { height: 3px; background: var(--border-strong); }
+.badge-link-line.green { background: var(--success); }
+.badge-link-line.yellow { background: #ba8a00; }
+.badge-link-line.orange { background: #c76620; }
+.badge-link-line.red { background: var(--danger); }
+.text-muted { color: var(--muted) !important; }
+@media (max-width: 850px) {
+    .connection-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .connection-fields > .field:first-child { grid-column: 1 / -1; }
+    .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 540px) {
+    .connection-fields, .connection-options .connection-fields { grid-template-columns: minmax(0, 1fr); }
+    .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .participant-display { min-height: 180px; }
+}
+
+.btn.btn-primary, .btn.btn-primary:disabled {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-text);
+}
+.btn.btn-primary:not(:disabled):hover { background: var(--primary-hover); border-color: var(--primary-hover); }

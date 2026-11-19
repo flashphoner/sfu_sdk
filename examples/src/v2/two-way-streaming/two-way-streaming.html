@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" data-wcs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SFU Two Way Streaming</title>
+    <link rel="stylesheet" href="../dependencies/css/examples.css">
+    <script defer src="../../commons/dependencies/jquery@3.6.0/jquery.min.js"></script>
+    <script defer src="../../sfu.js"></script>
+    <script defer src="../../commons/js/util.js"></script>
+    <script defer src="../../commons/js/config.js"></script>
+    <script defer src="../dependencies/js/display.js"></script>
+    <script defer src="../dependencies/js/ui.js"></script>
+    <script defer src="../dependencies/js/session.js"></script>
+    <script defer src="two-way-streaming.js"></script>
+</head>
+<body>
+<main class="example-page" id="main">
+    <header class="page-header"><h1>SFU Two Way Streaming</h1><p>Publish your media and play an SFU room with independent sessions.</p></header>
+    <section class="connection-panel" aria-label="Connection"><div class="connection-fields">
+        <div class="field"><label for="url">WCS URL</label><input id="url" type="text" autocomplete="off" required></div>
+        <div class="field"><label for="roomName">Room name</label><input id="roomName" type="text" autocomplete="off" required></div>
+    </div></section>
+    <div class="video-grid">
+        <section class="video-panel" aria-label="Publisher">
+            <h2>Publisher</h2><div id="localVideo" class="video-display media-container"></div><p id="publishPlaceholder" class="empty-state">Your camera and microphone preview.</p>
+            <div class="section"><div class="field"><label for="publishName">Publisher name</label><input id="publishName" type="text" autocomplete="off" required></div>
+                <div class="controls"><button id="publishBtn" class="primary" type="button" disabled>Publish</button><span id="publishStatus" class="status" role="status" aria-live="polite">Loading configuration…</span></div><p id="publishErrorInfo" class="error" role="alert"></p>
+            </div>
+        </section>
+        <section class="video-panel" aria-label="Player">
+            <h2>Player</h2><div id="remoteVideo" class="video-display media-container"></div><p id="playPlaceholder" class="empty-state">Room playback will appear here.</p>
+            <div class="section"><div class="field"><label for="playName">Player name</label><input id="playName" type="text" autocomplete="off" required></div>
+                <div class="controls"><button id="playBtn" class="primary" type="button" disabled>Play</button><span id="playStatus" class="status" role="status" aria-live="polite">Loading configuration…</span></div><p id="playErrorInfo" class="error" role="alert"></p>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>
